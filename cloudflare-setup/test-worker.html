@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare Worker Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .pending {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background: #0051c3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #0041a3;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-card">
+        <h1>🧪 Cloudflare Worker Test</h1>
+        
+        <p>This page tests if your Cloudflare Worker is properly configured to proxy requests to your Kubernetes application.</p>
+        
+        <div id="status" class="status pending">
+            Waiting to test...
+        </div>
+        
+        <button onclick="testWorker()">Test Worker Connection</button>
+        <button onclick="testDirect()">Test Direct Connection</button>
+        
+        <div id="result" class="result"></div>
+        
+        <h3>Expected Setup:</h3>
+        <ul>
+            <li>Domain: <code>linknode.com</code></li>
+            <li>Backend: <code>http://119.9.118.22:32304</code></li>
+            <li>Worker: <code>linknode-proxy</code></li>
+        </ul>
+    </div>
+
+    <div class="test-card">
+        <h2>📋 Quick Diagnostics</h2>
+        <button onclick="checkDNS()">Check DNS</button>
+        <button onclick="checkSSL()">Check SSL</button>
+        <button onclick="checkHeaders()">Check Headers</button>
+        <div id="diagnostics" class="result"></div>
+    </div>
+
+    <script>
+        async function testWorker() {
+            const status = document.getElementById('status');
+            const result = document.getElementById('result');
+            
+            status.className = 'status pending';
+            status.textContent = 'Testing worker connection...';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('https://linknode.com', {
+                    method: 'HEAD',
+                    mode: 'no-cors'
+                });
+                
+                status.className = 'status success';
+                status.textContent = '✅ Worker appears to be configured! Visit https://linknode.com to see your app.';
+                
+                result.textContent = 'Worker proxy test successful.\nNote: Due to CORS, we cannot read the response content from this test page.\nPlease visit https://linknode.com directly.';
+                result.style.display = 'block';
+                
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ Could not connect to worker';
+                
+                result.textContent = `Error: ${error.message}\n\nPossible issues:\n- DNS not propagated yet\n- Worker not deployed\n- Route not configured`;
+                result.style.display = 'block';
+            }
+        }
+        
+        async function testDirect() {
+            const status = document.getElementById('status');
+            const result = document.getElementById('result');
+            
+            status.className = 'status pending';
+            status.textContent = 'Testing direct backend connection...';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('http://119.9.118.22:32304', {
+                    method: 'HEAD',
+                    mode: 'no-cors'
+                });
+                
+                status.className = 'status success';
+                status.textContent = '✅ Direct backend connection works!';
+                
+                result.textContent = 'Backend server is reachable.\nYour Kubernetes app is running at http://119.9.118.22:32304';
+                result.style.display = 'block';
+                
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ Cannot reach backend directly';
+                
+                result.textContent = `Error: ${error.message}\n\nThis might be normal if:\n- You're testing from a different network\n- Firewall blocks the port\n- The app is only accessible via Cloudflare`;
+                result.style.display = 'block';
+            }
+        }
+        
+        async function checkDNS() {
+            const diagnostics = document.getElementById('diagnostics');
+            diagnostics.style.display = 'block';
+            diagnostics.textContent = 'Checking DNS...\n\n';
+            
+            // This is a simple check - in reality, you'd need a DNS API
+            diagnostics.textContent += 'To check DNS propagation:\n';
+            diagnostics.textContent += '1. Visit: https://dnschecker.org/#NS/linknode.com\n';
+            diagnostics.textContent += '2. Look for Cloudflare nameservers\n';
+            diagnostics.textContent += '3. Green checkmarks = DNS propagated\n\n';
+            diagnostics.textContent += 'Command line check:\n';
+            diagnostics.textContent += 'nslookup linknode.com';
+        }
+        
+        async function checkSSL() {
+            const diagnostics = document.getElementById('diagnostics');
+            diagnostics.style.display = 'block';
+            diagnostics.textContent = 'SSL/TLS Configuration:\n\n';
+            diagnostics.textContent += '1. Cloudflare Dashboard → SSL/TLS\n';
+            diagnostics.textContent += '2. Set to "Flexible" mode\n';
+            diagnostics.textContent += '3. Enable "Always Use HTTPS"\n';
+            diagnostics.textContent += '4. Wait 15 minutes for certificate\n\n';
+            diagnostics.textContent += 'Test: https://linknode.com should show padlock';
+        }
+        
+        async function checkHeaders() {
+            const diagnostics = document.getElementById('diagnostics');
+            diagnostics.style.display = 'block';
+            diagnostics.textContent = 'To check response headers:\n\n';
+            diagnostics.textContent += 'curl -I https://linknode.com\n\n';
+            diagnostics.textContent += 'Look for:\n';
+            diagnostics.textContent += '- cf-ray: (Cloudflare header)\n';
+            diagnostics.textContent += '- server: cloudflare\n';
+            diagnostics.textContent += '- HTTP status: 200 OK';
+        }
+    </script>
+</body>
+</html>
