@@ -1,0 +1,88 @@
+name: Deploy to Rackspace Kubernetes
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'k8s/**'
+      - 'app/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+env:
+  KUBE_NAMESPACE: demo-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+        chmod 600 $HOME/.kube/config
+
+    - name: Verify connection
+      run: |
+        kubectl cluster-info
+        kubectl get nodes
+
+    - name: Deploy to Kubernetes
+      run: |
+        # Apply namespace first
+        kubectl apply -f k8s/namespace.yaml
+        
+        # Apply ConfigMaps
+        kubectl apply -f k8s/configmap.yaml || true
+        kubectl apply -f k8s/configmap-nginx.yaml
+        
+        # Apply deployment
+        kubectl apply -f k8s/deployment-nginx.yaml
+        
+        # Apply service
+        kubectl apply -f k8s/service.yaml
+        
+        # Apply HPA
+        kubectl apply -f k8s/hpa.yaml
+        
+        # Restart deployment to pick up any ConfigMap changes
+        kubectl rollout restart deployment demo-app -n $KUBE_NAMESPACE
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment demo-app -n $KUBE_NAMESPACE --timeout=300s
+
+    - name: Get deployment info
+      if: always()
+      run: |
+        echo "=== Pods ==="
+        kubectl get pods -n $KUBE_NAMESPACE
+        echo ""
+        echo "=== Services ==="
+        kubectl get svc -n $KUBE_NAMESPACE
+        echo ""
+        echo "=== HPA ==="
+        kubectl get hpa -n $KUBE_NAMESPACE
+        echo ""
+        echo "=== Access URL ==="
+        NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+        NODE_PORT=$(kubectl get svc demo-app-service -n $KUBE_NAMESPACE -o jsonpath='{.spec.ports[0].nodePort}')
+        echo "Application URL: http://${NODE_IP}:${NODE_PORT}"
+
+    - name: Create deployment summary
+      if: success()
+      run: |
+        NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+        NODE_PORT=$(kubectl get svc demo-app-service -n $KUBE_NAMESPACE -o jsonpath='{.spec.ports[0].nodePort}')
+        echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Application URL**: http://${NODE_IP}:${NODE_PORT}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Namespace**: $KUBE_NAMESPACE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
