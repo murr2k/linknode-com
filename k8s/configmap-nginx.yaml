@@ -1,0 +1,393 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: demo-app
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Rackspace K8s Demo</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #0f0f0f;
+                color: #fff;
+                overflow-x: hidden;
+            }
+            
+            /* Animated background */
+            .bg-animation {
+                position: fixed;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(45deg, #1a1a2e, #16213e, #0f3460, #1a1a2e);
+                background-size: 400% 400%;
+                animation: gradient 15s ease infinite;
+                z-index: -1;
+            }
+            
+            @keyframes gradient {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+            }
+            
+            /* Floating particles */
+            .particle {
+                position: fixed;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 50%;
+                pointer-events: none;
+                animation: float 20s infinite linear;
+            }
+            
+            @keyframes float {
+                from {
+                    transform: translateY(100vh) rotate(0deg);
+                    opacity: 0;
+                }
+                10% { opacity: 1; }
+                90% { opacity: 1; }
+                to {
+                    transform: translateY(-100vh) rotate(720deg);
+                    opacity: 0;
+                }
+            }
+            
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 2rem;
+                position: relative;
+                z-index: 1;
+            }
+            
+            header {
+                text-align: center;
+                margin-bottom: 4rem;
+                animation: fadeInDown 1s ease-out;
+            }
+            
+            @keyframes fadeInDown {
+                from {
+                    opacity: 0;
+                    transform: translateY(-30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            h1 {
+                font-size: 3.5rem;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                margin-bottom: 1rem;
+                letter-spacing: -2px;
+            }
+            
+            .subtitle {
+                font-size: 1.25rem;
+                color: #888;
+                margin-bottom: 2rem;
+            }
+            
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 2rem;
+                margin-bottom: 3rem;
+            }
+            
+            .card {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 16px;
+                padding: 2rem;
+                backdrop-filter: blur(10px);
+                transition: all 0.3s ease;
+                animation: fadeInUp 1s ease-out;
+                animation-fill-mode: both;
+            }
+            
+            .card:nth-child(1) { animation-delay: 0.1s; }
+            .card:nth-child(2) { animation-delay: 0.2s; }
+            .card:nth-child(3) { animation-delay: 0.3s; }
+            
+            @keyframes fadeInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .card:hover {
+                transform: translateY(-5px);
+                background: rgba(255, 255, 255, 0.08);
+                border-color: rgba(255, 255, 255, 0.2);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            }
+            
+            .card-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                display: block;
+            }
+            
+            .card h2 {
+                font-size: 1.5rem;
+                margin-bottom: 1rem;
+                color: #fff;
+            }
+            
+            .card p {
+                color: #ccc;
+                line-height: 1.6;
+                margin-bottom: 0.5rem;
+            }
+            
+            .tech-stack {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                margin-top: 1rem;
+            }
+            
+            .tech-badge {
+                background: rgba(102, 126, 234, 0.2);
+                border: 1px solid rgba(102, 126, 234, 0.3);
+                padding: 0.25rem 0.75rem;
+                border-radius: 20px;
+                font-size: 0.875rem;
+                color: #667eea;
+            }
+            
+            .metrics {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin: 3rem 0;
+            }
+            
+            .metric {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+                padding: 1.5rem;
+                text-align: center;
+                transition: all 0.3s ease;
+            }
+            
+            .metric:hover {
+                background: rgba(255, 255, 255, 0.05);
+                transform: scale(1.05);
+            }
+            
+            .metric-value {
+                font-size: 2.5rem;
+                font-weight: bold;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            
+            .metric-label {
+                color: #888;
+                font-size: 0.875rem;
+                margin-top: 0.5rem;
+            }
+            
+            .footer {
+                text-align: center;
+                padding: 2rem;
+                color: #666;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                margin-top: 4rem;
+            }
+            
+            .footer a:hover {
+                color: #764ba2 !important;
+                text-decoration: underline !important;
+            }
+            
+            .status-indicator {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                background: #4ade80;
+                border-radius: 50%;
+                margin-right: 0.5rem;
+                animation: pulse 2s infinite;
+            }
+            
+            @keyframes pulse {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+                }
+                70% {
+                    box-shadow: 0 0 0 10px rgba(74, 222, 128, 0);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+                }
+            }
+            
+            .pod-info {
+                background: rgba(102, 126, 234, 0.1);
+                border: 1px solid rgba(102, 126, 234, 0.2);
+                border-radius: 8px;
+                padding: 1rem;
+                margin-top: 2rem;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9rem;
+            }
+            
+            /* Responsive */
+            @media (max-width: 768px) {
+                h1 { font-size: 2.5rem; }
+                .grid { grid-template-columns: 1fr; }
+                .metrics { grid-template-columns: 1fr 1fr; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="bg-animation"></div>
+        
+        <!-- Floating particles -->
+        <script>
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.width = particle.style.height = Math.random() * 10 + 5 + 'px';
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (Math.random() * 20 + 20) + 's';
+                document.body.appendChild(particle);
+            }
+        </script>
+        
+        <div class="container">
+            <header>
+                <h1>Kubernetes Demo</h1>
+                <p class="subtitle">Running on Rackspace Cloud • Powered by K8s</p>
+            </header>
+            
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-value">3</div>
+                    <div class="metric-label">Active Pods</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">100%</div>
+                    <div class="metric-label">Uptime</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">v1.31</div>
+                    <div class="metric-label">K8s Version</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value"><span class="status-indicator"></span>Live</div>
+                    <div class="metric-label">Status</div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <span class="card-icon">🚀</span>
+                    <h2>Cloud Native Architecture</h2>
+                    <p>This demo showcases a modern cloud-native application deployed on Rackspace's managed Kubernetes platform.</p>
+                    <p>Built with containerization best practices and designed for scalability.</p>
+                    <div class="tech-stack">
+                        <span class="tech-badge">Docker</span>
+                        <span class="tech-badge">Kubernetes</span>
+                        <span class="tech-badge">NGINX</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <span class="card-icon">⚡</span>
+                    <h2>Auto-Scaling & Load Balancing</h2>
+                    <p>Horizontal Pod Autoscaler configured to scale between 2-10 pods based on CPU and memory usage.</p>
+                    <p>Service mesh ensures traffic is distributed evenly across all healthy pods.</p>
+                    <div class="tech-stack">
+                        <span class="tech-badge">HPA</span>
+                        <span class="tech-badge">ClusterIP</span>
+                        <span class="tech-badge">ConfigMaps</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <span class="card-icon">🔒</span>
+                    <h2>Secure Access</h2>
+                    <p>Application is only accessible through SSH tunnels, ensuring maximum security.</p>
+                    <p>No public endpoints exposed - all traffic flows through encrypted channels.</p>
+                    <div class="tech-stack">
+                        <span class="tech-badge">SSH Tunnel</span>
+                        <span class="tech-badge">Port Forward</span>
+                        <span class="tech-badge">WSL2</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pod-info">
+                <strong>Pod Information:</strong><br>
+                Hostname: HOSTNAME<br>
+                Namespace: demo-app<br>
+                Service: demo-app-service<br>
+                Container: nginx:alpine
+            </div>
+            
+            <footer class="footer">
+                <p>Kubernetes Demo Application • Deployed on Rackspace Cloud</p>
+                <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                    Created by <a href="https://github.com/murr2k" style="color: #667eea; text-decoration: none;">Murray Kopit</a> • 
+                    <a href="https://github.com/murr2k/rackspace-k8s-demo" style="color: #667eea; text-decoration: none;">View on GitHub</a>
+                </p>
+                <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+                    <span id="time"></span>
+                </p>
+            </footer>
+        </div>
+        
+        <script>
+            // Update time
+            function updateTime() {
+                const now = new Date();
+                document.getElementById('time').textContent = now.toLocaleString();
+            }
+            updateTime();
+            setInterval(updateTime, 1000);
+            
+            // Add some interactivity
+            document.querySelectorAll('.metric').forEach(metric => {
+                metric.addEventListener('click', function() {
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1.05)';
+                        setTimeout(() => {
+                            this.style.transform = 'scale(1)';
+                        }, 200);
+                    }, 100);
+                });
+            });
+        </script>
+    </body>
+    </html>
