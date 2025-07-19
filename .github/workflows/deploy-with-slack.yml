@@ -1,4 +1,4 @@
-name: Deploy to Rackspace Kubernetes
+name: Deploy with Slack Notifications
 
 on:
   push:
