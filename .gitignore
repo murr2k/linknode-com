@@ -56,6 +56,9 @@ nohup.out
 *.crt
 secrets/
 .secrets/
+secrets.yaml
+*-secrets.yaml
+k8s/secrets.yaml
 cloudflare-setup/.env
 cloudflare-setup/auto-setup.sh
 
