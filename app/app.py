@@ -3,8 +3,12 @@ import os
 import socket
 import datetime
 import requests
+from power_monitor import power_monitor
 
 app = Flask(__name__)
+
+# Register the power monitoring blueprint
+app.register_blueprint(power_monitor)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>

@@ -1,0 +1,123 @@
+name: Deploy Monitoring Stack
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'k8s/**'
+      - 'app/**'
+      - 'monitoring/**'
+      - '.github/workflows/deploy-monitoring.yml'
+  workflow_dispatch:
+
+env:
+  KUBE_NAMESPACE: demo-app
+
+jobs:
+  deploy-monitoring:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+        chmod 600 $HOME/.kube/config
+
+    - name: Verify connection
+      run: |
+        kubectl cluster-info
+        kubectl get nodes
+
+    - name: Deploy Monitoring Stack
+      run: |
+        echo "=== Deploying Monitoring Components ==="
+        
+        # Ensure namespace exists
+        kubectl apply -f k8s/namespace.yaml
+        
+        # Deploy InfluxDB (if exists)
+        if [ -f k8s/influxdb.yaml ]; then
+          echo "Deploying InfluxDB..."
+          kubectl apply -f k8s/influxdb.yaml
+        fi
+        
+        # Deploy Grafana
+        if [ -f k8s/grafana.yaml ]; then
+          echo "Deploying Grafana..."
+          kubectl apply -f k8s/grafana.yaml
+        fi
+        
+        # Update Grafana dashboards
+        echo "Updating Grafana dashboards..."
+        for dashboard in k8s/grafana-dashboard-*.yaml; do
+          if [ -f "$dashboard" ]; then
+            echo "Applying $dashboard"
+            kubectl apply -f "$dashboard"
+          fi
+        done
+        
+        # Update monitoring deployment
+        if [ -f k8s/deployment-monitoring.yaml ]; then
+          echo "Deploying monitoring app..."
+          kubectl apply -f k8s/deployment-monitoring.yaml
+        fi
+        
+        # Apply any ConfigMaps for Flask app
+        if [ -f k8s/configmap-flask-app.yaml ]; then
+          kubectl apply -f k8s/configmap-flask-app.yaml
+        fi
+        
+        # Wait for deployments
+        echo "Waiting for deployments to be ready..."
+        kubectl wait --for=condition=available --timeout=300s deployment/grafana -n $KUBE_NAMESPACE || true
+        kubectl wait --for=condition=available --timeout=300s deployment/influxdb -n $KUBE_NAMESPACE || true
+        kubectl wait --for=condition=available --timeout=300s deployment/demo-app-monitoring -n $KUBE_NAMESPACE || true
+
+    - name: Trigger Dashboard Reload
+      run: |
+        echo "=== Triggering Live Dashboard Reload ==="
+        
+        # Force Grafana to reload dashboards without restart
+        kubectl exec -n $KUBE_NAMESPACE deployment/grafana -- sh -c "
+          # Touch dashboard files to trigger reload
+          find /var/lib/grafana/dashboards -name '*.json' -exec touch {} \;
+        " || true
+        
+        echo "Dashboard reload triggered. Changes will appear within 10 seconds."
+
+    - name: Get deployment info
+      if: always()
+      run: |
+        echo "=== Monitoring Stack Status ==="
+        echo ""
+        echo "=== Pods ==="
+        kubectl get pods -n $KUBE_NAMESPACE | grep -E "(grafana|influx|monitoring)"
+        echo ""
+        echo "=== Services ==="
+        kubectl get svc -n $KUBE_NAMESPACE | grep -E "(grafana|influx|monitoring)"
+        echo ""
+        echo "=== ConfigMaps ==="
+        kubectl get configmaps -n $KUBE_NAMESPACE | grep -E "(grafana|dashboard)"
+
+    - name: Create deployment summary
+      if: success()
+      run: |
+        echo "## 🚀 Monitoring Stack Deployed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Access URLs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Grafana Dashboard**: http://119.9.118.22:30300" >> $GITHUB_STEP_SUMMARY
+        echo "- **Power Monitor API**: http://119.9.118.22:30500/api/power-data" >> $GITHUB_STEP_SUMMARY
+        echo "- **API Test**: http://119.9.118.22:30500/api/power-data/test" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Namespace**: $KUBE_NAMESPACE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Dashboard Updates" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Dashboards updated live - no Grafana restart needed!" >> $GITHUB_STEP_SUMMARY
+        echo "Just refresh your browser to see changes." >> $GITHUB_STEP_SUMMARY

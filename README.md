@@ -13,6 +13,10 @@ A modern, interactive Kubernetes demo application showcasing cloud-native deploy
 - **Direct Access**: http://119.9.118.22:30898
 - **Cloudflare Tunnel**: https://daniel-holidays-diesel-gross.trycloudflare.com
 
+**Monitoring Stack**:
+- **Grafana Dashboard**: http://119.9.118.22:30300
+- **Power Monitor API**: http://119.9.118.22:30500/api/power-data
+
 ### What's Special About This Demo?
 
 This entire Kubernetes platform was **built in under 24 hours** using AI-augmented development, showcasing:
@@ -33,6 +37,12 @@ Visit the live demo to see both the technical capabilities and learn about AI-au
   - Horizontal Pod Autoscaling (HPA)
   - Health checks and probes
   - Resource limits and requests
+- **Real-time Power Monitoring**:
+  - EAGLE smart meter integration
+  - Live power consumption dashboard (Grafana)
+  - Time-series data storage (InfluxDB)
+  - RESTful API for data ingestion
+  - Automatic dashboard updates via CI/CD
 - **Secure Access Options**: 
   - SSH tunnel access for development
   - NodePort for cost-effective public access
@@ -82,7 +92,8 @@ Visit the live demo to see both the technical capabilities and learn about AI-au
 ```
 rackspace-k8s-demo/
 ├── app/                      # Application source code
-│   ├── app.py               # Flask application (if using Python)
+│   ├── app.py               # Flask application
+│   ├── power_monitor.py     # Power monitoring endpoints
 │   ├── requirements.txt     # Python dependencies
 │   └── Dockerfile           # Container definition
 ├── k8s/                      # Kubernetes manifests
@@ -91,15 +102,21 @@ rackspace-k8s-demo/
 │   ├── configmap-nginx.yaml # Nginx HTML content
 │   ├── deployment.yaml      # Main deployment
 │   ├── deployment-nginx.yaml# Nginx deployment
+│   ├── deployment-monitoring.yaml # Monitoring stack
 │   ├── service.yaml         # Service definition
-│   └── hpa.yaml            # Horizontal Pod Autoscaler
-├── wsl-access.sh            # WSL2 port-forward script
-├── ssh-tunnel-setup.sh      # SSH tunnel setup
-├── start-secure-access.sh   # Quick start script
-├── check-ports.sh           # Port availability checker
-├── nodeport-access.md       # NodePort documentation
-├── secure-access.md         # SSH access guide
-└── README-WSL.md           # WSL-specific instructions
+│   ├── hpa.yaml            # Horizontal Pod Autoscaler
+│   ├── influxdb.yaml       # Time-series database
+│   ├── grafana.yaml        # Monitoring dashboard
+│   └── grafana-dashboard-*.yaml # Dashboard configs
+├── monitoring/              # Monitoring utilities
+│   ├── diagnose-no-data.sh # Troubleshooting script
+│   └── *.md                # Documentation
+├── .github/workflows/       # CI/CD pipelines
+│   ├── deploy.yml          # Main deployment
+│   └── deploy-monitoring.yml # Monitoring deployment
+├── wsl-access.sh           # WSL2 port-forward script
+├── ssh-tunnel-setup.sh     # SSH tunnel setup
+└── README.md              # This file
 ```
 
 ## 🔧 Configuration
@@ -168,6 +185,49 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - The Kubernetes community
 - All contributors and testers
 
+## 📊 Power Monitoring Dashboard
+
+This demo includes a real-time power monitoring system integrated with EAGLE smart meters:
+
+### Features
+- **Real-time Data**: Updates every 5 seconds
+- **Grafana Dashboard**: Beautiful visualizations at http://119.9.118.22:30300
+- **REST API**: Accepts JSON data from EAGLE devices
+- **Time-series Storage**: InfluxDB for historical data
+- **Auto-deployment**: Dashboard updates via CI/CD pipeline
+
+### EAGLE Configuration
+Configure your EAGLE device to send data to:
+- Protocol: HTTP
+- Hostname: 119.9.118.22
+- Port: 30500
+- Path: /api/power-data
+
+### Dashboard Metrics
+- Current power demand (kW)
+- Power usage over time
+- Min/Max/Average statistics
+- Cost rate calculation
+- Daily usage projections
+
+## 🚀 CI/CD Pipeline
+
+The project includes GitHub Actions workflows for automated deployment:
+
+1. **Main Deployment** (`deploy.yml`):
+   - Deploys application and monitoring stack
+   - Updates Grafana dashboards live (no restart)
+   - Triggered on push to `main` branch
+
+2. **Monitoring Deployment** (`deploy-monitoring.yml`):
+   - Dedicated workflow for monitoring updates
+   - Live dashboard updates without service interruption
+
+### Automated Updates
+- Push changes to `k8s/grafana-dashboard-*.yaml`
+- Pipeline automatically deploys within minutes
+- Dashboards update live - just refresh your browser!
+
 ---
 
-🌟 If you find this demo helpful, please consider giving it a star on GitHub!# Test pipeline
+🌟 If you find this demo helpful, please consider giving it a star on GitHub!

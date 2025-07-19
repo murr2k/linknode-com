@@ -1,0 +1,219 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-power
+  namespace: demo-app
+data:
+  power-monitoring.json: |
+    {
+      "id": null,
+      "uid": "power-monitoring",
+      "title": "Power Line Monitoring",
+      "tags": ["power", "energy", "eagle"],
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "5s",
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 3},
+                  {"color": "red", "value": 5}
+                ]
+              },
+              "unit": "kwatt",
+              "decimals": 3
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "values": false,
+              "calcs": ["lastNotNull"]
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "pluginVersion": "10.2.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "${datasource}"
+              },
+              "query": "from(bucket: \"power_metrics\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_metrics\")\n  |> filter(fn: (r) => r[\"_field\"] == \"demand_kw\")\n  |> last()",
+              "refId": "A"
+            }
+          ],
+          "title": "Current Power Demand",
+          "type": "gauge"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [],
+              "unit": "kwatth",
+              "decimals": 3
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "values": false,
+              "calcs": ["lastNotNull"]
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "10.2.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "${datasource}"
+              },
+              "query": "from(bucket: \"power_metrics\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_metrics\")\n  |> filter(fn: (r) => r[\"_field\"] == \"net_consumption_kwh\")\n  |> last()",
+              "refId": "A"
+            }
+          ],
+          "title": "Total Energy Consumed (24h)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "auto",
+                "spanNulls": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null}
+                ]
+              },
+              "unit": "kwatt"
+            }
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 8},
+          "id": 3,
+          "options": {
+            "legend": {
+              "calcs": ["mean", "max", "min"],
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "${datasource}"
+              },
+              "query": "from(bucket: \"power_metrics\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_metrics\")\n  |> filter(fn: (r) => r[\"_field\"] == \"demand_kw\")\n  |> aggregateWindow(every: 30s, fn: mean, createEmpty: false)",
+              "refId": "A"
+            }
+          ],
+          "title": "Power Demand Over Time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "displayMode": "auto"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null}
+                ]
+              }
+            }
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+          "id": 4,
+          "options": {
+            "showHeader": true
+          },
+          "pluginVersion": "10.2.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "influxdb",
+                "uid": "${datasource}"
+              },
+              "query": "from(bucket: \"power_metrics\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_metrics\")\n  |> filter(fn: (r) => r[\"_field\"] == \"demand_kw\" or r[\"_field\"] == \"net_consumption_kwh\")\n  |> last()\n  |> group(columns: [\"_field\"])",
+              "refId": "A"
+            }
+          ],
+          "title": "Latest Readings",
+          "type": "table"
+        }
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "selected": false,
+              "text": "InfluxDB",
+              "value": "InfluxDB"
+            },
+            "hide": 0,
+            "includeAll": false,
+            "label": "Data Source",
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "influxdb",
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "type": "datasource"
+          }
+        ]
+      }
+    }

@@ -6,6 +6,7 @@ on:
     paths:
       - 'k8s/**'
       - 'app/**'
+      - 'monitoring/**'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -49,11 +50,32 @@ jobs:
         # Apply HPA
         kubectl apply -f k8s/hpa.yaml
         
-        # Restart deployment to pick up any ConfigMap changes
-        kubectl rollout restart deployment demo-app -n $KUBE_NAMESPACE
+        # Deploy monitoring components
+        echo "=== Deploying Monitoring Stack ==="
+        # Apply monitoring yamls if they exist
+        for file in k8s/influxdb.yaml k8s/grafana.yaml k8s/deployment-monitoring.yaml; do
+          if [ -f "$file" ]; then
+            kubectl apply -f "$file"
+          fi
+        done
         
-        # Wait for rollout to complete
+        # Apply all Grafana dashboards
+        for dashboard in k8s/grafana-dashboard-*.yaml; do
+          if [ -f "$dashboard" ]; then
+            kubectl apply -f "$dashboard"
+          fi
+        done
+        
+        # Restart deployments to pick up any ConfigMap changes
+        kubectl rollout restart deployment demo-app -n $KUBE_NAMESPACE
+        kubectl rollout restart deployment demo-app-monitoring -n $KUBE_NAMESPACE || true
+        
+        # Trigger live dashboard reload without restarting Grafana
+        kubectl exec -n $KUBE_NAMESPACE deployment/grafana -- sh -c "touch /var/lib/grafana/dashboards/*.json" || true
+        
+        # Wait for rollouts to complete
         kubectl rollout status deployment demo-app -n $KUBE_NAMESPACE --timeout=300s
+        kubectl rollout status deployment demo-app-monitoring -n $KUBE_NAMESPACE --timeout=300s || true
 
     - name: Get deployment info
       if: always()
@@ -78,6 +100,10 @@ jobs:
         fi
         echo "Custom Domain: https://linknode.com"
         echo "Known NodePort: http://119.9.118.22:32304"
+        echo ""
+        echo "=== Monitoring Stack ==="
+        echo "Grafana: http://119.9.118.22:30300"
+        echo "Power API: http://119.9.118.22:30500/api/power-data"
 
     - name: Create deployment summary
       if: success()
@@ -88,6 +114,10 @@ jobs:
         echo "- **Custom Domain**: https://linknode.com" >> $GITHUB_STEP_SUMMARY
         echo "- **Direct Access**: http://119.9.118.22:32304" >> $GITHUB_STEP_SUMMARY
         echo "- **Cloudflare Tunnel**: https://supply-motherboard-relation-features.trycloudflare.com" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Monitoring Stack" >> $GITHUB_STEP_SUMMARY
+        echo "- **Grafana Dashboard**: http://119.9.118.22:30300" >> $GITHUB_STEP_SUMMARY
+        echo "- **Power Monitor API**: http://119.9.118.22:30500/api/power-data" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
         echo "- **Namespace**: $KUBE_NAMESPACE" >> $GITHUB_STEP_SUMMARY
