@@ -712,7 +712,7 @@ data:
                 <!-- Grafana Dashboard Preview -->
                 <div class="grafana-preview">
                     <h3 style="text-align: center; margin-bottom: 1rem;">📊 Live Energy Dashboard</h3>
-                    <iframe src="http://119.9.118.22:30300/public-dashboards/51a5565681464739ba4b2569e0949ffe" 
+                    <iframe src="http://119.9.118.22:30300/public-dashboards/69ea815afaa245248a2f1a81491ca3f1" 
                             width="100%" 
                             height="400" 
                             frameborder="0"
@@ -720,7 +720,7 @@ data:
                             sandbox="allow-same-origin allow-scripts allow-forms"
                             loading="lazy"></iframe>
                     <div style="text-align: center; margin-top: 1rem;">
-                        <a href="http://119.9.118.22:30300/public-dashboards/51a5565681464739ba4b2569e0949ffe" 
+                        <a href="http://119.9.118.22:30300/public-dashboards/69ea815afaa245248a2f1a81491ca3f1" 
                            target="_blank" 
                            style="color: #667eea; text-decoration: none; font-weight: 500;">
                            📊 View Full Dashboard →

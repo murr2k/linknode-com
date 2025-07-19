@@ -39,7 +39,12 @@ jobs:
         
         # Apply ConfigMaps
         kubectl apply -f k8s/configmap.yaml || true
-        kubectl apply -f k8s/configmap-nginx.yaml
+        # Use the enhanced nginx config if it exists, otherwise fall back to original
+        if [ -f "k8s/configmap-nginx-fixed.yaml" ]; then
+          kubectl apply -f k8s/configmap-nginx-fixed.yaml
+        else
+          kubectl apply -f k8s/configmap-nginx.yaml
+        fi
         
         # Apply deployment
         kubectl apply -f k8s/deployment-nginx.yaml
@@ -53,11 +58,21 @@ jobs:
         # Deploy monitoring components
         echo "=== Deploying Monitoring Stack ==="
         # Apply monitoring yamls if they exist
-        for file in k8s/influxdb.yaml k8s/grafana.yaml k8s/deployment-monitoring.yaml; do
+        for file in k8s/influxdb.yaml k8s/deployment-monitoring.yaml; do
           if [ -f "$file" ]; then
             kubectl apply -f "$file"
           fi
         done
+        
+        # Apply Grafana with public dashboard support if exists
+        if [ -f "k8s/grafana-anonymous-complete.yaml" ]; then
+          kubectl apply -f k8s/configmap-grafana-ini.yaml || true
+          kubectl apply -f k8s/configmap-grafana-datasources-public-v2.yaml || true
+          kubectl apply -f k8s/configmap-grafana-dashboards-public.yaml || true
+          kubectl apply -f k8s/grafana-anonymous-complete.yaml
+        elif [ -f "k8s/grafana.yaml" ]; then
+          kubectl apply -f k8s/grafana.yaml
+        fi
         
         # Apply all Grafana dashboards
         for dashboard in k8s/grafana-dashboard-*.yaml; do
@@ -65,6 +80,13 @@ jobs:
             kubectl apply -f "$dashboard"
           fi
         done
+        
+        # Deploy Eagle XML monitoring if exists
+        if [ -f "k8s/configmap-eagle-xml.yaml" ]; then
+          kubectl apply -f k8s/configmap-eagle-xml.yaml
+          kubectl apply -f k8s/deployment-eagle-monitoring.yaml
+          kubectl apply -f k8s/service-eagle-monitoring.yaml
+        fi
         
         # Restart deployments to pick up any ConfigMap changes
         kubectl rollout restart deployment demo-app -n $KUBE_NAMESPACE
