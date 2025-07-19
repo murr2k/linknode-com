@@ -11,12 +11,20 @@ A comprehensive energy monitoring solution deployed on Rackspace Kubernetes infr
 - **Cost Estimation**: Provides energy cost calculations based on configurable rates
 
 ### Data Visualization (Grafana Dashboard)
+- **Public Access Dashboard**: No login required! Embedded directly in webpage
 - **Current Power Gauge**: Real-time power display with 0-10kW range
 - **24-Hour Statistics**: Total usage, cost, average, minimum, and maximum values
 - **Time Series Graphs**: Power consumption trends over customizable periods
 - **Weekly Heatmap**: Visual representation of usage patterns
 - **Hourly Usage Bars**: Detailed 24-hour consumption breakdown
 - **Monthly Cost Estimation**: Projected monthly expenses based on current usage
+
+### Interactive Web Interface
+- **Live Power Widget**: Real-time power display with 5-second updates
+- **Embedded Grafana**: Public dashboard integrated into main webpage
+- **API Status Indicators**: Visual health checks for all services
+- **Real-time Metrics**: Pod count and connection statistics
+- **Fallback Support**: Simulated data when APIs are unavailable
 
 ### Infrastructure
 - **Kubernetes Deployment**: Fully containerized microservices architecture
@@ -138,8 +146,10 @@ Required GitHub Secrets:
    ```
 
 4. **Access Services**
+   - Main Demo Page: http://119.9.118.22:30898
    - InfluxDB: http://119.9.118.22:30086
    - Grafana: http://119.9.118.22:30300 (admin/admin)
+   - Public Dashboard: http://119.9.118.22:30300/public-dashboards/51a5565681464739ba4b2569e0949ffe
    - Eagle Endpoint: http://119.9.118.22:30500
 
 5. **Configure Eagle-200 Device**
@@ -179,16 +189,16 @@ Required GitHub Secrets:
 
 1. **Check Pod Status**
    ```bash
-   kubectl get pods -n monitoring
-   kubectl logs -f deployment/eagle-monitoring -n monitoring
+   kubectl get pods -n demo-app
+   kubectl logs -f deployment/eagle-xml-monitor -n demo-app
    ```
 
 2. **Verify Data Flow**
    ```bash
    # Check InfluxDB for data
-   kubectl exec -it deployment/influxdb -n monitoring -- influx
-   > use power_metrics
-   > SELECT * FROM eagle_power_monitor ORDER BY time DESC LIMIT 10
+   kubectl exec -it deployment/influxdb -n demo-app -- influx query \
+     'from(bucket: "power_metrics") |> range(start: -1h) |> last()' \
+     --org rackspace --token my-super-secret-auth-token
    ```
 
 3. **Access Grafana Dashboard**

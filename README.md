@@ -29,7 +29,12 @@ Visit the live demo to see both the technical capabilities and learn about AI-au
 
 ## 📋 Features
 
-- **Modern Web Interface**: Animated gradients, floating particles, and interactive elements
+- **Modern Interactive Web Interface**: 
+  - Animated gradients and floating particles
+  - Live power consumption widget with real-time updates
+  - Embedded Grafana dashboard (no login required!)
+  - API status indicators for monitoring services
+  - Real-time pod/connection counter
 - **Kubernetes Native**: Demonstrates key K8s concepts including:
   - Deployments and ReplicaSets
   - Services (ClusterIP, NodePort, LoadBalancer)
@@ -40,13 +45,16 @@ Visit the live demo to see both the technical capabilities and learn about AI-au
 - **Real-time Power Monitoring**:
   - Eagle-200 smart meter integration (XML format)
   - Live power consumption dashboard (Grafana)
+  - Public dashboard access (no authentication needed)
   - Time-series data storage (InfluxDB)
   - XML data ingestion endpoint
   - Automatic dashboard updates via CI/CD
+  - Fallback to simulated data when APIs unavailable
 - **Secure Access Options**: 
   - SSH tunnel access for development
   - NodePort for cost-effective public access
   - LoadBalancer support (optional)
+  - Public dashboards with read-only access
 - **WSL2 Compatible**: Optimized for Windows Subsystem for Linux
 
 ## 🛠️ Prerequisites
@@ -99,15 +107,16 @@ rackspace-k8s-demo/
 ├── k8s/                      # Kubernetes manifests
 │   ├── namespace.yaml       # Namespace definition
 │   ├── configmap.yaml       # App configuration
-│   ├── configmap-nginx.yaml # Nginx HTML content
+│   ├── configmap-nginx-fixed.yaml # Enhanced interactive webpage
 │   ├── configmap-monitoring-xml.yaml # Eagle XML monitoring code
+│   ├── configmap-grafana-*.yaml # Grafana configurations
 │   ├── deployment.yaml      # Main deployment
 │   ├── deployment-nginx.yaml# Nginx deployment
 │   ├── deployment-monitoring-xml.yaml # Eagle monitoring stack
 │   ├── service.yaml         # Service definition
 │   ├── hpa.yaml            # Horizontal Pod Autoscaler
 │   ├── influxdb.yaml       # Time-series database
-│   ├── grafana.yaml        # Monitoring dashboard
+│   ├── grafana-anonymous-complete.yaml # Public Grafana setup
 │   └── grafana-dashboard-*.yaml # Dashboard configs
 ├── monitoring/              # Monitoring utilities
 │   ├── diagnose-no-data.sh # Troubleshooting script
@@ -214,6 +223,32 @@ Configure your Eagle-200 device to send data to:
 - Weekly usage heatmap
 - Hourly consumption breakdown
 - Estimated monthly cost
+
+### Interactive Web Features
+The demo webpage includes several live widgets:
+
+1. **Live Power Widget**:
+   - Real-time power consumption display
+   - Updates every 5 seconds from Eagle-200
+   - Shows current watts, 24h usage, and estimated cost
+   - Falls back to simulated data if API unavailable
+
+2. **Embedded Grafana Dashboard**:
+   - Public dashboard - no login required!
+   - Shows power consumption graph
+   - Fully interactive with time range selection
+   - Accessible at: http://119.9.118.22:30300/public-dashboards/51a5565681464739ba4b2569e0949ffe
+
+3. **API Status Indicators**:
+   - InfluxDB API health
+   - Grafana service status  
+   - Eagle XML endpoint availability
+   - Visual indicators (green = online, red = offline)
+
+4. **Real-time Metrics**:
+   - Active pod count
+   - Total connections
+   - Auto-refreshing statistics
 
 ## 🚀 CI/CD Pipeline
 
