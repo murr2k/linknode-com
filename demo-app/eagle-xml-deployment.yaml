@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eagle-xml-monitor
+  namespace: demo-app
+  labels:
+    app: eagle-xml-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eagle-xml-monitor
+  template:
+    metadata:
+      labels:
+        app: eagle-xml-monitor
+    spec:
+      containers:
+      - name: eagle-xml-monitor
+        image: python:3.9-slim
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: INFLUXDB_URL
+          value: "http://influxdb:8086"
+        - name: INFLUXDB_TOKEN
+          value: "my-super-secret-auth-token"
+        - name: INFLUXDB_ORG
+          value: "myorg"
+        - name: INFLUXDB_BUCKET
+          value: "power_monitoring"
+        - name: PORT
+          value: "5000"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Install dependencies
+          pip install flask influxdb-client
+          
+          # Copy the script from ConfigMap
+          cp /app/code/power_monitor_eagle_xml.py /app/power_monitor_eagle_xml.py
+          
+          # Run the application
+          python /app/power_monitor_eagle_xml.py
+        volumeMounts:
+        - name: code
+          mountPath: /app/code
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: code
+        configMap:
+          name: eagle-xml-code
+          defaultMode: 0755

@@ -1,0 +1,75 @@
+{
+  "datasource": {
+    "type": "influxdb",
+    "uid": "${datasource}"
+  },
+  "fieldConfig": {
+    "defaults": {
+      "color": {
+        "mode": "thresholds"
+      },
+      "mappings": [],
+      "max": 10000,
+      "min": 0,
+      "thresholds": {
+        "mode": "absolute",
+        "steps": [
+          {
+            "color": "green",
+            "value": null
+          },
+          {
+            "color": "yellow",
+            "value": 5000
+          },
+          {
+            "color": "orange",
+            "value": 7500
+          },
+          {
+            "color": "red",
+            "value": 9000
+          }
+        ]
+      },
+      "unit": "watt",
+      "decimals": 0
+    },
+    "overrides": []
+  },
+  "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 0,
+    "y": 0
+  },
+  "id": 1,
+  "options": {
+    "orientation": "auto",
+    "reduceOptions": {
+      "values": false,
+      "calcs": ["lastNotNull"],
+      "fields": ""
+    },
+    "showThresholdLabels": true,
+    "showThresholdMarkers": true,
+    "text": {
+      "titleSize": 16,
+      "valueSize": 40
+    }
+  },
+  "pluginVersion": "10.0.0",
+  "targets": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${datasource}"
+      },
+      "query": "from(bucket: \"power_metrics\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"eagle_power_monitor\")\n  |> filter(fn: (r) => r[\"_field\"] == \"power_watts\")\n  |> last()",
+      "refId": "A"
+    }
+  ],
+  "title": "Current Power",
+  "transparent": false,
+  "type": "gauge"
+}
