@@ -67,18 +67,19 @@ eagle.yourdomain.com    -> 119.9.118.22
 rackspace-k8s-demo/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml          # CI/CD pipeline
+│       └── deploy.yml              # CI/CD pipeline
 ├── k8s/
-│   ├── namespace.yaml          # Kubernetes namespace
-│   ├── influxdb-deployment.yaml
-│   ├── influxdb-service.yaml
-│   ├── grafana-deployment.yaml
-│   ├── grafana-service.yaml
-│   ├── configmap-eagle-xml.yaml    # Eagle monitoring code
-│   ├── deployment-eagle-monitoring.yaml
-│   └── service-eagle-monitoring.yaml
-└── grafana-dashboards/
-    └── eagle-energy-monitor.json   # Dashboard configuration
+│   ├── namespace.yaml              # Kubernetes namespace
+│   ├── influxdb.yaml               # InfluxDB deployment and service
+│   ├── grafana.yaml                # Grafana deployment and service
+│   ├── configmap-monitoring-xml.yaml   # Power monitoring code
+│   ├── deployment-monitoring-xml.yaml  # Monitoring deployment
+│   └── grafana-dashboard-*.yaml    # Various dashboard configurations
+└── demo-app/
+    ├── eagle-xml-configmap.yaml    # Eagle XML monitoring code
+    ├── eagle-xml-deployment.yaml   # Eagle monitoring deployment
+    ├── eagle-xml-service.yaml      # Eagle monitoring service
+    └── power_monitor_eagle_xml.py  # Eagle XML parser implementation
 ```
 
 ### CI/CD Pipeline Configuration
@@ -160,17 +161,17 @@ Required GitHub Secrets:
 
 2. **Test Eagle XML Parser**
    ```bash
-   cd demo-app/app
+   cd demo-app
    python power_monitor_eagle_xml.py
    ```
 
 3. **Update ConfigMap and Deploy**
    ```bash
    # Edit the monitoring code
-   vim k8s/configmap-eagle-xml.yaml
+   vim demo-app/eagle-xml-configmap.yaml
    
    # Deploy changes
-   kubectl apply -f k8s/configmap-eagle-xml.yaml
+   kubectl apply -f demo-app/eagle-xml-configmap.yaml
    kubectl rollout restart deployment/eagle-monitoring -n monitoring
    ```
 
