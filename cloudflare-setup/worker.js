@@ -5,9 +5,60 @@ addEventListener('fetch', event => {
 async function handleRequest(request) {
   const url = new URL(request.url)
   
-  // The quick tunnel URL (update this when you run a new tunnel)
+  // Service URLs
   const tunnelUrl = 'https://daniel-holidays-diesel-gross.trycloudflare.com'
-  const directUrl = 'http://119.9.118.22:30898'
+  const nginxDirectUrl = 'http://119.9.118.22:30898'
+  const monitoringDirectUrl = 'http://119.9.118.22:30500'
+  const grafanaDirectUrl = 'http://119.9.118.22:30300'
+  
+  // Route to monitoring service for API endpoints
+  if (url.pathname.startsWith('/api/power-data')) {
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Max-Age': '86400',
+        }
+      })
+    }
+    
+    // Clone the request to modify it
+    const modifiedRequest = new Request(monitoringDirectUrl + url.pathname + url.search, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body
+    })
+    
+    try {
+      // Forward the request to the monitoring service
+      const response = await fetch(modifiedRequest)
+      
+      // Return the response with CORS headers
+      const modifiedResponse = new Response(response.body, response)
+      modifiedResponse.headers.set('Access-Control-Allow-Origin', '*')
+      modifiedResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      modifiedResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type')
+      
+      return modifiedResponse
+    } catch (error) {
+      return new Response(JSON.stringify({ error: 'Failed to proxy request', details: error.message }), {
+        status: 502,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      })
+    }
+  }
+  
+  // Route to Grafana dashboard
+  if (url.pathname.startsWith('/grafana')) {
+    return Response.redirect(grafanaDirectUrl + url.pathname.replace('/grafana', '') + url.search, 302)
+  }
   
   // For the root path, return a nice page with both options
   if (url.pathname === '/' || url.pathname === '') {
@@ -128,13 +179,16 @@ async function handleRequest(request) {
             <div class="option">
                 <h2>🔗 Direct Access</h2>
                 <p>Connect directly to the Kubernetes cluster</p>
-                <a href="${directUrl}" class="button secondary" target="_blank">Open Direct Version</a>
+                <a href="${nginxDirectUrl}" class="button secondary" target="_blank">Open Direct Version</a>
             </div>
         </div>
         
         <div class="note">
             <strong>Note:</strong> The tunnel URL provides secure HTTPS access through Cloudflare's network, 
             while direct access connects straight to the Kubernetes NodePort service.
+            <br><br>
+            <strong>Power Monitoring API:</strong> Configure your EAGLE device to send data to 
+            <code>https://linknode.com/api/power-data</code> using JSON format.
         </div>
     </div>
 </body>

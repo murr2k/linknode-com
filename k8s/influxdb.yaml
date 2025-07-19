@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-pvc
+  namespace: demo-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-config
+  namespace: demo-app
+data:
+  influxdb.conf: |
+    [meta]
+      dir = "/var/lib/influxdb/meta"
+    
+    [data]
+      dir = "/var/lib/influxdb/data"
+      wal-dir = "/var/lib/influxdb/wal"
+    
+    [http]
+      enabled = true
+      bind-address = ":8086"
+      auth-enabled = true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb
+  namespace: demo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: influxdb
+  template:
+    metadata:
+      labels:
+        app: influxdb
+    spec:
+      containers:
+      - name: influxdb
+        image: influxdb:2.7-alpine
+        ports:
+        - containerPort: 8086
+        env:
+        - name: DOCKER_INFLUXDB_INIT_MODE
+          value: "setup"
+        - name: DOCKER_INFLUXDB_INIT_USERNAME
+          value: "admin"
+        - name: DOCKER_INFLUXDB_INIT_PASSWORD
+          value: "supersecretpassword"
+        - name: DOCKER_INFLUXDB_INIT_ORG
+          value: "rackspace"
+        - name: DOCKER_INFLUXDB_INIT_BUCKET
+          value: "power_metrics"
+        - name: DOCKER_INFLUXDB_INIT_RETENTION
+          value: "30d"
+        - name: DOCKER_INFLUXDB_INIT_ADMIN_TOKEN
+          value: "my-super-secret-auth-token"
+        volumeMounts:
+        - name: influxdb-storage
+          mountPath: /var/lib/influxdb2
+        - name: config
+          mountPath: /etc/influxdb
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8086
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8086
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: influxdb-storage
+        persistentVolumeClaim:
+          claimName: influxdb-pvc
+      - name: config
+        configMap:
+          name: influxdb-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb
+  namespace: demo-app
+spec:
+  selector:
+    app: influxdb
+  ports:
+  - port: 8086
+    targetPort: 8086
+  type: ClusterIP

@@ -1,0 +1,356 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flask-app-code
+  namespace: demo-app
+data:
+  requirements.txt: |
+    Flask==2.3.3
+    requests==2.31.0
+    gunicorn==21.2.0
+    influxdb-client==1.38.0
+  
+  power_monitor.py: |
+    from flask import Blueprint, request, jsonify
+    from influxdb_client import InfluxDBClient, Point, WritePrecision
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    import os
+    import logging
+    from datetime import datetime
+
+    # Create blueprint for power monitoring endpoints
+    power_monitor = Blueprint('power_monitor', __name__)
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    # InfluxDB configuration
+    INFLUXDB_URL = os.environ.get('INFLUXDB_URL', 'http://influxdb:8086')
+    INFLUXDB_TOKEN = os.environ.get('INFLUXDB_TOKEN', 'my-super-secret-auth-token')
+    INFLUXDB_ORG = os.environ.get('INFLUXDB_ORG', 'rackspace')
+    INFLUXDB_BUCKET = os.environ.get('INFLUXDB_BUCKET', 'power_metrics')
+
+    # Initialize InfluxDB client
+    try:
+        client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
+        write_api = client.write_api(write_options=SYNCHRONOUS)
+        logger.info(f"Connected to InfluxDB at {INFLUXDB_URL}")
+    except Exception as e:
+        logger.error(f"Failed to connect to InfluxDB: {e}")
+        client = None
+        write_api = None
+
+    @power_monitor.route('/api/power-data', methods=['POST'])
+    def receive_power_data():
+        """
+        Endpoint to receive power data from EAGLE device
+        """
+        try:
+            # Log the incoming request
+            logger.info(f"Received power data request from {request.remote_addr}")
+            
+            # Parse JSON data
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No JSON data provided'}), 400
+            
+            logger.info(f"Power data: {data}")
+            
+            # Extract key metrics
+            device_id = data.get('DeviceMacId', 'unknown')
+            meter_id = data.get('MeterMacId', 'unknown')
+            timestamp = data.get('TimeStamp', datetime.utcnow().isoformat())
+            
+            # Calculate actual values using multiplier and divisor
+            multiplier = float(data.get('Multiplier', 1))
+            divisor = float(data.get('Divisor', 1))
+            
+            # Current power demand in kW
+            demand = float(data.get('Demand', 0)) * multiplier / divisor
+            
+            # Total energy consumed in kWh
+            total_delivered = float(data.get('CurrentSummationDelivered', 0)) * multiplier / divisor
+            total_received = float(data.get('CurrentSummationReceived', 0)) * multiplier / divisor
+            net_consumption = total_delivered - total_received
+            
+            # Store in InfluxDB if available
+            if write_api:
+                try:
+                    # Create InfluxDB point
+                    point = Point("power_metrics") \
+                        .tag("device_id", device_id) \
+                        .tag("meter_id", meter_id) \
+                        .field("demand_kw", demand) \
+                        .field("total_delivered_kwh", total_delivered) \
+                        .field("total_received_kwh", total_received) \
+                        .field("net_consumption_kwh", net_consumption) \
+                        .time(timestamp, WritePrecision.NS)
+                    
+                    # Write to InfluxDB
+                    write_api.write(bucket=INFLUXDB_BUCKET, record=point)
+                    logger.info(f"Stored power metrics: demand={demand}kW, net={net_consumption}kWh")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to write to InfluxDB: {e}")
+                    # Continue processing even if InfluxDB write fails
+            
+            # Return EAGLE-compatible response
+            # Most EAGLE devices expect an empty 200 OK response
+            return '', 200
+            
+        except Exception as e:
+            logger.error(f"Error processing power data: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @power_monitor.route('/api/power-data/test', methods=['GET'])
+    def test_endpoint():
+        """Test endpoint to verify the API is working"""
+        return jsonify({
+            'status': 'ok',
+            'message': 'Power monitoring endpoint is active',
+            'influxdb_connected': client is not None,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+
+    @power_monitor.route('/api/power-data/latest', methods=['GET'])
+    def get_latest_reading():
+        """Get the latest power reading from InfluxDB"""
+        if not client:
+            return jsonify({'error': 'InfluxDB not connected'}), 503
+        
+        try:
+            query_api = client.query_api()
+            query = f'''
+            from(bucket: "{INFLUXDB_BUCKET}")
+                |> range(start: -1h)
+                |> filter(fn: (r) => r["_measurement"] == "power_metrics")
+                |> last()
+            '''
+            
+            result = query_api.query(query)
+            
+            latest_data = {}
+            for table in result:
+                for record in table.records:
+                    field = record.get_field()
+                    value = record.get_value()
+                    latest_data[field] = value
+                    latest_data['timestamp'] = record.get_time().isoformat()
+            
+            if latest_data:
+                return jsonify({
+                    'status': 'success',
+                    'data': latest_data
+                })
+            else:
+                return jsonify({
+                    'status': 'no_data',
+                    'message': 'No power readings found in the last hour'
+                }), 404
+                
+        except Exception as e:
+            logger.error(f"Error querying InfluxDB: {e}")
+            return jsonify({'error': str(e)}), 500
+
+  app.py: |
+    from flask import Flask, jsonify, render_template_string
+    import os
+    import socket
+    import datetime
+    import requests
+    from power_monitor import power_monitor
+
+    app = Flask(__name__)
+
+    # Register the power monitoring blueprint
+    app.register_blueprint(power_monitor)
+
+    HTML_TEMPLATE = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Kubernetes Demo - Power Monitoring Dashboard</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f0f0f0;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            h1 {
+                color: #333;
+                text-align: center;
+            }
+            .info-card {
+                background: white;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .info-item {
+                margin: 10px 0;
+                padding: 10px;
+                background-color: #f8f8f8;
+                border-radius: 4px;
+            }
+            .label {
+                font-weight: bold;
+                color: #555;
+            }
+            .value {
+                color: #333;
+            }
+            .status {
+                text-align: center;
+                font-size: 24px;
+                margin: 20px 0;
+            }
+            .healthy {
+                color: #4CAF50;
+            }
+            .error {
+                color: #f44336;
+            }
+            .monitoring-links {
+                text-align: center;
+                margin: 30px 0;
+            }
+            .monitoring-links a {
+                display: inline-block;
+                margin: 0 10px;
+                padding: 10px 20px;
+                background: #2196F3;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+            }
+            .monitoring-links a:hover {
+                background: #1976D2;
+            }
+        </style>
+        <meta http-equiv="refresh" content="30">
+    </head>
+    <body>
+        <div class="container">
+            <h1>⚡ Power Monitoring Dashboard</h1>
+            <div class="status {{ health_class }}">{{ health_status }}</div>
+            
+            <div class="monitoring-links">
+                <a href="/api/power-data/test" target="_blank">Test API Endpoint</a>
+                <a href="/api/power-data/latest" target="_blank">Latest Reading</a>
+                <a href="http://{{ cluster_ip }}:30300" target="_blank">Open Grafana Dashboard</a>
+            </div>
+            
+            <div class="info-card">
+                <h2>📊 API Endpoints</h2>
+                <div class="info-item">
+                    <span class="label">POST /api/power-data</span>
+                    <span class="value">Receive power data from EAGLE device</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">GET /api/power-data/test</span>
+                    <span class="value">Test endpoint status</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">GET /api/power-data/latest</span>
+                    <span class="value">Get latest power reading</span>
+                </div>
+            </div>
+            
+            <div class="info-card">
+                <h2>🔧 EAGLE Configuration</h2>
+                <div class="info-item">
+                    <span class="label">Protocol:</span>
+                    <span class="value">HTTPS (recommended) or HTTP</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Hostname:</span>
+                    <span class="value">linknode.com or {{ cluster_ip }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">URL:</span>
+                    <span class="value">/api/power-data</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Port:</span>
+                    <span class="value">443 (HTTPS) or 30500 (HTTP direct)</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Format:</span>
+                    <span class="value">JSON</span>
+                </div>
+            </div>
+            
+            <div class="info-card">
+                <h2>📦 Pod Information</h2>
+                <div class="info-item">
+                    <span class="label">Pod Name:</span>
+                    <span class="value">{{ pod_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Node Name:</span>
+                    <span class="value">{{ node_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Namespace:</span>
+                    <span class="value">{{ namespace }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Service Account:</span>
+                    <span class="value">{{ service_account }}</span>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    @app.route('/')
+    def home():
+        try:
+            # Get pod information from environment variables
+            pod_name = os.environ.get('HOSTNAME', 'Unknown')
+            node_name = os.environ.get('NODE_NAME', 'Unknown')
+            namespace = os.environ.get('POD_NAMESPACE', 'Unknown')
+            service_account = os.environ.get('SERVICE_ACCOUNT', 'Unknown')
+            
+            # Get cluster IP (you'll need to update this with your actual cluster IP)
+            cluster_ip = "119.9.118.22"
+            
+            return render_template_string(HTML_TEMPLATE,
+                health_status='✅ Healthy',
+                health_class='healthy',
+                pod_name=pod_name,
+                node_name=node_name,
+                namespace=namespace,
+                service_account=service_account,
+                cluster_ip=cluster_ip
+            )
+        except Exception as e:
+            return render_template_string(HTML_TEMPLATE,
+                health_status='❌ Error',
+                health_class='error',
+                pod_name='Error',
+                node_name='Error',
+                namespace='Error',
+                service_account='Error',
+                cluster_ip='Error'
+            )
+
+    @app.route('/health')
+    def health():
+        return jsonify({'status': 'healthy', 'timestamp': datetime.datetime.now().isoformat()})
+
+    @app.route('/ready')
+    def ready():
+        return jsonify({'status': 'ready', 'timestamp': datetime.datetime.now().isoformat()})
+
+    if __name__ == '__main__':
+        port = int(os.environ.get('PORT', 5000))
+        app.run(host='0.0.0.0', port=port, debug=False)
