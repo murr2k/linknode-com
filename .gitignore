@@ -56,6 +56,8 @@ nohup.out
 *.crt
 secrets/
 .secrets/
+cloudflare-setup/.env
+cloudflare-setup/auto-setup.sh
 
 # Local test files
 test/

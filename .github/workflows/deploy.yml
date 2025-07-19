@@ -67,19 +67,27 @@ jobs:
         echo "=== HPA ==="
         kubectl get hpa -n $KUBE_NAMESPACE
         echo ""
-        echo "=== Access URL ==="
-        NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
-        NODE_PORT=$(kubectl get svc demo-app-service -n $KUBE_NAMESPACE -o jsonpath='{.spec.ports[0].nodePort}')
-        echo "Application URL: http://${NODE_IP}:${NODE_PORT}"
+        echo "=== Access URLs ==="
+        SERVICE_TYPE=$(kubectl get svc demo-app-service -n $KUBE_NAMESPACE -o jsonpath='{.spec.type}')
+        if [ "$SERVICE_TYPE" = "NodePort" ]; then
+          NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+          NODE_PORT=$(kubectl get svc demo-app-service -n $KUBE_NAMESPACE -o jsonpath='{.spec.ports[0].nodePort}')
+          echo "NodePort URL: http://${NODE_IP}:${NODE_PORT}"
+        else
+          echo "Service type: $SERVICE_TYPE (not publicly accessible)"
+        fi
+        echo "Custom Domain: https://linknode.com"
+        echo "Known NodePort: http://119.9.118.22:32304"
 
     - name: Create deployment summary
       if: success()
       run: |
-        NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
-        NODE_PORT=$(kubectl get svc demo-app-service -n $KUBE_NAMESPACE -o jsonpath='{.spec.ports[0].nodePort}')
         echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Application URL**: http://${NODE_IP}:${NODE_PORT}" >> $GITHUB_STEP_SUMMARY
+        echo "### Access URLs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Custom Domain**: https://linknode.com" >> $GITHUB_STEP_SUMMARY
+        echo "- **Direct Access**: http://119.9.118.22:32304" >> $GITHUB_STEP_SUMMARY
+        echo "- **Cloudflare Tunnel**: https://supply-motherboard-relation-features.trycloudflare.com" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
         echo "- **Namespace**: $KUBE_NAMESPACE" >> $GITHUB_STEP_SUMMARY
