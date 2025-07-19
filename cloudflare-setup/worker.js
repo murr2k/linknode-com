@@ -6,8 +6,8 @@ async function handleRequest(request) {
   const url = new URL(request.url)
   
   // The quick tunnel URL (update this when you run a new tunnel)
-  const tunnelUrl = 'https://supply-motherboard-relation-features.trycloudflare.com'
-  const directUrl = 'http://119.9.118.22:32304'
+  const tunnelUrl = 'https://daniel-holidays-diesel-gross.trycloudflare.com'
+  const directUrl = 'http://119.9.118.22:30898'
   
   // For the root path, return a nice page with both options
   if (url.pathname === '/' || url.pathname === '') {

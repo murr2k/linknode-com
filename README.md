@@ -10,8 +10,18 @@ A modern, interactive Kubernetes demo application showcasing cloud-native deploy
 
 **Public URLs**:
 - **Custom Domain**: https://linknode.com
-- **Direct Access**: http://119.9.118.22:32304
-- **Cloudflare Tunnel**: https://supply-motherboard-relation-features.trycloudflare.com
+- **Direct Access**: http://119.9.118.22:30898
+- **Cloudflare Tunnel**: https://daniel-holidays-diesel-gross.trycloudflare.com
+
+### What's Special About This Demo?
+
+This entire Kubernetes platform was **built in under 24 hours** using AI-augmented development, showcasing:
+- Enterprise-grade infrastructure deployed at record speed
+- Production-ready patterns and best practices
+- Live auto-scaling and self-healing capabilities
+- Professional marketing content integrated seamlessly
+
+Visit the live demo to see both the technical capabilities and learn about AI-augmented development services.
 
 ## 📋 Features
 
