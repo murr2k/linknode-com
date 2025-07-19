@@ -8,7 +8,10 @@ A modern, interactive Kubernetes demo application showcasing cloud-native deploy
 
 ## 🚀 Live Demo
 
-**Public URL**: http://119.9.118.22:32091
+**Public URLs**:
+- **Custom Domain**: https://linknode.com
+- **Direct Access**: http://119.9.118.22:32304
+- **Cloudflare Tunnel**: https://supply-motherboard-relation-features.trycloudflare.com
 
 ## 📋 Features
 
