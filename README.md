@@ -15,7 +15,7 @@ A modern, interactive Kubernetes demo application showcasing cloud-native deploy
 
 **Monitoring Stack**:
 - **Grafana Dashboard**: http://119.9.118.22:30300
-- **Power Monitor API**: http://119.9.118.22:30500/api/power-data
+- **Eagle XML Endpoint**: http://119.9.118.22:30500 (accepts XML data)
 
 ### What's Special About This Demo?
 
@@ -38,10 +38,10 @@ Visit the live demo to see both the technical capabilities and learn about AI-au
   - Health checks and probes
   - Resource limits and requests
 - **Real-time Power Monitoring**:
-  - EAGLE smart meter integration
+  - Eagle-200 smart meter integration (XML format)
   - Live power consumption dashboard (Grafana)
   - Time-series data storage (InfluxDB)
-  - RESTful API for data ingestion
+  - XML data ingestion endpoint
   - Automatic dashboard updates via CI/CD
 - **Secure Access Options**: 
   - SSH tunnel access for development
@@ -100,9 +100,10 @@ rackspace-k8s-demo/
 │   ├── namespace.yaml       # Namespace definition
 │   ├── configmap.yaml       # App configuration
 │   ├── configmap-nginx.yaml # Nginx HTML content
+│   ├── configmap-monitoring-xml.yaml # Eagle XML monitoring code
 │   ├── deployment.yaml      # Main deployment
 │   ├── deployment-nginx.yaml# Nginx deployment
-│   ├── deployment-monitoring.yaml # Monitoring stack
+│   ├── deployment-monitoring-xml.yaml # Eagle monitoring stack
 │   ├── service.yaml         # Service definition
 │   ├── hpa.yaml            # Horizontal Pod Autoscaler
 │   ├── influxdb.yaml       # Time-series database
@@ -192,23 +193,27 @@ This demo includes a real-time power monitoring system integrated with EAGLE sma
 ### Features
 - **Real-time Data**: Updates every 5 seconds
 - **Grafana Dashboard**: Beautiful visualizations at http://119.9.118.22:30300
-- **REST API**: Accepts JSON data from EAGLE devices
+- **XML API**: Accepts XML data from Eagle-200 devices
 - **Time-series Storage**: InfluxDB for historical data
 - **Auto-deployment**: Dashboard updates via CI/CD pipeline
 
-### EAGLE Configuration
-Configure your EAGLE device to send data to:
-- Protocol: HTTP
+### Eagle-200 Configuration
+Configure your Eagle-200 device to send data to:
+- Cloud Provider: Other
+- Protocol: XML/RAW
 - Hostname: 119.9.118.22
 - Port: 30500
-- Path: /api/power-data
+- URL: /
+- Format: XML_RAW
 
 ### Dashboard Metrics
-- Current power demand (kW)
-- Power usage over time
-- Min/Max/Average statistics
-- Cost rate calculation
-- Daily usage projections
+- Current power gauge (0-10kW range)
+- 24-hour total usage and cost
+- Power consumption time series
+- Min/Max/Average statistics  
+- Weekly usage heatmap
+- Hourly consumption breakdown
+- Estimated monthly cost
 
 ## 🚀 CI/CD Pipeline
 
