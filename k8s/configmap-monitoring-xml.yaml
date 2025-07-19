@@ -1,0 +1,280 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-app-code
+  namespace: demo-app
+data:
+  power_monitor.py: |
+    from flask import Blueprint, request, jsonify
+    from influxdb_client import InfluxDBClient, Point, WritePrecision
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    import os
+    import logging
+    from datetime import datetime
+    import xml.etree.ElementTree as ET
+
+    # Create blueprint for power monitoring endpoints
+    power_monitor = Blueprint('power_monitor', __name__)
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    # InfluxDB configuration
+    INFLUXDB_URL = os.environ.get('INFLUXDB_URL', 'http://influxdb:8086')
+    INFLUXDB_TOKEN = os.environ.get('INFLUXDB_TOKEN', 'my-super-secret-auth-token')
+    INFLUXDB_ORG = os.environ.get('INFLUXDB_ORG', 'rackspace')
+    INFLUXDB_BUCKET = os.environ.get('INFLUXDB_BUCKET', 'power_metrics')
+
+    # Initialize InfluxDB client
+    try:
+        client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
+        write_api = client.write_api(write_options=SYNCHRONOUS)
+        logger.info(f"Connected to InfluxDB at {INFLUXDB_URL}")
+    except Exception as e:
+        logger.error(f"Failed to connect to InfluxDB: {e}")
+        client = None
+        write_api = None
+
+    def parse_hex_value(hex_string):
+        """Convert hex string (0x format) to integer"""
+        if hex_string and hex_string.startswith('0x'):
+            return int(hex_string, 16)
+        return 0
+
+    @power_monitor.route('/api/power-data', methods=['POST'])
+    def receive_power_data():
+        """
+        Endpoint to receive power data from EAGLE device (XML or JSON)
+        """
+        try:
+            # Log the incoming request
+            logger.info(f"Received power data request from {request.remote_addr}")
+            content_type = request.headers.get('Content-Type', '').lower()
+            logger.info(f"Content-Type: {content_type}")
+            
+            # Get raw data
+            raw_data = request.data
+            if not raw_data:
+                logger.warning("No data provided")
+                return '', 200
+            
+            # Try XML parsing first
+            if 'xml' in content_type or raw_data.strip().startswith(b'<'):
+                try:
+                    # Parse XML
+                    root = ET.fromstring(raw_data.decode('utf-8'))
+                    logger.info(f"Received XML message type: {root.tag}")
+                    
+                    # Extract device ID (handle both with and without 0x prefix)
+                    device_elem = root.find('DeviceMacId')
+                    if device_elem is not None:
+                        device_id = device_elem.text
+                        if device_id.startswith('0x'):
+                            device_id = device_id[2:]  # Remove 0x prefix
+                    else:
+                        device_id = 'unknown'
+                    
+                    # Get timestamp
+                    timestamp = datetime.utcnow().isoformat() + 'Z'
+                    
+                    # Handle InstantaneousDemand
+                    if root.tag == 'InstantaneousDemand':
+                        demand_elem = root.find('Demand')
+                        mult_elem = root.find('Multiplier')
+                        div_elem = root.find('Divisor')
+                        
+                        if demand_elem is not None and mult_elem is not None and div_elem is not None:
+                            demand_raw = parse_hex_value(demand_elem.text)
+                            multiplier = parse_hex_value(mult_elem.text)
+                            divisor = parse_hex_value(div_elem.text)
+                            
+                            # Calculate demand in kW
+                            if divisor > 0:
+                                demand_kw = (demand_raw * multiplier) / divisor
+                            else:
+                                demand_kw = 0
+                            
+                            logger.info(f"XML Power Demand: {demand_kw:.3f} kW (raw={demand_raw}, mult={multiplier}, div={divisor})")
+                            
+                            if write_api:
+                                point = Point("power_metrics") \
+                                    .tag("device_id", device_id) \
+                                    .field("demand_kw", float(demand_kw)) \
+                                    .time(timestamp, WritePrecision.NS)
+                                
+                                write_api.write(bucket=INFLUXDB_BUCKET, record=point)
+                                logger.info(f"Stored power demand: {demand_kw:.3f} kW")
+                    
+                    # Handle CurrentSummationDelivered
+                    elif root.tag == 'CurrentSummationDelivered':
+                        summ_elem = root.find('SummationDelivered')
+                        mult_elem = root.find('Multiplier')
+                        div_elem = root.find('Divisor')
+                        
+                        if summ_elem is not None and mult_elem is not None and div_elem is not None:
+                            summation_raw = parse_hex_value(summ_elem.text)
+                            multiplier = parse_hex_value(mult_elem.text)
+                            divisor = parse_hex_value(div_elem.text)
+                            
+                            # Calculate total in kWh
+                            if divisor > 0:
+                                total_kwh = (summation_raw * multiplier) / divisor
+                            else:
+                                total_kwh = 0
+                            
+                            logger.info(f"XML Total Delivered: {total_kwh:.3f} kWh")
+                            
+                            if write_api:
+                                point = Point("power_metrics") \
+                                    .tag("device_id", device_id) \
+                                    .field("total_delivered_kwh", float(total_kwh)) \
+                                    .time(timestamp, WritePrecision.NS)
+                                
+                                write_api.write(bucket=INFLUXDB_BUCKET, record=point)
+                                logger.info(f"Stored total delivered: {total_kwh:.3f} kWh")
+                    
+                    # Handle CurrentSummationReceived (for solar/net metering)
+                    elif root.tag == 'CurrentSummationReceived':
+                        summ_elem = root.find('SummationReceived')
+                        mult_elem = root.find('Multiplier')
+                        div_elem = root.find('Divisor')
+                        
+                        if summ_elem is not None and mult_elem is not None and div_elem is not None:
+                            summation_raw = parse_hex_value(summ_elem.text)
+                            multiplier = parse_hex_value(mult_elem.text)
+                            divisor = parse_hex_value(div_elem.text)
+                            
+                            if divisor > 0:
+                                total_kwh = (summation_raw * multiplier) / divisor
+                            else:
+                                total_kwh = 0
+                            
+                            logger.info(f"XML Total Received: {total_kwh:.3f} kWh")
+                            
+                            if write_api:
+                                point = Point("power_metrics") \
+                                    .tag("device_id", device_id) \
+                                    .field("total_received_kwh", float(total_kwh)) \
+                                    .time(timestamp, WritePrecision.NS)
+                                
+                                write_api.write(bucket=INFLUXDB_BUCKET, record=point)
+                    
+                    else:
+                        logger.info(f"Unhandled XML message type: {root.tag}")
+                    
+                    return '', 200
+                    
+                except ET.ParseError as e:
+                    logger.error(f"XML parsing error: {e}")
+                    logger.error(f"Raw data: {raw_data[:200]}")  # Log first 200 chars
+                    # Fall through to JSON parsing
+                except Exception as e:
+                    logger.error(f"XML processing error: {e}")
+                    # Fall through to JSON parsing
+            
+            # Try JSON parsing as fallback
+            try:
+                # Force JSON parsing even without proper content type
+                data = request.get_json(force=True)
+                logger.info(f"Parsing as JSON: {type(data)}")
+                
+                # Handle nested EAGLE JSON format
+                if isinstance(data, dict) and 'body' in data and isinstance(data['body'], list):
+                    device_id = data.get('deviceGuid', 'unknown')
+                    
+                    for item in data['body']:
+                        data_type = item.get('dataType', '')
+                        item_data = item.get('data', {})
+                        timestamp = datetime.utcnow().isoformat() + 'Z'
+                        
+                        if data_type == 'InstantaneousDemand':
+                            demand = float(item_data.get('demand', 0))
+                            
+                            logger.info(f"JSON Power Demand: {demand} kW")
+                            
+                            if write_api and demand >= 0:
+                                point = Point("power_metrics") \
+                                    .tag("device_id", device_id) \
+                                    .field("demand_kw", demand) \
+                                    .time(timestamp, WritePrecision.NS)
+                                
+                                write_api.write(bucket=INFLUXDB_BUCKET, record=point)
+                                logger.info(f"Stored JSON power demand: {demand} kW")
+                        
+                        elif data_type == 'CurrentSummation':
+                            delivered = float(item_data.get('summationDelivered', 0))
+                            received = float(item_data.get('summationReceived', 0))
+                            
+                            if write_api:
+                                point = Point("power_metrics") \
+                                    .tag("device_id", device_id) \
+                                    .field("total_delivered_kwh", delivered) \
+                                    .field("total_received_kwh", received) \
+                                    .field("net_consumption_kwh", delivered - received) \
+                                    .time(timestamp, WritePrecision.NS)
+                                
+                                write_api.write(bucket=INFLUXDB_BUCKET, record=point)
+                                logger.info(f"Stored summation: delivered={delivered} kWh, received={received} kWh")
+                
+                else:
+                    logger.warning(f"Unexpected JSON format: {data}")
+                
+                return '', 200
+                
+            except Exception as e:
+                logger.error(f"JSON parsing error: {e}")
+                return '', 200  # Return 200 to keep EAGLE happy
+            
+        except Exception as e:
+            logger.error(f"Error processing power data: {e}")
+            return '', 500
+
+    @power_monitor.route('/api/power-data/test', methods=['GET'])
+    def test_endpoint():
+        """Test endpoint to verify the API is working"""
+        return jsonify({
+            'status': 'ok',
+            'message': 'Power monitoring endpoint is active (XML/JSON support)',
+            'influxdb_connected': client is not None,
+            'timestamp': datetime.utcnow().isoformat(),
+            'version': 'v2.0-xml'
+        })
+
+    @power_monitor.route('/api/power-data/latest', methods=['GET'])
+    def get_latest_reading():
+        """Get the latest power reading from InfluxDB"""
+        if not client:
+            return jsonify({'error': 'InfluxDB not connected'}), 503
+        
+        try:
+            query_api = client.query_api()
+            
+            # Get latest demand
+            query = f'''
+            from(bucket: "{INFLUXDB_BUCKET}")
+                |> range(start: -5m)
+                |> filter(fn: (r) => r["_measurement"] == "power_metrics")
+                |> filter(fn: (r) => r["_field"] == "demand_kw")
+                |> last()
+            '''
+            
+            result = query_api.query(query)
+            
+            for table in result:
+                for record in table.records:
+                    return jsonify({
+                        'status': 'success',
+                        'demand_kw': record.get_value(),
+                        'device_id': record.values.get('device_id'),
+                        'timestamp': record.get_time().isoformat()
+                    })
+            
+            return jsonify({
+                'status': 'no_data',
+                'message': 'No recent power readings'
+            }), 404
+            
+        except Exception as e:
+            logger.error(f"Error querying InfluxDB: {e}")
+            return jsonify({'error': str(e)}), 500

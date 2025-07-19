@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app-monitoring
+  namespace: demo-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: demo-app-monitoring
+  template:
+    metadata:
+      labels:
+        app: demo-app-monitoring
+    spec:
+      containers:
+      - name: flask
+        image: murr2k/demo-app:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: INFLUXDB_URL
+          value: "http://influxdb:8086"
+        - name: INFLUXDB_TOKEN
+          value: "my-super-secret-auth-token"
+        - name: INFLUXDB_ORG
+          value: "rackspace"
+        - name: INFLUXDB_BUCKET
+          value: "power_metrics"
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: app-code
+          mountPath: /app/power_monitor.py
+          subPath: power_monitor.py
+        command: ["/bin/bash", "-c"]
+        args: 
+          - |
+            pip install influxdb-client
+            python -c "
+            from flask import Flask
+            from power_monitor import power_monitor
+            import os
+
+            app = Flask(__name__)
+            app.register_blueprint(power_monitor)
+
+            @app.route('/')
+            def home():
+                return 'Power Monitoring API v2.0-xml'
+
+            if __name__ == '__main__':
+                app.run(host='0.0.0.0', port=5000)
+            " || gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
+      volumes:
+      - name: app-code
+        configMap:
+          name: monitoring-app-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app-monitoring
+  namespace: demo-app
+spec:
+  selector:
+    app: demo-app-monitoring
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+      nodePort: 30500
+  type: NodePort
