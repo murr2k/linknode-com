@@ -74,3 +74,10 @@ Desktop.ini
 # Project specific
 /app/__pycache__/
 /app/*.pyc
+# Fly.io secrets and configurations
+fly/.env
+fly/**/.env
+fly/**/secrets
+.fly-token
+*.env.local
+*.env.production

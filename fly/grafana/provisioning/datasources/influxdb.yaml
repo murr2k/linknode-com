@@ -1,0 +1,12 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: http://linknode-influxdb.internal:8086
+    database: eagle_monitor
+    isDefault: true
+    jsonData:
+      httpMode: GET
+    editable: false
