@@ -39,7 +39,7 @@ jobs:
       run: |
         cd fly/influxdb
         # Create app if it doesn't exist
-        flyctl apps list | grep -q "linknode-influxdb" || flyctl apps create linknode-influxdb --region sjc
+        flyctl apps list | grep -q "linknode-influxdb" || flyctl apps create linknode-influxdb
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
@@ -48,7 +48,7 @@ jobs:
       run: |
         cd fly/eagle-monitor
         # Create app if it doesn't exist
-        flyctl apps list | grep -q "linknode-eagle-monitor" || flyctl apps create linknode-eagle-monitor --region sjc
+        flyctl apps list | grep -q "linknode-eagle-monitor" || flyctl apps create linknode-eagle-monitor
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
@@ -57,7 +57,7 @@ jobs:
       run: |
         cd fly/grafana
         # Create app if it doesn't exist
-        flyctl apps list | grep -q "linknode-grafana" || flyctl apps create linknode-grafana --region sjc
+        flyctl apps list | grep -q "linknode-grafana" || flyctl apps create linknode-grafana
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
@@ -66,7 +66,7 @@ jobs:
       run: |
         cd fly/web
         # Create app if it doesn't exist
-        flyctl apps list | grep -q "linknode-web" || flyctl apps create linknode-web --region sjc
+        flyctl apps list | grep -q "linknode-web" || flyctl apps create linknode-web
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
