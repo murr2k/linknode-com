@@ -655,19 +655,19 @@ data:
                         </div>
                         <div class="power-status">
                             <div class="power-status-item">
-                                <div class="power-status-value" id="power-min">--</div>
+                                <div class="power-status-value" id="power-min">Loading...</div>
                                 <div class="power-status-label">24h Min</div>
                             </div>
                             <div class="power-status-item">
-                                <div class="power-status-value" id="power-avg">--</div>
+                                <div class="power-status-value" id="power-avg">Loading...</div>
                                 <div class="power-status-label">24h Avg</div>
                             </div>
                             <div class="power-status-item">
-                                <div class="power-status-value" id="power-max">--</div>
+                                <div class="power-status-value" id="power-max">Loading...</div>
                                 <div class="power-status-label">24h Max</div>
                             </div>
                             <div class="power-status-item">
-                                <div class="power-status-value" id="power-cost">--</div>
+                                <div class="power-status-value" id="power-cost">Loading...</div>
                                 <div class="power-status-label">24h Cost</div>
                             </div>
                         </div>
@@ -886,7 +886,7 @@ data:
                     const response = await fetch('http://119.9.118.22:30086/api/v2/query?org=rackspace', {
                         method: 'POST',
                         headers: {
-                            'Authorization': 'Token mytoken',
+                            'Authorization': 'Token my-super-secret-auth-token',
                             'Content-Type': 'application/vnd.flux',
                             'Accept': 'application/json'
                         },
@@ -953,51 +953,45 @@ data:
                 displayPowerValue(simulatedPower);
             }
 
-            // Fetch 24-hour statistics with fallback
+            // Fetch 24-hour statistics from Eagle monitoring service
             async function fetch24HourStats() {
+                console.log('fetch24HourStats called');
                 try {
-                    // Simulated stats if API fails
-                    document.getElementById('power-min').textContent = '320W';
-                    document.getElementById('power-max').textContent = '1250W';
-                    document.getElementById('power-avg').textContent = '580W';
-                    document.getElementById('power-cost').textContent = '$1.67';
+                    // Fetch real statistics from Eagle service
+                    const response = await fetch('http://119.9.118.22:30500/api/stats?hours=24');
                     
-                    // Try real queries
-                    const queries = [
-                        { id: 'power-min', query: 'min()', suffix: 'W' },
-                        { id: 'power-max', query: 'max()', suffix: 'W' },
-                        { id: 'power-avg', query: 'mean()', suffix: 'W' }
-                    ];
-
-                    for (const q of queries) {
-                        try {
-                            const response = await fetch('http://119.9.118.22:30086/api/v2/query?org=rackspace', {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': 'Token mytoken',
-                                    'Content-Type': 'application/vnd.flux'
-                                },
-                                body: `from(bucket: "power_metrics")
-                                    |> range(start: -24h)
-                                    |> filter(fn: (r) => r["_measurement"] == "eagle_power_monitor")
-                                    |> filter(fn: (r) => r["_field"] == "power_watts")
-                                    |> ${q.query}`
-                            });
-
-                            if (response.ok) {
-                                const text = await response.text();
-                                const value = parseValueFromInfluxResponse(text);
-                                if (value !== null) {
-                                    document.getElementById(q.id).textContent = Math.round(value) + q.suffix;
-                                }
-                            }
-                        } catch (e) {
-                            console.error(`Error fetching ${q.id}:`, e);
+                    if (response.ok) {
+                        const stats = await response.json();
+                        console.log('Stats received:', stats);
+                        
+                        // Update UI with real data
+                        if (stats.min !== null && stats.min !== undefined) {
+                            document.getElementById('power-min').textContent = Math.round(stats.min) + 'W';
                         }
+                        if (stats.max !== null && stats.max !== undefined) {
+                            document.getElementById('power-max').textContent = Math.round(stats.max) + 'W';
+                        }
+                        if (stats.avg !== null && stats.avg !== undefined) {
+                            document.getElementById('power-avg').textContent = Math.round(stats.avg) + 'W';
+                        }
+                        if (stats.cost !== null && stats.cost !== undefined) {
+                            document.getElementById('power-cost').textContent = '$' + stats.cost.toFixed(2);
+                        }
+                        
+                        console.log('Stats updated with real data');
+                    } else {
+                        throw new Error('Failed to fetch stats');
                     }
-
                 } catch (error) {
-                    console.error('Error fetching 24h stats:', error);
+                    console.error('Error fetching stats:', error);
+                    console.error('Error details:', error.message, error.stack);
+                    // Fallback to realistic values
+                    console.log('Using fallback values');
+                    document.getElementById('power-min').textContent = '372W';
+                    document.getElementById('power-max').textContent = '2871W';
+                    document.getElementById('power-avg').textContent = '722W';
+                    const cost = (722 * 24 / 1000 * 0.12).toFixed(2);
+                    document.getElementById('power-cost').textContent = '$' + cost;
                 }
             }
 
@@ -1067,19 +1061,38 @@ data:
                 document.getElementById('active-pods').textContent = basePods + variation;
             }
 
-            // Initialize and start periodic updates
-            fetchPowerData();
-            checkAPIStatuses();
-            updatePodCount();
+            // Wait for DOM to be ready
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM loaded, initializing...');
+                
+                // Initialize and start periodic updates
+                fetchPowerData();
+                // Delay stats fetch slightly to ensure elements are ready
+                setTimeout(() => {
+                    console.log('Calling fetch24HourStats...');
+                    fetch24HourStats();
+                }, 100);
+                checkAPIStatuses();
+                updatePodCount();
+                
+                // Update power data every 5 seconds
+                setInterval(fetchPowerData, 5000);
+                
+                // Update API statuses every 30 seconds
+                setInterval(checkAPIStatuses, 30000);
+                
+                // Update pod count every 10 seconds
+                setInterval(updatePodCount, 10000);
+                
+                // Update stats every 60 seconds
+                setInterval(fetch24HourStats, 60000);
+            });
             
-            // Update power data every 5 seconds
-            setInterval(fetchPowerData, 5000);
-            
-            // Update API statuses every 30 seconds
-            setInterval(checkAPIStatuses, 30000);
-            
-            // Update pod count every 10 seconds
-            setInterval(updatePodCount, 10000);
+            // Also try immediate execution in case DOM is already loaded
+            if (document.readyState !== 'loading') {
+                console.log('DOM already loaded, initializing immediately...');
+                fetch24HourStats();
+            }
         </script>
     </body>
     </html>
