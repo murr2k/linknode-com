@@ -1,0 +1,107 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'fly/**'
+      - '.github/workflows/deploy-fly.yml'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy (all, web, grafana, influxdb, eagle-monitor)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - grafana
+          - influxdb
+          - eagle-monitor
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Fly CLI
+      uses: superfly/flyctl-actions/setup-flyctl@master
+
+    - name: Deploy InfluxDB
+      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'influxdb' || github.event.inputs.service == ''
+      run: |
+        cd fly/influxdb
+        flyctl deploy --remote-only --wait-timeout 300
+      continue-on-error: false
+
+    - name: Deploy Eagle Monitor
+      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'eagle-monitor' || github.event.inputs.service == ''
+      run: |
+        cd fly/eagle-monitor
+        flyctl deploy --remote-only --wait-timeout 300
+      continue-on-error: false
+
+    - name: Deploy Grafana
+      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'grafana' || github.event.inputs.service == ''
+      run: |
+        cd fly/grafana
+        flyctl deploy --remote-only --wait-timeout 300
+      continue-on-error: false
+
+    - name: Deploy Web Interface
+      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'web' || github.event.inputs.service == ''
+      run: |
+        cd fly/web
+        flyctl deploy --remote-only --wait-timeout 300
+      continue-on-error: false
+
+    - name: Verify Deployments
+      if: always()
+      run: |
+        echo "=== Deployment Status ==="
+        flyctl status -a linknode-influxdb || echo "InfluxDB: Failed to get status"
+        echo ""
+        flyctl status -a linknode-eagle-monitor || echo "Eagle Monitor: Failed to get status"
+        echo ""
+        flyctl status -a linknode-grafana || echo "Grafana: Failed to get status"
+        echo ""
+        flyctl status -a linknode-web || echo "Web: Failed to get status"
+
+    - name: Create deployment summary
+      if: always()
+      run: |
+        echo "## 🚀 Fly.io Deployment Status" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Public Access URLs" >> $GITHUB_STEP_SUMMARY
+        echo "- **Main Site**: https://linknode.com" >> $GITHUB_STEP_SUMMARY
+        echo "- **Direct Fly URL**: https://linknode-web.fly.dev" >> $GITHUB_STEP_SUMMARY
+        echo "- **Grafana Dashboard**: https://linknode-grafana.fly.dev" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Service Endpoints" >> $GITHUB_STEP_SUMMARY
+        echo "- **Eagle Monitor API**: https://linknode-eagle-monitor.fly.dev/api/stats" >> $GITHUB_STEP_SUMMARY
+        echo "- **Health Check**: https://linknode-eagle-monitor.fly.dev/health" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Service**: ${{ github.event.inputs.service || 'all' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+    - name: Check service health
+      if: success()
+      run: |
+        echo "Checking service health..."
+        sleep 30  # Wait for services to stabilize
+        
+        # Check each service
+        curl -sf https://linknode-web.fly.dev > /dev/null && echo "✅ Web interface is healthy" || echo "❌ Web interface is not responding"
+        curl -sf https://linknode-grafana.fly.dev/api/health > /dev/null && echo "✅ Grafana is healthy" || echo "❌ Grafana is not responding"
+        curl -sf https://linknode-eagle-monitor.fly.dev/health > /dev/null && echo "✅ Eagle Monitor is healthy" || echo "❌ Eagle Monitor is not responding"
