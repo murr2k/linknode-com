@@ -1,6 +1,6 @@
 # Grafana Dashboard Troubleshooting Guide
 
-This document captures all the issues encountered and fixes applied when setting up the Grafana dashboard for the LinkNode Energy Monitor project. Use this guide when porting to a new server to avoid common pitfalls.
+This document captures all the issues encountered and fixes applied when setting up the Grafana dashboard for the Linknode Energy Monitor project. Use this guide when porting to a new server to avoid common pitfalls.
 
 ## Issues Encountered and Solutions
 

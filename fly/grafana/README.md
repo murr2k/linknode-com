@@ -1,4 +1,4 @@
-# Grafana Configuration for LinkNode Energy Monitor
+# Grafana Configuration for Linknode Energy Monitor
 
 This directory contains the Grafana configuration for visualizing energy monitoring data from the Eagle-200 device.
 
