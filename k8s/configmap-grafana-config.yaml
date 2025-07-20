@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: demo-app
+data:
+  grafana.ini: |
+    [auth.anonymous]
+    enabled = true
+    org_name = Main Org.
+    org_role = Viewer
+    hide_version = false
+
+    [security]
+    allow_embedding = true
+
+    [server]
+    root_url = http://119.9.118.22:30300
+
+    [dashboards]
+    default_home_dashboard_path = /var/lib/grafana/dashboards/eagle-energy-monitor.json

@@ -237,7 +237,7 @@ The demo webpage includes several live widgets:
    - Public dashboard - no login required!
    - Shows power consumption graph
    - Fully interactive with time range selection
-   - Accessible at: http://119.9.118.22:30300/public-dashboards/51a5565681464739ba4b2569e0949ffe
+   - Direct link: http://119.9.118.22:30300/d/eagle-energy/eagle-energy-monitor?orgId=1
 
 3. **API Status Indicators**:
    - InfluxDB API health
@@ -249,6 +249,11 @@ The demo webpage includes several live widgets:
    - Active pod count
    - Total connections
    - Auto-refreshing statistics
+
+5. **Enterprise Showcase Section**:
+   - Learn about AI-augmented development
+   - See how this platform was built in <24 hours
+   - Interactive animations and modern UI design
 
 ## 🚀 CI/CD Pipeline
 
