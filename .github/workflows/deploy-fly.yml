@@ -38,6 +38,8 @@ jobs:
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'influxdb' || github.event.inputs.service == ''
       run: |
         cd fly/influxdb
+        # Create app if it doesn't exist
+        flyctl apps list | grep -q "linknode-influxdb" || flyctl apps create linknode-influxdb --region sjc
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
@@ -45,6 +47,8 @@ jobs:
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'eagle-monitor' || github.event.inputs.service == ''
       run: |
         cd fly/eagle-monitor
+        # Create app if it doesn't exist
+        flyctl apps list | grep -q "linknode-eagle-monitor" || flyctl apps create linknode-eagle-monitor --region sjc
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
@@ -52,6 +56,8 @@ jobs:
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'grafana' || github.event.inputs.service == ''
       run: |
         cd fly/grafana
+        # Create app if it doesn't exist
+        flyctl apps list | grep -q "linknode-grafana" || flyctl apps create linknode-grafana --region sjc
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
@@ -59,6 +65,8 @@ jobs:
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'web' || github.event.inputs.service == ''
       run: |
         cd fly/web
+        # Create app if it doesn't exist
+        flyctl apps list | grep -q "linknode-web" || flyctl apps create linknode-web --region sjc
         flyctl deploy --remote-only --wait-timeout 300
       continue-on-error: false
 
