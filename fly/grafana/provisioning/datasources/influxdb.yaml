@@ -11,6 +11,7 @@ datasources:
       organization: linknode
       defaultBucket: energy
       tlsSkipVerify: true
+      httpMode: POST
     secureJsonData:
       token: ${INFLUXDB_TOKEN}
     editable: false

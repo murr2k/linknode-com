@@ -35,7 +35,7 @@ cd ../eagle-monitor
 
 Set the InfluxDB token for the Eagle monitor:
 ```bash
-# Use the same token as InfluxDB
+# CRITICAL: Use the same token as InfluxDB - token mismatch will cause "No data" errors!
 fly secrets set INFLUXDB_TOKEN="$INFLUX_TOKEN"
 ```
 
@@ -46,10 +46,15 @@ Navigate to the Grafana directory:
 cd ../grafana
 ```
 
-Set Grafana admin password:
+Set Grafana admin password and InfluxDB token:
 ```bash
 fly secrets set GF_SECURITY_ADMIN_PASSWORD="your-secure-grafana-password"
+
+# CRITICAL: Use the same token as InfluxDB and Eagle monitor!
+fly secrets set INFLUXDB_TOKEN="$INFLUX_TOKEN"
 ```
+
+**Important**: All three services (InfluxDB, Eagle Monitor, and Grafana) MUST use the same `INFLUXDB_TOKEN`. Token mismatch is the most common cause of "No data" errors in Grafana.
 
 ## Verifying Secrets
 
@@ -59,6 +64,16 @@ To verify that secrets are set correctly:
 # List all secrets (names only, not values)
 fly secrets list
 ```
+
+To verify token synchronization across services:
+```bash
+# Check token digest for each service - they should all match!
+fly secrets list -a linknode-influxdb | grep INFLUXDB_TOKEN
+fly secrets list -a linknode-eagle-monitor | grep INFLUXDB_TOKEN
+fly secrets list -a linknode-grafana | grep INFLUXDB_TOKEN
+```
+
+If the digest values don't match, update them all to use the same token.
 
 ## Environment File for Local Development
 

@@ -80,3 +80,12 @@ Each service will need specific environment variables configured in their respec
 - **Eagle Monitor**: INFLUXDB_URL, INFLUXDB_TOKEN, EAGLE_IP, EAGLE_USERNAME, EAGLE_PASSWORD
 - **Grafana**: GF_* configuration variables
 - **Web**: API endpoints for other services
+
+## Secrets Setup
+
+See [SECRETS_SETUP.md](SECRETS_SETUP.md) for detailed instructions on setting up the required secrets.
+
+## Troubleshooting
+
+- **Grafana Dashboard Issues**: See [GRAFANA_TROUBLESHOOTING.md](GRAFANA_TROUBLESHOOTING.md) for solutions to common Grafana problems including "No data" errors and embedding issues
+- **Individual Service Issues**: Check the README.md in each service directory for service-specific troubleshooting

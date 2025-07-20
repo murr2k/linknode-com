@@ -7,6 +7,11 @@
   "schemaVersion": 38,
   "version": 1,
   "refresh": "5s",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
   "time": {
     "from": "now-1h",
     "to": "now"
@@ -51,7 +56,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_data\")\n  |> filter(fn: (r) => r[\"_field\"] == \"power\")\n  |> last()",
+          "query": "from(bucket: \"energy\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> last()",
           "refId": "A"
         }
       ],
@@ -128,7 +133,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_data\")\n  |> filter(fn: (r) => r[\"_field\"] == \"power\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "query": "from(bucket: \"energy\") |> range(start: -2h) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\")",
           "refId": "A"
         }
       ],
@@ -173,7 +178,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\")\n  |> range(start: today())\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_data\")\n  |> filter(fn: (r) => r[\"_field\"] == \"energy\")\n  |> sum()",
+          "query": "from(bucket: \"energy\") |> range(start: today()) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"energy_delivered_kwh\") |> sum()",
           "refId": "A"
         }
       ],
@@ -218,7 +223,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_data\")\n  |> filter(fn: (r) => r[\"_field\"] == \"power\")\n  |> mean()",
+          "query": "from(bucket: \"energy\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> mean()",
           "refId": "A"
         }
       ],
@@ -263,7 +268,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"power_data\")\n  |> filter(fn: (r) => r[\"_field\"] == \"power\")\n  |> max()",
+          "query": "from(bucket: \"energy\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> max()",
           "refId": "A"
         }
       ],
@@ -271,12 +276,6 @@
       "type": "stat"
     }
   ],
-  "editable": false,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "links": [],
-  "liveNow": false,
-  "panels": [],
   "style": "dark",
   "templating": {
     "list": []

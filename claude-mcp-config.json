@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "claude-flow": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "claude-flow@alpha",
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "CLAUDE_FLOW_LOG_LEVEL": "info",
+        "CLAUDE_FLOW_MCP_TRANSPORT": "stdio",
+        "NODE_ENV": "production"
+      }
+    }
+  },
+  "defaults": {
+    "model": "claude-3-5-sonnet-20241022",
+    "maxTokens": 8192
+  }
+}
