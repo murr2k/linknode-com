@@ -618,7 +618,7 @@
             .api-status-grid { grid-template-columns: 1fr; }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js removed - using embedded Grafana dashboard instead -->
 </head>
 <body>
     <div class="bg-animation"></div>
@@ -723,36 +723,15 @@
                 </div>
             </div>
 
-            <!-- Power Usage Chart -->
+            <!-- Embedded Grafana Dashboard -->
             <div class="grafana-preview">
-                <div style="margin-bottom: 12px;">
-                    <h3 style="color: #c7d0d9; font-size: 14px; font-weight: normal; margin: 0;">Power Consumption Over Time</h3>
-                </div>
-                <canvas id="powerChart" width="400" height="200" style="width: 100%; max-height: 280px;"></canvas>
-                
-                <!-- Data table like Grafana -->
-                <div style="margin-top: 24px; border-top: 1px solid #1b1b1f; padding-top: 8px;">
-                    <table style="width: 100%; font-size: 11px; color: #c7d0d9; border-collapse: collapse;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid #1b1b1f;">
-                                <th style="text-align: left; padding: 4px 8px; font-weight: normal; color: #70747c;">Name</th>
-                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Last *</th>
-                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Mean</th>
-                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Max</th>
-                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Min</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="padding: 4px 8px; color: #4ade80;">— power_watts {device_mac="d8d5b900000ef69", message_type="instantaneousDemand", meter_ma...</td>
-                                <td style="text-align: right; padding: 4px 8px;" id="table-last">--</td>
-                                <td style="text-align: right; padding: 4px 8px;" id="table-mean">--</td>
-                                <td style="text-align: right; padding: 4px 8px;" id="table-max">--</td>
-                                <td style="text-align: right; padding: 4px 8px;" id="table-min">--</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <iframe 
+                    src="https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor?orgId=1&theme=dark&kiosk=tv"
+                    width="100%" 
+                    height="600" 
+                    frameborder="0"
+                    style="border-radius: 8px; background: #111217; border: 1px solid #262626;">
+                </iframe>
             </div>
         </section>
         
@@ -1008,155 +987,7 @@
             document.getElementById('active-services').textContent = count;
         }
 
-        // Initialize Chart.js for power trend
-        const ctx = document.getElementById('powerChart').getContext('2d');
-        
-        const powerData = {
-            labels: [],
-            datasets: [{
-                label: 'power_watts',
-                data: [],
-                borderColor: '#4ade80',  // Bright green matching screenshot
-                backgroundColor: 'transparent',  // No fill
-                borderWidth: 2,
-                tension: 0.1,            // Less smoothing for crisper lines
-                fill: false,             // No fill under line
-                pointRadius: 0,          // No points
-                pointHoverRadius: 4,
-                pointBackgroundColor: '#4ade80',
-                pointBorderColor: '#111217',
-                pointBorderWidth: 2,
-                pointHoverBackgroundColor: '#4ade80',
-                pointHoverBorderColor: '#4ade80',
-                pointHoverBorderWidth: 0
-            }]
-        };
-        
-        const powerChart = new Chart(ctx, {
-            type: 'line',
-            data: powerData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    legend: {
-                        display: false  // Hide legend, using table instead
-                    },
-                    tooltip: {
-                        enabled: false  // Disable tooltips to match Grafana
-                    }
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        grid: {
-                            color: 'rgba(204, 204, 220, 0.04)',
-                            drawTicks: false
-                        },
-                        border: {
-                            display: false
-                        },
-                        ticks: {
-                            color: '#70747c',
-                            font: {
-                                size: 11,
-                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                            },
-                            maxRotation: 0,
-                            autoSkip: true,
-                            maxTicksLimit: 6,
-                            padding: 0
-                        }
-                    },
-                    y: {
-                        display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Power (W)',
-                            color: '#70747c',
-                            font: {
-                                size: 11,
-                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                                weight: 'normal'
-                            }
-                        },
-                        grid: {
-                            color: 'rgba(204, 204, 220, 0.04)',
-                            drawTicks: false
-                        },
-                        border: {
-                            display: false
-                        },
-                        ticks: {
-                            color: '#70747c',
-                            font: {
-                                size: 11,
-                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                            },
-                            callback: function(value) {
-                                return value + ' W';
-                            },
-                            stepSize: 100,
-                            padding: 0
-                        },
-                        beginAtZero: true
-                    }
-                },
-                animation: {
-                    duration: 0  // No animation for Grafana-like feel
-                }
-            }
-        });
-        
-        // Store power readings for chart
-        let powerReadings = [];
-        
-        // Update fetchPowerData to also update chart
-        const originalFetchPowerData = fetchPowerData;
-        fetchPowerData = async function() {
-            await originalFetchPowerData();
-            
-            // Get current power value
-            const powerElement = document.getElementById('current-power');
-            if (powerElement && powerElement.textContent !== '--') {
-                const power = parseInt(powerElement.textContent);
-                const now = new Date();
-                const timeStr = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
-                
-                // Add to chart data
-                powerReadings.push({time: timeStr, power: power});
-                
-                // Keep only last 20 readings
-                if (powerReadings.length > 20) {
-                    powerReadings.shift();
-                }
-                
-                // Update chart
-                powerChart.data.labels = powerReadings.map(r => r.time);
-                powerChart.data.datasets[0].data = powerReadings.map(r => r.power);
-                
-                // Update Y axis scale dynamically
-                const allData = powerChart.data.datasets[0].data;
-                if (allData.length > 0) {
-                    const min = Math.min(...allData);
-                    const max = Math.max(...allData);
-                    const padding = (max - min) * 0.1 || 100;
-                    
-                    // Update table values
-                    document.getElementById('table-last').textContent = power + ' W';
-                    document.getElementById('table-mean').textContent = Math.round(allData.reduce((a, b) => a + b, 0) / allData.length) + ' W';
-                    document.getElementById('table-max').textContent = max + ' W';
-                    document.getElementById('table-min').textContent = min + ' W';
-                }
-                
-                powerChart.update('none'); // No animation for smooth updates
-            }
-        };
+        // Chart.js code removed - using embedded Grafana dashboard instead
         
         // Initialize and start periodic updates
         fetchPowerData();

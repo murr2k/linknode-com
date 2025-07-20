@@ -5,8 +5,12 @@ datasources:
     type: influxdb
     access: proxy
     url: http://linknode-influxdb.internal:8086
-    database: eagle_monitor
     isDefault: true
     jsonData:
-      httpMode: GET
+      version: Flux
+      organization: linknode
+      defaultBucket: energy
+      tlsSkipVerify: true
+    secureJsonData:
+      token: $INFLUXDB_TOKEN
     editable: false
