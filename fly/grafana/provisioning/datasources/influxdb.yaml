@@ -12,5 +12,5 @@ datasources:
       defaultBucket: energy
       tlsSkipVerify: true
     secureJsonData:
-      token: $INFLUXDB_TOKEN
+      token: ${INFLUXDB_TOKEN}
     editable: false

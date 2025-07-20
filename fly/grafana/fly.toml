@@ -7,8 +7,18 @@ primary_region = "iad"
 [env]
   GF_SECURITY_ALLOW_EMBEDDING = "true"
   GF_AUTH_ANONYMOUS_ENABLED = "true"
+  GF_AUTH_ANONYMOUS_ORG_NAME = "Main Org."
   GF_AUTH_ANONYMOUS_ORG_ROLE = "Viewer"
   GF_AUTH_DISABLE_LOGIN_FORM = "true"
+  GF_AUTH_BASIC_ENABLED = "true"
+  GF_RBAC_PERMISSION_CACHE_ENABLED = "false"
+  GF_RBAC_ENABLED = "false"
+  GF_USERS_DEFAULT_PERMISSIONS = "Viewer"
+  GF_AUTH_ANONYMOUS_ORG_ID = "1"
+  GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH = "/etc/grafana/provisioning/dashboards/power-monitoring.json"
+  GF_PUBLIC_DASHBOARDS_ENABLED = "true"
+  GF_FEATURE_TOGGLES_ENABLE = "publicDashboards"
+  GF_SECURITY_COOKIE_SAMESITE = "disabled"
   GF_LOG_LEVEL = "info"
 
 [[services]]
