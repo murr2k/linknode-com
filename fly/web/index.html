@@ -672,6 +672,7 @@
                     <h3 style="text-align: center; margin-bottom: 1rem;">⚡ Real-Time Power Consumption</h3>
                     <div class="power-display">
                         <span class="power-value" id="current-power">--</span>
+                        <div style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;" id="power-status">Loading...</div>
                         <span class="power-unit">W</span>
                     </div>
                     <div class="power-status">
@@ -725,13 +726,15 @@
 
             <!-- Embedded Grafana Dashboard -->
             <div class="grafana-preview">
-                <iframe 
-                    src="https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor?orgId=1&theme=dark&kiosk"
-                    width="100%" 
-                    height="600" 
-                    frameborder="0"
-                    style="border-radius: 8px; background: #111217; border: 1px solid #262626;">
-                </iframe>
+                <div style="height: 600px; display: flex; align-items: center; justify-content: center; background: #111217; border-radius: 8px; border: 1px solid #262626;">
+                    <div style="text-align: center;">
+                        <h3 style="color: #c7d0d9; margin-bottom: 1rem;">Grafana Dashboard</h3>
+                        <p style="color: #888; margin-bottom: 1.5rem;">View the full energy monitoring dashboard</p>
+                        <a href="https://linknode-grafana.fly.dev/" target="_blank" style="display: inline-block; padding: 0.75rem 2rem; background: #667eea; color: white; border-radius: 6px; text-decoration: none; font-weight: 500;">
+                            Open Grafana Dashboard →
+                        </a>
+                    </div>
+                </div>
             </div>
         </section>
         
@@ -909,10 +912,18 @@
                     document.getElementById('power-max').textContent = Math.round(data.max_24h || 0) + 'W';
                     document.getElementById('power-avg').textContent = Math.round(data.avg_24h || 0) + 'W';
                     document.getElementById('power-cost').textContent = '$' + (data.cost_24h || 0).toFixed(2);
+                    
+                    // Update status
+                    document.getElementById('power-status').textContent = 'Live';
+                    document.getElementById('power-status').style.color = '#4ade80';
+                } else {
+                    throw new Error('API returned status ' + response.status);
                 }
             } catch (error) {
                 console.error('Error fetching power data:', error);
-                document.getElementById('current-power').textContent = '--';
+                document.getElementById('current-power').textContent = 'ERR';
+                document.getElementById('power-status').textContent = 'Error: ' + error.message;
+                document.getElementById('power-status').style.color = '#ef4444';
             } finally {
                 indicator.classList.remove('updating');
             }
@@ -990,8 +1001,9 @@
         // Chart.js code removed - using embedded Grafana dashboard instead
         
         // Initialize and start periodic updates
-        fetchPowerData();
-        checkAPIStatuses();
+        console.log('Starting LinkNode Energy Monitor...');
+        fetchPowerData().then(() => console.log('Initial power data fetch completed'));
+        checkAPIStatuses().then(() => console.log('Initial status check completed'));
         
         // Update power data every 5 seconds
         setInterval(fetchPowerData, 5000);

@@ -1,10 +1,21 @@
 FROM grafana/grafana:10.2.0
 
+# Use root user to set permissions
+USER root
+
 # Copy custom configuration
-COPY --chown=472:472 grafana.ini /etc/grafana/grafana.ini
+COPY grafana.ini /etc/grafana/grafana.ini
 
 # Copy provisioning files  
-COPY --chown=472:472 provisioning /etc/grafana/provisioning
+COPY provisioning /etc/grafana/provisioning
+
+# Set proper permissions
+RUN chown -R grafana:root /etc/grafana && \
+    chmod -R 755 /usr/share/grafana && \
+    chown -R grafana:root /var/lib/grafana
+
+# Switch back to grafana user
+USER 472
 
 # Expose Grafana port
 EXPOSE 3000

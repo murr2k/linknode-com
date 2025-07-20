@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Status</title>
+    <meta http-equiv="refresh" content="5">
+</head>
+<body>
+    <h1>LinkNode Energy Monitor - Live Status</h1>
+    <p>Page loaded at: <span id="time"></span></p>
+    <div id="status">Loading...</div>
+    
+    <script>
+        document.getElementById('time').textContent = new Date().toLocaleString();
+        
+        // Fetch and display current status
+        fetch('https://linknode-eagle-monitor.fly.dev/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status').innerHTML = `
+                    <h2>✅ System Operational</h2>
+                    <ul>
+                        <li><strong>Current Power:</strong> ${data.current_power} watts</li>
+                        <li><strong>24h Average:</strong> ${Math.round(data.avg_24h)} watts</li>
+                        <li><strong>24h Max:</strong> ${data.max_24h} watts</li>
+                        <li><strong>24h Min:</strong> ${data.min_24h} watts</li>
+                        <li><strong>24h Cost:</strong> $${data.cost_24h.toFixed(2)}</li>
+                        <li><strong>Successful Writes:</strong> ${data.monitor_stats.successful_writes}</li>
+                        <li><strong>Last Update:</strong> ${new Date(data.last_update).toLocaleString()}</li>
+                    </ul>
+                `;
+            })
+            .catch(error => {
+                document.getElementById('status').innerHTML = `<h2>❌ Error: ${error.message}</h2>`;
+            });
+    </script>
+</body>
+</html>

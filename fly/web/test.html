@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 20px 0; padding: 20px; background: #f0f0f0; border-radius: 5px; }
+        .error { background: #ffcccc; }
+        .success { background: #ccffcc; }
+    </style>
+</head>
+<body>
+    <h1>LinkNode API Test</h1>
+    <button onclick="testAPI()">Test API</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing API...';
+            
+            try {
+                console.log('Fetching from API...');
+                const response = await fetch('https://linknode-eagle-monitor.fly.dev/api/stats');
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Data received:', data);
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h2>API Test Successful!</h2>
+                    <p><strong>Current Power:</strong> ${data.current_power} watts</p>
+                    <p><strong>Last Update:</strong> ${new Date(data.last_update).toLocaleString()}</p>
+                    <p><strong>24h Average:</strong> ${Math.round(data.avg_24h)} watts</p>
+                    <p><strong>24h Max:</strong> ${data.max_24h} watts</p>
+                    <p><strong>24h Min:</strong> ${data.min_24h} watts</p>
+                    <p><strong>24h Cost:</strong> $${data.cost_24h.toFixed(2)}</p>
+                    <h3>Raw Data:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('API Error:', error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h2>API Test Failed</h2>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Check the browser console for more details.</p>
+                `;
+            }
+        }
+        
+        // Auto-test on load
+        window.onload = () => {
+            console.log('Page loaded, auto-testing API...');
+            testAPI();
+        };
+    </script>
+</body>
+</html>
