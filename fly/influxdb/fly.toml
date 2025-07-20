@@ -5,12 +5,13 @@ primary_region = "ord"
 
 [env]
   DOCKER_INFLUXDB_INIT_MODE = "setup"
-  DOCKER_INFLUXDB_INIT_USERNAME = "admin"
-  DOCKER_INFLUXDB_INIT_PASSWORD = "admin123456"
   DOCKER_INFLUXDB_INIT_ORG = "linknode"
   DOCKER_INFLUXDB_INIT_BUCKET = "energy"
   DOCKER_INFLUXDB_INIT_RETENTION = "30d"
-  DOCKER_INFLUXDB_INIT_ADMIN_TOKEN = "my-super-secret-auth-token"
+  # IMPORTANT: Set these as fly secrets:
+  # fly secrets set DOCKER_INFLUXDB_INIT_USERNAME=admin
+  # fly secrets set DOCKER_INFLUXDB_INIT_PASSWORD=your-secure-password
+  # fly secrets set DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=your-secure-token
 
 [[services]]
   internal_port = 8086

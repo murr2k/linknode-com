@@ -8,7 +8,7 @@ if [ ! -f /var/lib/influxdb2/.influxdbv2 ]; then
     # Set up initial configuration
     export INFLUXD_INIT_MODE=setup
     export INFLUXD_INIT_USERNAME=admin
-    export INFLUXD_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD:-linknode-admin-2024}
+    export INFLUXD_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD}
     export INFLUXD_INIT_ORG=linknode
     export INFLUXD_INIT_BUCKET=energy
     export INFLUXD_INIT_RETENTION=30d

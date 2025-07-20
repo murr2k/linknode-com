@@ -360,13 +360,14 @@
         }
         
         .grafana-preview {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 1rem;
+            background: #111217;
+            border: 1px solid #1b1b1f;
+            border-radius: 2px;
+            padding: 16px;
             margin: 2rem 0;
-            min-height: 400px;
+            min-height: 300px;
             position: relative;
+            overflow: hidden;
         }
         
         .grafana-preview iframe {
@@ -724,11 +725,34 @@
 
             <!-- Power Usage Chart -->
             <div class="grafana-preview">
-                <h3 style="text-align: center; color: #667eea; margin-bottom: 1rem;">📊 Power Usage Trend</h3>
-                <canvas id="powerChart" width="400" height="200" style="width: 100%; max-height: 200px;"></canvas>
-                <p style="text-align: center; margin-top: 1rem; opacity: 0.7;">
-                    Real-time power consumption data from your Eagle-200 meter
-                </p>
+                <div style="margin-bottom: 12px;">
+                    <h3 style="color: #c7d0d9; font-size: 14px; font-weight: normal; margin: 0;">Power Consumption Over Time</h3>
+                </div>
+                <canvas id="powerChart" width="400" height="200" style="width: 100%; max-height: 280px;"></canvas>
+                
+                <!-- Data table like Grafana -->
+                <div style="margin-top: 24px; border-top: 1px solid #1b1b1f; padding-top: 8px;">
+                    <table style="width: 100%; font-size: 11px; color: #c7d0d9; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #1b1b1f;">
+                                <th style="text-align: left; padding: 4px 8px; font-weight: normal; color: #70747c;">Name</th>
+                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Last *</th>
+                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Mean</th>
+                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Max</th>
+                                <th style="text-align: right; padding: 4px 8px; font-weight: normal; color: #70747c;">Min</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 4px 8px; color: #4ade80;">— power_watts {device_mac="d8d5b900000ef69", message_type="instantaneousDemand", meter_ma...</td>
+                                <td style="text-align: right; padding: 4px 8px;" id="table-last">--</td>
+                                <td style="text-align: right; padding: 4px 8px;" id="table-mean">--</td>
+                                <td style="text-align: right; padding: 4px 8px;" id="table-max">--</td>
+                                <td style="text-align: right; padding: 4px 8px;" id="table-min">--</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
         
@@ -986,15 +1010,25 @@
 
         // Initialize Chart.js for power trend
         const ctx = document.getElementById('powerChart').getContext('2d');
+        
         const powerData = {
             labels: [],
             datasets: [{
-                label: 'Power (W)',
+                label: 'power_watts',
                 data: [],
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.4,
-                fill: true
+                borderColor: '#4ade80',  // Bright green matching screenshot
+                backgroundColor: 'transparent',  // No fill
+                borderWidth: 2,
+                tension: 0.1,            // Less smoothing for crisper lines
+                fill: false,             // No fill under line
+                pointRadius: 0,          // No points
+                pointHoverRadius: 4,
+                pointBackgroundColor: '#4ade80',
+                pointBorderColor: '#111217',
+                pointBorderWidth: 2,
+                pointHoverBackgroundColor: '#4ade80',
+                pointHoverBorderColor: '#4ade80',
+                pointHoverBorderWidth: 0
             }]
         };
         
@@ -1004,33 +1038,77 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 plugins: {
                     legend: {
-                        display: false
+                        display: false  // Hide legend, using table instead
+                    },
+                    tooltip: {
+                        enabled: false  // Disable tooltips to match Grafana
                     }
                 },
                 scales: {
                     x: {
                         display: true,
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.1)'
+                            color: 'rgba(204, 204, 220, 0.04)',
+                            drawTicks: false
+                        },
+                        border: {
+                            display: false
                         },
                         ticks: {
-                            color: 'rgba(255, 255, 255, 0.7)'
+                            color: '#70747c',
+                            font: {
+                                size: 11,
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            },
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 6,
+                            padding: 0
                         }
                     },
                     y: {
                         display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Power (W)',
+                            color: '#70747c',
+                            font: {
+                                size: 11,
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                weight: 'normal'
+                            }
+                        },
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.1)'
+                            color: 'rgba(204, 204, 220, 0.04)',
+                            drawTicks: false
+                        },
+                        border: {
+                            display: false
                         },
                         ticks: {
-                            color: 'rgba(255, 255, 255, 0.7)',
+                            color: '#70747c',
+                            font: {
+                                size: 11,
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            },
                             callback: function(value) {
-                                return value + 'W';
-                            }
-                        }
+                                return value + ' W';
+                            },
+                            stepSize: 100,
+                            padding: 0
+                        },
+                        beginAtZero: true
                     }
+                },
+                animation: {
+                    duration: 0  // No animation for Grafana-like feel
                 }
             }
         });
@@ -1061,6 +1139,21 @@
                 // Update chart
                 powerChart.data.labels = powerReadings.map(r => r.time);
                 powerChart.data.datasets[0].data = powerReadings.map(r => r.power);
+                
+                // Update Y axis scale dynamically
+                const allData = powerChart.data.datasets[0].data;
+                if (allData.length > 0) {
+                    const min = Math.min(...allData);
+                    const max = Math.max(...allData);
+                    const padding = (max - min) * 0.1 || 100;
+                    
+                    // Update table values
+                    document.getElementById('table-last').textContent = power + ' W';
+                    document.getElementById('table-mean').textContent = Math.round(allData.reduce((a, b) => a + b, 0) / allData.length) + ' W';
+                    document.getElementById('table-max').textContent = max + ' W';
+                    document.getElementById('table-min').textContent = min + ' W';
+                }
+                
                 powerChart.update('none'); // No animation for smooth updates
             }
         };

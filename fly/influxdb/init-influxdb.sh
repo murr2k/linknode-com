@@ -11,7 +11,7 @@ ADMIN_TOKEN="linknode-$(date +%Y%m%d)-$(openssl rand -hex 16)"
 # Set environment variables for auto-setup
 export DOCKER_INFLUXDB_INIT_MODE=setup
 export DOCKER_INFLUXDB_INIT_USERNAME=admin
-export DOCKER_INFLUXDB_INIT_PASSWORD="${INFLUXDB_ADMIN_PASSWORD:-linknode-admin-2024}"
+export DOCKER_INFLUXDB_INIT_PASSWORD="${INFLUXDB_ADMIN_PASSWORD}"
 export DOCKER_INFLUXDB_INIT_ORG=linknode
 export DOCKER_INFLUXDB_INIT_BUCKET=energy
 export DOCKER_INFLUXDB_INIT_RETENTION=30d

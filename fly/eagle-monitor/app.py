@@ -27,7 +27,7 @@ CORS(app)  # Enable CORS for all routes
 
 # InfluxDB configuration
 INFLUXDB_URL = os.getenv('INFLUXDB_URL', 'http://linknode-influxdb.internal:8086')
-INFLUXDB_TOKEN = os.getenv('INFLUXDB_TOKEN', '')
+INFLUXDB_TOKEN = os.getenv('INFLUXDB_TOKEN')  # Required - must be set via fly secrets
 INFLUXDB_ORG = os.getenv('INFLUXDB_ORG', 'linknode')
 INFLUXDB_BUCKET = os.getenv('INFLUXDB_BUCKET', 'energy')
 

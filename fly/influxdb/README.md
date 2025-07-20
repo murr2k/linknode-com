@@ -13,8 +13,8 @@ InfluxDB has been successfully deployed with the following configuration:
 
 - **Organization**: linknode
 - **Username**: admin
-- **Password**: linknode-admin-2024
-- **Admin Token**: `linknode-20250720-7468d2699f48f7f91ee4abbeec90a25f`
+- **Password**: (set via fly secrets)
+- **Admin Token**: (generated during deployment - check fly secrets)
 
 ## Configuration
 
@@ -26,8 +26,8 @@ InfluxDB has been successfully deployed with the following configuration:
 
 1. Set the admin token in your other Fly apps:
    ```bash
-   fly secrets set INFLUXDB_TOKEN='linknode-20250720-7468d2699f48f7f91ee4abbeec90a25f' --app linknode-eagle-monitor
-   fly secrets set INFLUXDB_TOKEN='linknode-20250720-7468d2699f48f7f91ee4abbeec90a25f' --app linknode-grafana
+   fly secrets set INFLUXDB_TOKEN='<your-influxdb-token>' --app linknode-eagle-monitor
+   fly secrets set INFLUXDB_TOKEN='<your-influxdb-token>' --app linknode-grafana
    ```
 
 2. Configure your applications to use InfluxDB:

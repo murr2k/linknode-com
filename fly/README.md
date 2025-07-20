@@ -2,6 +2,13 @@
 
 This directory contains the configuration files and Dockerfiles needed to deploy the Rackspace energy monitoring system on Fly.io.
 
+## ⚠️ Security Notice
+
+**IMPORTANT**: This project requires secrets for authentication. Before deploying:
+1. Read the [SECRETS_SETUP.md](SECRETS_SETUP.md) guide
+2. Configure all required secrets using `fly secrets set`
+3. Never commit secrets to version control
+
 ## Directory Structure
 
 ```
