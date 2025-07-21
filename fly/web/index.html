@@ -1011,7 +1011,7 @@
         fetchPowerData().then(() => console.log('Initial power data fetch completed'));
         checkAPIStatuses().then(() => console.log('Initial status check completed'));
         
-        // Update power data every 5 seconds
+        // Update power data every 5 seconds.
         setInterval(fetchPowerData, 5000);
         
         // Update API statuses every 30 seconds
