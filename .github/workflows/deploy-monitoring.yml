@@ -122,6 +122,10 @@ jobs:
         echo "✅ Dashboards updated live - no Grafana restart needed!" >> $GITHUB_STEP_SUMMARY
         echo "Just refresh your browser to see changes." >> $GITHUB_STEP_SUMMARY
 
+    - name: Generate short SHA
+      id: short-sha
+      run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+      
     - name: Slack Notification - Success
       if: success()
       uses: 8398a7/action-slack@v3
@@ -132,7 +136,7 @@ jobs:
           
           *Environment:* Rackspace K8s
           *Branch:* ${{ github.ref_name }}
-          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Commit:* `${{ steps.short-sha.outputs.sha }}`
           *Author:* ${{ github.actor }}
           
           *Live Monitoring:*
@@ -152,7 +156,7 @@ jobs:
           
           *Environment:* Rackspace K8s
           *Branch:* ${{ github.ref_name }}
-          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Commit:* `${{ steps.short-sha.outputs.sha }}`
           *Author:* ${{ github.actor }}
           
           *Error:* Check the <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|workflow logs>
