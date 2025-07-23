@@ -1,31 +1,29 @@
-# Rackspace Kubernetes Demo
+# Linknode Energy Monitor
 
-A modern, interactive Kubernetes demo application showcasing cloud-native deployment on Rackspace's managed Kubernetes platform.
+A real-time energy monitoring dashboard that tracks power consumption using Eagle-200 smart meter data. Built with modern web technologies, comprehensive testing, and deployed on Fly.io.
 
-![Kubernetes](https://img.shields.io/badge/kubernetes-%23326ce5.svg?style=for-the-badge&logo=kubernetes&logoColor=white)
-![Nginx](https://img.shields.io/badge/nginx-%23009639.svg?style=for-the-badge&logo=nginx&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-45ba4b?style=for-the-badge&logo=playwright&logoColor=white)
+![Fly.io](https://img.shields.io/badge/Fly.io-8B5CF6?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdOb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyUzYuNDggMjIgMTIgMjJTMjIgMTcuNTIgMjIgMTJTMTcuNTIgMiAxMiAyWk0xMiAyMEMxMiAyMCAxMiAyMCAxMiAyMFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPg==&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
 
 ## 🚀 Live Demo
 
-**Public URLs**:
-- **Custom Domain**: https://linknode.com
-- **Direct Access**: http://119.9.118.22:30898
-- **Cloudflare Tunnel**: https://daniel-holidays-diesel-gross.trycloudflare.com
+**Production URLs**:
+- **Main Site**: [https://linknode.com](https://linknode.com)
+- **Direct Fly URL**: https://linknode-web.fly.dev
+- **Grafana Dashboard**: https://linknode-grafana.fly.dev
+- **Eagle Monitor API**: https://linknode-eagle-monitor.fly.dev/api/stats
 
-**Monitoring Stack**:
-- **Grafana Dashboard**: http://119.9.118.22:30300
-- **Eagle XML Endpoint**: http://119.9.118.22:30500 (accepts XML data)
+### Current Status
 
-### What's Special About This Demo?
+✅ **All systems operational** | 🔖 **Version: v1.0.0-baseline**
 
-This entire Kubernetes platform was **built in under 24 hours** using AI-augmented development, showcasing:
-- Enterprise-grade infrastructure deployed at record speed
-- Production-ready patterns and best practices
-- Live auto-scaling and self-healing capabilities
-- Professional marketing content integrated seamlessly
-
-Visit the live demo to see both the technical capabilities and learn about AI-augmented development services.
+This project features:
+- Comprehensive E2E testing with Playwright (3 phases, 30+ test scenarios)
+- Regression testing baseline established for quality assurance
+- Automated CI/CD with GitHub Actions
+- Real-time power monitoring with Eagle-200 integration
+- Professional UI with dark theme and responsive design
 
 ## 📋 Features
 
@@ -57,12 +55,72 @@ Visit the live demo to see both the technical capabilities and learn about AI-au
   - Public dashboards with read-only access
 - **WSL2 Compatible**: Optimized for Windows Subsystem for Linux
 
+## 🤖 Claude Flow Development
+
+This project is optimized for development with [claude-flow](https://github.com/ruvnet/claude-flow). State files are maintained for seamless session continuity.
+
+### Resume Development
+
+**General development session:**
+```bash
+claude-flow --project linknode \
+  --context "Resume development of energy monitoring app with established regression baseline. Check CLAUDE_FLOW_STATE.md for full context. Website live at https://linknode.com" \
+  --tools git,bash,web \
+  --model opus-4
+```
+
+**Comprehensive session with status check:**
+```bash
+claude-flow --project linknode \
+  --context "Continue linknode.com development. Regression baseline established (v1.0.0-baseline). All tests passing. Review CLAUDE_FLOW_STATE.md and .claude/PROJECT_CONTEXT.md for details." \
+  --task "Check current deployment status and run baseline comparison" \
+  --tools git,bash,web,grep,read,write \
+  --model opus-4 \
+  --verbose
+```
+
+### Task-Specific Sessions
+
+**Performance Optimization:**
+```bash
+claude-flow --project linknode \
+  --context "Optimize linknode.com performance. Baseline FCP: 148ms. See test-baselines/baseline.json" \
+  --task "Analyze and improve Core Web Vitals" \
+  --tools all \
+  --model opus-4
+```
+
+**Feature Development:**
+```bash
+claude-flow --project linknode \
+  --context "Add new features to linknode.com. Run regression tests after changes" \
+  --task "Implement historical data visualization" \
+  --tools all \
+  --model opus-4
+```
+
+**Testing/Maintenance:**
+```bash
+claude-flow --project linknode \
+  --context "Maintenance session for linknode.com" \
+  --task "Run npm run baseline:compare and update baselines if needed" \
+  --tools git,bash,read,write \
+  --model opus-4
+```
+
+### State Files
+
+- `CLAUDE_FLOW_STATE.md` - Comprehensive session history and project state
+- `.claude/PROJECT_CONTEXT.md` - Quick reference and key commands
+- `test-baselines/` - Regression testing baselines (visual, performance, API)
+
 ## 🛠️ Prerequisites
 
-- Kubernetes cluster (tested on v1.31.1)
-- kubectl CLI tool
-- Valid kubeconfig file
-- Docker (for building custom images)
+- Node.js 20+
+- npm or yarn
+- Fly.io CLI (`flyctl`)
+- Git
+- Playwright (for testing)
 
 ## 📦 Quick Start
 
@@ -72,110 +130,125 @@ Visit the live demo to see both the technical capabilities and learn about AI-au
    cd rackspace-k8s-demo
    ```
 
-2. **Deploy to Kubernetes**
+2. **Install dependencies**
    ```bash
-   # Create namespace
-   kubectl apply -f k8s/namespace.yaml
-   
-   # Deploy all resources
-   kubectl apply -f k8s/
+   npm install
    ```
 
-3. **Access the application**
-   
-   For NodePort (public access):
+3. **Run tests**
    ```bash
-   kubectl get svc -n demo-app
-   # Access at http://<NODE-IP>:<NODE-PORT>
+   npm test                    # Run all tests
+   npm run baseline:compare    # Compare against baseline
    ```
-   
-   For local access:
+
+4. **Deploy to Fly.io**
    ```bash
-   ./wsl-access.sh
-   # Access at http://localhost:8090
+   # Deployment is automated via GitHub Actions
+   git push origin main
+   
+   # Or manual deployment:
+   cd fly/web && flyctl deploy
    ```
+
+5. **Access the application**
+   - Production: https://linknode.com
+   - Grafana: https://linknode-grafana.fly.dev
 
 ## 📁 Project Structure
 
 ```
-rackspace-k8s-demo/
-├── app/                      # Application source code
-│   ├── app.py               # Flask application
-│   ├── power_monitor.py     # Power monitoring endpoints
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile           # Container definition
-├── k8s/                      # Kubernetes manifests
-│   ├── namespace.yaml       # Namespace definition
-│   ├── configmap.yaml       # App configuration
-│   ├── configmap-nginx-fixed.yaml # Enhanced interactive webpage
-│   ├── configmap-monitoring-xml.yaml # Eagle XML monitoring code
-│   ├── configmap-grafana-*.yaml # Grafana configurations
-│   ├── deployment.yaml      # Main deployment
-│   ├── deployment-nginx.yaml# Nginx deployment
-│   ├── deployment-monitoring-xml.yaml # Eagle monitoring stack
-│   ├── service.yaml         # Service definition
-│   ├── hpa.yaml            # Horizontal Pod Autoscaler
-│   ├── influxdb.yaml       # Time-series database
-│   ├── grafana-anonymous-complete.yaml # Public Grafana setup
-│   └── grafana-dashboard-*.yaml # Dashboard configs
-├── monitoring/              # Monitoring utilities
-│   ├── diagnose-no-data.sh # Troubleshooting script
-│   └── *.md                # Documentation
-├── .github/workflows/       # CI/CD pipelines
-│   ├── deploy.yml          # Main deployment
-│   ├── deploy-monitoring.yml # Monitoring deployment
-│   ├── deploy-fly.yml      # Fly.io edge deployment
-│   └── e2e-tests.yml       # Playwright E2E tests
-├── e2e/                    # End-to-end tests
-│   ├── tests/             # Test suites
-│   ├── pages/             # Page Object Model
-│   └── utils/             # Test utilities
-├── wsl-access.sh           # WSL2 port-forward script
-├── ssh-tunnel-setup.sh     # SSH tunnel setup
-└── README.md              # This file
+rackspace/
+├── fly/                          # Fly.io service configurations
+│   ├── web/                      # Main website (nginx)
+│   │   ├── index.html           # Interactive dashboard
+│   │   ├── nginx.conf           # Web server config
+│   │   └── Dockerfile           # Container definition
+│   ├── eagle-monitor/            # Power monitoring API
+│   │   ├── server.js            # Node.js API server
+│   │   └── Dockerfile           # Container definition
+│   ├── grafana/                  # Metrics dashboard
+│   │   └── provisioning/        # Dashboard configs
+│   └── influxdb/                 # Time series database
+│       └── Dockerfile           # Container definition
+├── e2e/                          # E2E test suite
+│   ├── tests/                    # Test specifications
+│   │   ├── regression/           # Regression tests
+│   │   ├── visual/               # Visual tests
+│   │   └── performance/          # Performance tests
+│   ├── pages/                    # Page object models
+│   ├── utils/                    # Test utilities
+│   └── reporters/                # Custom reporters
+├── scripts/                      # Utility scripts
+│   ├── capture-baseline.ts       # Baseline capture
+│   └── compare-baseline.ts       # Baseline comparison
+├── test-baselines/               # Regression baselines
+│   ├── visual/                   # Screenshot baselines
+│   └── baseline.json             # Performance/feature baseline
+├── .github/workflows/            # CI/CD pipelines
+│   ├── deploy-fly.yml           # Main deployment
+│   ├── e2e-tests.yml            # E2E test suite
+│   ├── e2e-tests-phase3.yml     # Advanced tests
+│   └── regression-tests.yml      # Regression testing
+├── CLAUDE_FLOW_STATE.md         # Session continuity
+├── .claude/PROJECT_CONTEXT.md   # Quick reference
+└── README.md                    # This file
 ```
 
-## 🔧 Configuration
+## 🧪 Testing
 
-### Service Types
+### Comprehensive Test Suite
 
-The demo supports three service types:
-
-1. **ClusterIP** (default) - Internal access only
-2. **NodePort** - Public access on high port (30000-32767)
-3. **LoadBalancer** - Public access with dedicated IP
-
-To change service type:
 ```bash
-kubectl patch svc demo-app-service -n demo-app -p '{"spec":{"type":"NodePort"}}'
+# Run all tests
+npm test
+
+# Specific test categories
+npm run test:api          # API integration tests
+npm run test:visual       # Visual regression tests
+npm run test:perf         # Performance tests
+npm run test:a11y         # Accessibility tests
+npm run test:phase3       # Advanced tests
+
+# Regression testing
+npm run baseline:capture  # Capture new baseline
+npm run baseline:compare  # Compare against baseline
+npm run test:regression   # Run regression suite
 ```
 
-### Scaling
+### Test Coverage
 
-Manual scaling:
+- **Phase 1**: Smoke tests (18 scenarios)
+- **Phase 2**: API mocking, visual regression, performance, accessibility
+- **Phase 3**: Advanced visual and performance profiling
+- **Regression**: Baseline comparison with tolerances
+
+## 🚀 Deployment
+
+### Automated Deployment
+
+Push to main branch triggers automatic deployment:
+
 ```bash
-kubectl scale deployment demo-app -n demo-app --replicas=5
+git push origin main
 ```
 
-Auto-scaling is configured via HPA:
-- Min replicas: 2
-- Max replicas: 10
-- Target CPU: 70%
-- Target Memory: 80%
+### Manual Deployment
 
-## 🔒 Security
+Deploy individual services:
 
-- No default public exposure (ClusterIP)
-- SSH-only access option available
-- Resource limits enforced
-- Non-root container user
-- Health checks configured
+```bash
+cd fly/web && flyctl deploy
+cd fly/eagle-monitor && flyctl deploy
+cd fly/grafana && flyctl deploy
+cd fly/influxdb && flyctl deploy
+```
 
-## 💰 Cost Optimization
+### Environment Variables
 
-- **NodePort**: $0/month (uses existing infrastructure)
-- **ClusterIP + Port Forward**: $0/month (most secure)
-- **LoadBalancer**: ~$10-25/month (not recommended for demos)
+Required secrets in GitHub:
+- `FLY_API_TOKEN` - Fly.io deployment token
+- `INFLUXDB_TOKEN` - InfluxDB authentication
+- `EAGLE_IP` - Eagle-200 device IP address
 
 ## 🤝 Contributing
 
@@ -197,121 +270,91 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Rackspace for the Kubernetes platform
-- The Kubernetes community
-- All contributors and testers
+- Built with AI-augmented development using Claude
+- Deployed on [Fly.io](https://fly.io)
+- Testing with [Playwright](https://playwright.dev)
+- Monitoring with [Grafana](https://grafana.com) and [InfluxDB](https://www.influxdata.com)
 
-## 📊 Power Monitoring Dashboard
+## 📊 Regression Testing
 
-This demo includes a real-time power monitoring system integrated with EAGLE smart meters:
+### Baseline Established
 
-### Features
-- **Real-time Data**: Updates every 5 seconds
-- **Grafana Dashboard**: Beautiful visualizations at http://119.9.118.22:30300
-- **XML API**: Accepts XML data from Eagle-200 devices
-- **Time-series Storage**: InfluxDB for historical data
-- **Auto-deployment**: Dashboard updates via CI/CD pipeline
+Version **v1.0.0-baseline** (2025-07-23) serves as the regression testing baseline:
 
-### Eagle-200 Configuration
-Configure your Eagle-200 device to send data to:
-- Cloud Provider: Other
-- Protocol: XML/RAW
-- Hostname: 119.9.118.22
-- Port: 30500
-- URL: /
-- Format: XML_RAW
+- **Visual Baselines**: 8 screenshots (desktop, tablet, mobile, components)
+- **Performance Metrics**: FCP 148ms, Total duration 86.3ms
+- **Feature Validation**: All features documented and verified
+- **API Contracts**: All endpoints returning 200 OK
 
-### Dashboard Metrics
-- Current power gauge (0-10kW range)
-- 24-hour total usage and cost
-- Power consumption time series
-- Min/Max/Average statistics  
-- Weekly usage heatmap
-- Hourly consumption breakdown
-- Estimated monthly cost
+### Running Regression Tests
 
-### Interactive Web Features
-The demo webpage includes several live widgets:
-
-1. **Live Power Widget**:
-   - Real-time power consumption display
-   - Updates every 5 seconds from Eagle-200
-   - Shows current watts, 24h usage, and estimated cost
-   - Falls back to simulated data if API unavailable
-
-2. **Embedded Grafana Dashboard**:
-   - Public dashboard - no login required!
-   - Shows power consumption graph
-   - Fully interactive with time range selection
-   - Direct link: http://119.9.118.22:30300/d/eagle-energy/eagle-energy-monitor?orgId=1
-
-3. **API Status Indicators**:
-   - InfluxDB API health
-   - Grafana service status  
-   - Eagle XML endpoint availability
-   - Visual indicators (green = online, red = offline)
-
-4. **Real-time Metrics**:
-   - Active pod count
-   - Total connections
-   - Auto-refreshing statistics
-
-5. **Enterprise Showcase Section**:
-   - Learn about AI-augmented development
-   - See how this platform was built in <24 hours
-   - Interactive animations and modern UI design
-
-## 🚀 CI/CD Pipeline
-
-The project includes GitHub Actions workflows for automated deployment and testing:
-
-1. **Main Deployment** (`deploy.yml`):
-   - Deploys application and monitoring stack
-   - Updates Grafana dashboards live (no restart)
-   - Triggered on push to `main` branch
-
-2. **Monitoring Deployment** (`deploy-monitoring.yml`):
-   - Dedicated workflow for monitoring updates
-   - Live dashboard updates without service interruption
-
-3. **Fly.io Deployment** (`deploy-fly.yml`):
-   - Deploys to global edge network
-   - Multi-region distribution
-   - Automatic SSL certificates
-
-4. **E2E Testing** (`e2e-tests.yml`):
-   - Automated Playwright tests on every PR
-   - Multi-browser testing (Chrome, Firefox, Safari)
-   - Visual regression, API, and performance tests
-   - Accessibility compliance validation
-
-### Automated Updates
-- Push changes to `k8s/grafana-dashboard-*.yaml`
-- Pipeline automatically deploys within minutes
-- Dashboards update live - just refresh your browser!
-
-## 🧪 End-to-End Testing
-
-Comprehensive Playwright E2E testing ensures quality:
-
-### Test Suites
-- **Smoke Tests**: Basic functionality validation
-- **API Integration**: Endpoint and data flow testing
-- **Visual Regression**: UI consistency checks
-- **Performance**: Core Web Vitals monitoring
-- **Accessibility**: WCAG 2.1 compliance
-
-### Running Tests
 ```bash
-npm install
-npm test                    # Run all tests
-npm run test:api           # API tests only
-npm run test:visual        # Visual regression
-npm run test:perf          # Performance tests
-npm run test:a11y          # Accessibility tests
+# Compare current state to baseline
+npm run baseline:compare
+
+# Run full regression suite
+npm run test:regression
+
+# Update baseline after intentional changes
+npm run baseline:capture
 ```
 
-See [E2E Testing Documentation](E2E_TESTING_IMPLEMENTATION.md) for details.
+See [REGRESSION_TEST_CHECKLIST.md](REGRESSION_TEST_CHECKLIST.md) for pre-release validation.
+
+## 📈 Features in Detail
+
+### Power Monitoring
+- **Real-time Updates**: Power consumption refreshes every 5 seconds
+- **Current Power**: Live wattage display with visual indicator
+- **24-hour Stats**: Min/max/average power usage
+- **Cost Estimation**: Daily electricity cost calculation
+- **Historical Data**: Time-series graphs via Grafana
+
+### Dashboard Components
+- **Power Widget**: Current usage with color-coded status
+- **API Status**: Service health indicators
+- **Build Information**: Version, date, commit SHA
+- **Grafana Integration**: Embedded dashboards
+
+### Technical Stack
+- **Frontend**: Vanilla JS with dark theme
+- **Backend**: Node.js Eagle Monitor API
+- **Database**: InfluxDB for time-series data
+- **Visualization**: Grafana dashboards
+- **Hosting**: Fly.io global edge network
+
+## 🚀 CI/CD Workflows
+
+### GitHub Actions
+
+1. **Deploy to Fly.io** (`deploy-fly.yml`)
+   - Automatic deployment on push to main
+   - Builds and deploys all 4 services
+   - Updates build-info.json dynamically
+
+2. **E2E Tests** (`e2e-tests.yml`)
+   - Runs on all PRs and pushes
+   - Multi-browser testing (Chrome, Firefox, Safari)
+   - Smoke, API, visual, performance, accessibility tests
+
+3. **E2E Tests Phase 3** (`e2e-tests-phase3.yml`)
+   - Advanced visual and performance testing
+   - Multi-viewport testing (mobile to 4K)
+   - Memory profiling and animation performance
+
+4. **Regression Tests** (`regression-tests.yml`)
+   - Compares against established baseline
+   - Visual, performance, and feature validation
+   - Automatic PR comments with results
+
+## 📚 Documentation
+
+- [CLAUDE_FLOW_STATE.md](CLAUDE_FLOW_STATE.md) - Session continuity and project history
+- [REGRESSION_TEST_CHECKLIST.md](REGRESSION_TEST_CHECKLIST.md) - Pre-release validation checklist
+- [BASELINE_ESTABLISHMENT.md](BASELINE_ESTABLISHMENT.md) - Regression baseline guide
+- [E2E_TESTING_README.md](E2E_TESTING_README.md) - Comprehensive testing documentation
+- [E2E_PHASE2_GUIDE.md](E2E_PHASE2_GUIDE.md) - Phase 2 testing details
+- [E2E_PHASE3_GUIDE.md](E2E_PHASE3_GUIDE.md) - Phase 3 advanced testing
 
 ---
 
