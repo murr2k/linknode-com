@@ -38,13 +38,6 @@ jobs:
     - name: Install Playwright
       run: npx playwright install --with-deps chromium
       
-    - name: Download existing baseline
-      uses: actions/download-artifact@v4
-      with:
-        name: regression-baseline
-        path: test-baselines/
-      continue-on-error: true
-      
     - name: Capture new baseline (if requested)
       if: github.event.inputs.capture_baseline == 'true'
       run: |
