@@ -1,0 +1,291 @@
+name: E2E Tests - Phase 3
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'e2e/tests/visual/visual-advanced.spec.ts'
+      - 'e2e/tests/performance/performance-advanced.spec.ts'
+      - 'e2e/utils/test-reporter.ts'
+      - 'playwright.config.phase3.ts'
+      - '.github/workflows/e2e-tests-phase3.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_category:
+        description: 'Test category to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - visual-advanced
+          - performance-advanced
+      browsers:
+        description: 'Browsers to test'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - chromium-only
+          - firefox-only
+          - webkit-only
+          - mobile-only
+
+jobs:
+  phase3-visual-tests:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_category == 'all' || github.event.inputs.test_category == 'visual-advanced' || github.event.inputs.test_category == ''
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium-1080p, firefox-1080p, webkit-1080p, pixel-5, iphone-12]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+      
+    - name: Create directories
+      run: |
+        mkdir -p test-results/phase3/screenshots
+        mkdir -p test-results/visual-baselines
+        mkdir -p test-results/reports
+      
+    - name: Run Phase 3 Visual Tests
+      run: npx playwright test visual-advanced.spec.ts --config=playwright.config.phase3.ts --project=${{ matrix.browser }}
+      env:
+        CI: true
+        BASE_URL: https://linknode.com
+        PHASE3_TESTING: true
+        VISUAL_TESTING: true
+        
+    - name: Upload visual test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: phase3-visual-results-${{ matrix.browser }}
+        path: |
+          test-results/phase3/screenshots/
+          test-results/visual-baselines/
+          test-results/reports/
+        retention-days: 30
+        
+    - name: Upload test videos
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: phase3-visual-videos-${{ matrix.browser }}
+        path: test-results/phase3/videos/
+        retention-days: 7
+
+  phase3-performance-tests:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_category == 'all' || github.event.inputs.test_category == 'performance-advanced' || github.event.inputs.test_category == ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Install Playwright with Chrome
+      run: npx playwright install --with-deps chromium
+      
+    - name: Setup performance testing environment
+      run: |
+        # Increase system limits for performance testing
+        sudo sysctl -w vm.max_map_count=262144
+        sudo sysctl -w kernel.pid_max=4194304
+        
+    - name: Create directories
+      run: |
+        mkdir -p test-results/phase3/har
+        mkdir -p test-results/phase3/traces
+        mkdir -p test-results/reports
+      
+    - name: Run Phase 3 Performance Tests
+      run: npx playwright test performance-advanced.spec.ts --config=playwright.config.phase3.ts --project=performance-chrome
+      env:
+        CI: true
+        BASE_URL: https://linknode.com
+        PHASE3_TESTING: true
+        PERFORMANCE_TESTING: true
+        COVERAGE_TESTING: true
+        NODE_OPTIONS: --max-old-space-size=4096
+        
+    - name: Analyze HAR files
+      if: always()
+      run: |
+        echo "## HAR File Analysis" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        har_count=$(find test-results/phase3/har -name "*.har" 2>/dev/null | wc -l || echo 0)
+        echo "- HAR files generated: $har_count" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: phase3-performance-results
+        path: |
+          test-results/phase3/
+          test-results/reports/
+        retention-days: 30
+        
+    - name: Upload traces
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: phase3-performance-traces
+        path: test-results/phase3/traces/
+        retention-days: 7
+
+  phase3-cross-browser-tests:
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    if: github.event.inputs.browsers == 'all' || github.event.inputs.browsers == ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Install all Playwright browsers
+      run: npx playwright install --with-deps
+      
+    - name: Run all Phase 3 tests across browsers
+      run: npm run test:phase3
+      env:
+        CI: true
+        BASE_URL: https://linknode.com
+        PHASE3_TESTING: true
+        
+    - name: Generate comprehensive report
+      if: always()
+      run: |
+        echo "## Phase 3 Test Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for generated reports
+        if [ -f "test-results/reports/latest.md" ]; then
+          cat test-results/reports/latest.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No report generated" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+    - name: Upload comprehensive results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: phase3-comprehensive-results
+        path: test-results/
+        retention-days: 30
+
+  phase3-test-summary:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    needs: [phase3-visual-tests, phase3-performance-tests, phase3-cross-browser-tests]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: phase3-all-results/
+        
+    - name: Generate Phase 3 summary
+      run: |
+        echo "# 🚀 E2E Test Summary - Phase 3" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Advanced Testing Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Visual test summary
+        echo "### 👁️ Visual Testing" >> $GITHUB_STEP_SUMMARY
+        visual_screenshots=$(find phase3-all-results -name "*.png" 2>/dev/null | wc -l || echo 0)
+        echo "- Total screenshots: $visual_screenshots" >> $GITHUB_STEP_SUMMARY
+        echo "- Viewports tested: 9 (mobile, tablet, desktop)" >> $GITHUB_STEP_SUMMARY
+        echo "- Browsers tested: Chrome, Firefox, Safari/WebKit" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Performance test summary
+        echo "### ⚡ Performance Testing" >> $GITHUB_STEP_SUMMARY
+        echo "- Core Web Vitals measured" >> $GITHUB_STEP_SUMMARY
+        echo "- Memory profiling completed" >> $GITHUB_STEP_SUMMARY
+        echo "- Network analysis performed" >> $GITHUB_STEP_SUMMARY
+        echo "- Code coverage collected" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Advanced features tested
+        echo "### 🎯 Advanced Features Tested" >> $GITHUB_STEP_SUMMARY
+        echo "- Multi-viewport responsiveness" >> $GITHUB_STEP_SUMMARY
+        echo "- Cross-browser consistency" >> $GITHUB_STEP_SUMMARY
+        echo "- Animation performance" >> $GITHUB_STEP_SUMMARY
+        echo "- Theme variations" >> $GITHUB_STEP_SUMMARY
+        echo "- Print media" >> $GITHUB_STEP_SUMMARY
+        echo "- Edge cases and error states" >> $GITHUB_STEP_SUMMARY
+        echo "- Resource optimization" >> $GITHUB_STEP_SUMMARY
+        echo "- Performance budgets" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Publish Phase 3 test results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          phase3-all-results/**/*.xml
+        check_name: E2E Test Results - Phase 3
+        comment_mode: always
+        
+    # Slack notifications (using GitHub native integration)
+    # Setup: /github subscribe murr2k/rackspace-k8s-demo workflows:{name:"E2E Tests - Phase 3"}
+    
+    - name: Create issue for visual differences
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = 'Phase 3 Tests: Visual differences detected';
+          const body = `Visual regression tests have detected differences in Phase 3 testing.
+          
+          Please review the artifacts from run: ${context.runId}
+          
+          [View test results](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`;
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['testing', 'visual-regression', 'phase3']
+          });

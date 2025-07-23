@@ -13,8 +13,13 @@
     "test:visual": "playwright test --grep @visual",
     "test:perf": "playwright test --grep @performance",
     "test:a11y": "playwright test --grep @accessibility",
+    "test:phase3": "playwright test --config=playwright.config.phase3.ts",
+    "test:phase3:visual": "playwright test --config=playwright.config.phase3.ts visual-advanced.spec.ts",
+    "test:phase3:perf": "playwright test --config=playwright.config.phase3.ts performance-advanced.spec.ts",
+    "test:phase3:report": "playwright show-report test-results/phase3-html",
     "playwright:install": "npx playwright install --with-deps",
-    "update-snapshots": "playwright test --update-snapshots"
+    "update-snapshots": "playwright test --update-snapshots",
+    "clean:results": "rm -rf test-results"
   },
   "keywords": [
     "e2e",
