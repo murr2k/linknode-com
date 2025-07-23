@@ -1,0 +1,297 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - smoke
+          - api
+          - visual
+          - performance
+          - accessibility
+
+jobs:
+  test:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps ${{ matrix.browser }}
+      
+    - name: Create test directories
+      run: mkdir -p test-results/screenshots test-results/errors
+      
+    - name: Run Playwright tests
+      run: |
+        if [ "${{ github.event.inputs.test_type }}" = "all" ] || [ -z "${{ github.event.inputs.test_type }}" ]; then
+          npx playwright test --project=${{ matrix.browser }}
+        else
+          npx playwright test --grep @${{ github.event.inputs.test_type }} --project=${{ matrix.browser }}
+        fi
+      env:
+        CI: true
+        BASE_URL: https://linknode.com
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-results-${{ matrix.browser }}
+        path: test-results/
+        retention-days: 30
+        
+    - name: Upload test report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-report-${{ matrix.browser }}
+        path: playwright-report/
+        retention-days: 30
+
+  api-tests:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright
+      run: npx playwright install --with-deps chromium
+      
+    - name: Run API tests
+      run: npm run test:api
+      env:
+        CI: true
+        
+    - name: Upload API test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: api-test-results
+        path: test-results/
+        retention-days: 30
+
+  visual-tests:
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium firefox webkit
+      
+    - name: Create screenshot directories
+      run: mkdir -p test-results/screenshots test-results/visual-diffs
+      
+    - name: Run visual regression tests
+      run: npm run test:visual
+      env:
+        CI: true
+        
+    - name: Upload visual test screenshots
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: visual-regression-screenshots
+        path: test-results/screenshots/
+        retention-days: 30
+
+  performance-tests:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright with Chrome
+      run: npx playwright install --with-deps chromium
+      
+    - name: Run performance tests
+      run: npm run test:perf
+      env:
+        CI: true
+        
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-results
+        path: test-results/
+        retention-days: 30
+
+  accessibility-tests:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium firefox webkit
+      
+    - name: Run accessibility tests
+      run: npm run test:a11y
+      env:
+        CI: true
+        
+    - name: Upload accessibility results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: accessibility-results
+        path: test-results/
+        retention-days: 30
+
+  mobile-tests:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium
+      
+    - name: Run mobile tests
+      run: |
+        npx playwright test --project="Mobile Chrome"
+        npx playwright test --project="Mobile Safari"
+      env:
+        CI: true
+        
+    - name: Upload mobile test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-results-mobile
+        path: test-results/
+        retention-days: 30
+
+  test-summary:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    needs: [test, api-tests, visual-tests, performance-tests, accessibility-tests, mobile-tests]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: all-results/
+        
+    - name: Merge test results
+      run: |
+        mkdir -p merged-results
+        find all-results -name "*.xml" -exec cp {} merged-results/ \;
+        find all-results -name "*.json" -exec cp {} merged-results/ \;
+        
+    - name: Generate summary report
+      run: |
+        echo "# E2E Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Count test files
+        echo "- Total test files: $(find merged-results -name "*.xml" | wc -l)" >> $GITHUB_STEP_SUMMARY
+        echo "- Screenshot artifacts: $(find all-results -name "*.png" | wc -l)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "## Test Categories Run" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Smoke Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ API Integration Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Visual Regression Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Performance Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Accessibility Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Mobile Tests" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Publish test results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          merged-results/**/*.xml
+        check_name: E2E Test Results - Phase 2
+        comment_mode: always

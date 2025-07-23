@@ -1,0 +1,34 @@
+{
+  "name": "linknode-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for linknode.com using Playwright",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:api": "playwright test --grep @api",
+    "test:visual": "playwright test --grep @visual",
+    "test:perf": "playwright test --grep @performance",
+    "test:a11y": "playwright test --grep @accessibility",
+    "playwright:install": "npx playwright install --with-deps",
+    "update-snapshots": "playwright test --update-snapshots"
+  },
+  "keywords": [
+    "e2e",
+    "testing",
+    "playwright",
+    "linknode"
+  ],
+  "author": "Murray Kopit",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.48.2",
+    "@types/node": "^22.9.0",
+    "@axe-core/playwright": "^4.10.1",
+    "dotenv": "^16.4.5",
+    "playwright-chromium": "^1.48.2"
+  }
+}

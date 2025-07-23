@@ -123,7 +123,13 @@ rackspace-k8s-demo/
 │   └── *.md                # Documentation
 ├── .github/workflows/       # CI/CD pipelines
 │   ├── deploy.yml          # Main deployment
-│   └── deploy-monitoring.yml # Monitoring deployment
+│   ├── deploy-monitoring.yml # Monitoring deployment
+│   ├── deploy-fly.yml      # Fly.io edge deployment
+│   └── e2e-tests.yml       # Playwright E2E tests
+├── e2e/                    # End-to-end tests
+│   ├── tests/             # Test suites
+│   ├── pages/             # Page Object Model
+│   └── utils/             # Test utilities
 ├── wsl-access.sh           # WSL2 port-forward script
 ├── ssh-tunnel-setup.sh     # SSH tunnel setup
 └── README.md              # This file
@@ -257,7 +263,7 @@ The demo webpage includes several live widgets:
 
 ## 🚀 CI/CD Pipeline
 
-The project includes GitHub Actions workflows for automated deployment:
+The project includes GitHub Actions workflows for automated deployment and testing:
 
 1. **Main Deployment** (`deploy.yml`):
    - Deploys application and monitoring stack
@@ -268,10 +274,44 @@ The project includes GitHub Actions workflows for automated deployment:
    - Dedicated workflow for monitoring updates
    - Live dashboard updates without service interruption
 
+3. **Fly.io Deployment** (`deploy-fly.yml`):
+   - Deploys to global edge network
+   - Multi-region distribution
+   - Automatic SSL certificates
+
+4. **E2E Testing** (`e2e-tests.yml`):
+   - Automated Playwright tests on every PR
+   - Multi-browser testing (Chrome, Firefox, Safari)
+   - Visual regression, API, and performance tests
+   - Accessibility compliance validation
+
 ### Automated Updates
 - Push changes to `k8s/grafana-dashboard-*.yaml`
 - Pipeline automatically deploys within minutes
 - Dashboards update live - just refresh your browser!
+
+## 🧪 End-to-End Testing
+
+Comprehensive Playwright E2E testing ensures quality:
+
+### Test Suites
+- **Smoke Tests**: Basic functionality validation
+- **API Integration**: Endpoint and data flow testing
+- **Visual Regression**: UI consistency checks
+- **Performance**: Core Web Vitals monitoring
+- **Accessibility**: WCAG 2.1 compliance
+
+### Running Tests
+```bash
+npm install
+npm test                    # Run all tests
+npm run test:api           # API tests only
+npm run test:visual        # Visual regression
+npm run test:perf          # Performance tests
+npm run test:a11y          # Accessibility tests
+```
+
+See [E2E Testing Documentation](E2E_TESTING_IMPLEMENTATION.md) for details.
 
 ---
 
