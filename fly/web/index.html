@@ -1074,7 +1074,7 @@
                     const buildInfo = await response.json();
                     document.getElementById('app-version').textContent = buildInfo.version || 'v1.0.0';
                     document.getElementById('build-date').textContent = buildInfo.buildDate || '2025-07-23';
-                    document.getElementById('commit-sha').textContent = buildInfo.commit ? buildInfo.commit.substring(0, 7) : '-';
+                    document.getElementById('commit-sha').textContent = buildInfo.commit || '-';
                     document.getElementById('environment').textContent = buildInfo.environment || 'Production';
                 }
             } catch (error) {
