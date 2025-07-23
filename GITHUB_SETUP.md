@@ -12,12 +12,7 @@ This guide explains how to set up automated deployments from GitHub to Fly.io.
 
 ### 1. Get your Fly.io API Token
 
-I've generated a deploy token for you. Use this token:
-```
-FlyV1 fm2_lJPECAAAAAAACXgyxBCdmBlo3wKQxkYD4v+XiMuUwrVodHRwczovL2FwaS5mbHkuaW8vdjGWAJLOABIpYR8Lk7lodHRwczovL2FwaS5mbHkuaW8vYWFhL3YxxDzAE6+vJHkj2lKRmK8UTIpjh0V5+OKPyWRG93kjqkcoB7jjo0sXnmPN2aa827s3F+Aoh4z7g2yntFy2d1LEToeNNJpiOe1lykxuoUsax/ZoFQSJzkTc0/9VFMlGony0vjerY1rkD9f/1SLjhJGmNWmdU3tlk7veT5T7OqpR3XTCI3Y6mSoAwu1pZ+c6Vg2SlAORgc4Ah6w/HwWRgqdidWlsZGVyH6J3Zx8BxCDa1NiG+ubiNfY09QfyBTg2vCUpZKHA5FP9/TDYYV1DRw==,fm2_lJPEToeNNJpiOe1lykxuoUsax/ZoFQSJzkTc0/9VFMlGony0vjerY1rkD9f/1SLjhJGmNWmdU3tlk7veT5T7OqpR3XTCI3Y6mSoAwu1pZ+c6VsQQVIvdW5nRtmyeXgt/ZtCUAMO5aHR0cHM6Ly9hcGkuZmx5LmlvL2FhYS92MZgEks5ofSK1zo4VKNMXzgARdJQKkc4AEXSUDMQQHpx01htYAEuwjI3Ohx+cEcQgMp8uqEQ9j/HnrzfjfX/8oaHRxS02S7CGsnLSiDBB8tI=
-```
-
-Alternatively, you can generate a new token with:
+Generate a new token with:
 ```bash
 fly tokens create deploy
 ```
