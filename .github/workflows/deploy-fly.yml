@@ -82,7 +82,7 @@ jobs:
         {
           "version": "v1.0.${{ github.run_number }}",
           "buildDate": "$(date -u +%Y-%m-%d)",
-          "commit": "${{ github.sha }}",
+          "commit": "$(echo ${{ github.sha }} | cut -c1-7)",
           "environment": "production",
           "branch": "${{ github.ref_name }}",
           "buildNumber": "${{ github.run_number }}",
@@ -168,7 +168,7 @@ jobs:
                   {"title": "Service", "value": "'"${{ github.event.inputs.service || 'all' }}"'", "short": true},
                   {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
                   {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
-                  {"title": "Commit", "value": "'"${{ github.sha.substring(0, 7) }}"'", "short": true}
+                  {"title": "Commit", "value": "'"$(echo ${{ github.sha }} | cut -c1-7)"'", "short": true}
                 ],
                 "actions": [
                   {"type": "button", "text": "View Site", "url": "https://linknode.com"},
@@ -194,7 +194,7 @@ jobs:
                   {"title": "Service", "value": "'"${{ github.event.inputs.service || 'all' }}"'", "short": true},
                   {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
                   {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
-                  {"title": "Commit", "value": "'"${{ github.sha.substring(0, 7) }}"'", "short": true}
+                  {"title": "Commit", "value": "'"$(echo ${{ github.sha }} | cut -c1-7)"'", "short": true}
                 ],
                 "actions": [
                   {"type": "button", "text": "View Logs", "url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"}
