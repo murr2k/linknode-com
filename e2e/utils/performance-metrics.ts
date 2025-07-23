@@ -59,9 +59,8 @@ export class PerformanceCollector {
    */
   async initialize() {
     // Set up network monitoring
-    this.page.on('response', response => {
+    this.page.on('response', async response => {
       const request = response.request();
-      const timing = response.timing();
       
       this.networkRequests.push({
         url: response.url(),
@@ -69,7 +68,7 @@ export class PerformanceCollector {
         status: response.status(),
         size: response.headers()['content-length'] ? 
           parseInt(response.headers()['content-length']) : 0,
-        duration: timing ? timing.responseEnd - timing.requestStart : 0,
+        duration: 0, // timing() was removed in newer Playwright versions
         cached: response.fromCache(),
       });
     });

@@ -72,29 +72,13 @@ export default defineConfig({
     /* Reduced motion for consistent animations */
     reducedMotion: 'reduce',
 
-    /* Performance testing options */
-    launchOptions: {
-      args: [
-        '--enable-precise-memory-info',
-        '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled',
-        '--no-sandbox',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins',
-        '--disable-site-isolation-trials',
-        '--enable-features=NetworkService,NetworkServiceInProcess',
-        '--metrics-recording-only',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-      ],
-    },
+    /* Performance testing options - removed for cross-browser compatibility */
 
     /* Context options for performance */
     contextOptions: {
       // Enable CDP for advanced metrics
       recordHar: {
-        path: 'test-results/har/',
+        path: 'test-results/har/recording.har',
         mode: 'full',
         content: 'attach',
       },
