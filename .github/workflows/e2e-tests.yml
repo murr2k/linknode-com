@@ -20,6 +20,10 @@ on:
           - performance
           - accessibility
 
+concurrency:
+  group: e2e-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     timeout-minutes: 30

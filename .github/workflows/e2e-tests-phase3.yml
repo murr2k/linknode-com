@@ -34,6 +34,10 @@ on:
           - webkit-only
           - mobile-only
 
+concurrency:
+  group: e2e-phase3-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   phase3-visual-tests:
     timeout-minutes: 45

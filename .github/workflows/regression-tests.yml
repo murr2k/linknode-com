@@ -16,6 +16,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: regression-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   regression-testing:
     runs-on: ubuntu-latest
