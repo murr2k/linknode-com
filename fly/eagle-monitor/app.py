@@ -115,6 +115,7 @@ def parse_eagle_xml(xml_data):
                 data['message_type'] = 'instantaneous_demand'
         
         # 2. CurrentSummationDelivered - Total energy consumed
+        # Note: Eagle devices typically report energy in Wh (watt-hours), not kWh
         elif root.find('.//CurrentSummationDelivered') is not None or root.find('.//CurrentSummation') is not None:
             elem = root.find('.//CurrentSummationDelivered')
             if elem is None:
@@ -131,15 +132,16 @@ def parse_eagle_xml(xml_data):
                 div_val = int(divisor, 16) if divisor.startswith('0x') else int(divisor)
                 
                 # Calculate actual energy in kWh
+                # Eagle typically reports in Wh, so divide by 1000 to get kWh
                 if div_val != 0:
-                    data['energy_delivered_kwh'] = (delivered_val * mult_val) / div_val
+                    data['energy_delivered_kwh'] = (delivered_val * mult_val) / div_val / 1000
                     data['message_type'] = 'current_summation_delivered'
             
             # Handle energy received (for solar)
             if summation_received:
                 received_val = int(summation_received, 16) if summation_received.startswith('0x') else int(summation_received)
                 if div_val != 0:
-                    data['energy_received_kwh'] = (received_val * mult_val) / div_val
+                    data['energy_received_kwh'] = (received_val * mult_val) / div_val / 1000
         
         # 3. TimeCluster - Time synchronization
         elif root.find('.//TimeCluster') is not None:
