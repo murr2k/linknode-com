@@ -75,6 +75,24 @@ jobs:
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'web' || github.event.inputs.service == ''
       run: |
         cd fly/web
+        
+        # Generate build info
+        echo "Generating build-info.json..."
+        cat > build-info.json << EOF
+        {
+          "version": "v1.0.${{ github.run_number }}",
+          "buildDate": "$(date -u +%Y-%m-%d)",
+          "commit": "${{ github.sha }}",
+          "environment": "production",
+          "branch": "${{ github.ref_name }}",
+          "buildNumber": "${{ github.run_number }}",
+          "actor": "${{ github.actor }}"
+        }
+        EOF
+        
+        echo "Build info:"
+        cat build-info.json
+        
         flyctl deploy --remote-only --wait-timeout 300
       env:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

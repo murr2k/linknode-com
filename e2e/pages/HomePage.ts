@@ -28,6 +28,13 @@ export class HomePage extends BasePage {
 
   // Grafana elements
   readonly grafanaIframe: Locator;
+  
+  // Build status elements
+  readonly buildStatusSection: Locator;
+  readonly appVersion: Locator;
+  readonly buildDate: Locator;
+  readonly commitSha: Locator;
+  readonly environment: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -59,6 +66,13 @@ export class HomePage extends BasePage {
 
     // Grafana locators
     this.grafanaIframe = page.locator('.grafana-preview iframe');
+    
+    // Build status locators
+    this.buildStatusSection = page.locator('.build-status');
+    this.appVersion = page.locator('#app-version');
+    this.buildDate = page.locator('#build-date');
+    this.commitSha = page.locator('#commit-sha');
+    this.environment = page.locator('#environment');
   }
 
   /**
@@ -79,6 +93,19 @@ export class HomePage extends BasePage {
       avg: await this.powerAvg.textContent() || '--',
       max: await this.powerMax.textContent() || '--',
       cost: await this.powerCost.textContent() || '--',
+    };
+  }
+  
+  /**
+   * Get build status information
+   */
+  async getBuildInfo() {
+    await this.buildStatusSection.waitFor({ state: 'visible' });
+    return {
+      version: await this.appVersion.textContent() || 'unknown',
+      buildDate: await this.buildDate.textContent() || 'unknown',
+      commitSha: await this.commitSha.textContent() || 'unknown',
+      environment: await this.environment.textContent() || 'unknown',
     };
   }
 
