@@ -69,7 +69,7 @@ export class PerformanceCollector {
         size: response.headers()['content-length'] ? 
           parseInt(response.headers()['content-length']) : 0,
         duration: 0, // timing() was removed in newer Playwright versions
-        cached: response.fromCache(),
+        cached: false, // fromCache() was removed in newer Playwright versions
       });
     });
 
