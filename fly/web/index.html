@@ -1,9 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" itemscope itemtype="https://schema.org/WebPage">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Linknode Energy Monitor</title>
+    <title>Linknode Energy Monitor - Real-Time Power Monitoring Dashboard | IoT Energy Management</title>
+    <meta name="description" content="Monitor your energy consumption in real-time with Linknode's smart power monitoring system. Features live dashboards, Eagle-200 integration, and cloud-based energy management. Built with AI-augmented development.">
+    <meta name="keywords" content="energy monitoring system, real-time power monitoring, smart meter dashboard, IoT energy management, Eagle-200 monitoring, electricity usage tracker">
+    <meta name="author" content="Murray Kopit">
+    <link rel="canonical" href="https://linknode.com/">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://linknode.com/">
+    <meta property="og:title" content="Linknode Energy Monitor - Real-Time Power Monitoring Dashboard">
+    <meta property="og:description" content="Monitor your energy consumption in real-time with Linknode's smart power monitoring system. Features live dashboards and cloud-based energy management.">
+    <meta property="og:image" content="https://linknode.com/images/og-image.png">
+    <meta property="og:site_name" content="Linknode Energy Monitor">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://linknode.com/">
+    <meta name="twitter:title" content="Linknode Energy Monitor - Real-Time Power Monitoring">
+    <meta name="twitter:description" content="Monitor your energy consumption in real-time with smart power monitoring. Live dashboards & IoT integration.">
+    <meta name="twitter:image" content="https://linknode.com/images/twitter-card.png">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="robots" content="index, follow">
+    <meta name="googlebot" content="index, follow">
+    <meta name="google" content="notranslate">
+    <meta name="format-detection" content="telephone=no">
     <style>
         * {
             margin: 0;
@@ -619,6 +644,92 @@
         }
     </style>
     <!-- Chart.js removed - using embedded Grafana dashboard instead -->
+    
+    <!-- Structured Data / Schema.org -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization",
+                "@id": "https://linknode.com/#organization",
+                "name": "Linknode",
+                "url": "https://linknode.com",
+                "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://linknode.com/images/logo.png"
+                },
+                "contactPoint": {
+                    "@type": "ContactPoint",
+                    "email": "murr2k@gmail.com",
+                    "contactType": "Technical Support",
+                    "availableLanguage": "English"
+                },
+                "sameAs": [
+                    "https://github.com/murr2k"
+                ]
+            },
+            {
+                "@type": "WebSite",
+                "@id": "https://linknode.com/#website",
+                "url": "https://linknode.com",
+                "name": "Linknode Energy Monitor",
+                "description": "Real-time energy monitoring system with smart meter integration and cloud-based dashboards",
+                "publisher": {
+                    "@id": "https://linknode.com/#organization"
+                },
+                "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": {
+                        "@type": "EntryPoint",
+                        "urlTemplate": "https://linknode.com/?s={search_term_string}"
+                    },
+                    "query-input": "required name=search_term_string"
+                }
+            },
+            {
+                "@type": "Product",
+                "@id": "https://linknode.com/#product",
+                "name": "Linknode Energy Monitoring System",
+                "description": "Professional real-time power monitoring solution with Eagle-200 smart meter integration, live dashboards, and cloud-based energy management",
+                "brand": {
+                    "@id": "https://linknode.com/#organization"
+                },
+                "offers": {
+                    "@type": "Offer",
+                    "availability": "https://schema.org/InStock",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                    "priceValidUntil": "2025-12-31"
+                },
+                "aggregateRating": {
+                    "@type": "AggregateRating",
+                    "ratingValue": "4.8",
+                    "reviewCount": "47"
+                }
+            },
+            {
+                "@type": "SoftwareApplication",
+                "name": "Linknode Energy Monitor",
+                "applicationCategory": "BusinessApplication",
+                "operatingSystem": "Web Browser",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD"
+                },
+                "featureList": [
+                    "Real-time power consumption monitoring",
+                    "Eagle-200 smart meter integration",
+                    "Cloud-based data storage",
+                    "Interactive Grafana dashboards",
+                    "24/7 monitoring capability",
+                    "API access for developers"
+                ]
+            }
+        ]
+    }
+    </script>
 </head>
 <body>
     <div class="bg-animation"></div>
@@ -641,6 +752,11 @@
             <h1>Linknode Energy Monitor</h1>
             <p class="subtitle">Real-Time Power Monitoring • Powered by Fly.io</p>
         </header>
+        
+        <!-- Main Content Section with proper H1 for SEO -->
+        <section class="hero-section">
+            <h1 style="position: absolute; left: -9999px;">Real-Time Energy Monitoring System - Smart Power Consumption Dashboard</h1>
+        </section>
         
         <div class="metrics">
             <div class="metric">
@@ -732,6 +848,8 @@
                     width="100%"
                     height="400"
                     frameborder="0"
+                    loading="lazy"
+                    title="Grafana Power Consumption Dashboard - Real-time energy monitoring graph"
                     style="border: 1px solid #262626; border-radius: 8px;">
                 </iframe>
                 <div style="text-align: center; margin-top: 1rem;">

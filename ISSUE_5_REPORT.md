@@ -69,7 +69,7 @@ The user needs to update the FLY_API_TOKEN with a token that has access to all a
 
 1. Generate a new token locally:
    ```bash
-   flyctl auth token
+   flyctl tokens create
    ```
 
 2. Update the secret at:

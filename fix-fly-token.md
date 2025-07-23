@@ -9,10 +9,10 @@ You need to update the FLY_API_TOKEN in GitHub secrets with a token that has acc
 ### Step 1: Generate a new token with full access
 Run this command locally (where you're authenticated with access to all apps):
 ```bash
-flyctl auth token
+flyctl tokens create
 ```
 
-This will generate a token with full access to all your apps.
+This command will create a new authentication token and output it. Note: The old `flyctl auth token` command is deprecated.
 
 ### Step 2: Update GitHub Secret
 1. Copy the entire token output (it will start with `FlyV1`)
@@ -28,7 +28,7 @@ The CI/CD pipeline should now work correctly and deploy to all Fly.io apps.
 ## Alternative: Use Organization Token
 If the apps are in an organization, you might need to generate an organization-specific token:
 ```bash
-flyctl tokens create org -o YOUR_ORG_NAME
+flyctl tokens create --org YOUR_ORG_NAME
 ```
 
 ## What Changed in the Code
