@@ -1,0 +1,206 @@
+name: Regression Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      capture_baseline:
+        description: 'Capture new baseline'
+        type: boolean
+        default: false
+      compare_only:
+        description: 'Only run comparison (skip full tests)'
+        type: boolean
+        default: false
+
+jobs:
+  regression-testing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      run: |
+        npm install
+        npm install -D ts-node typescript
+        
+    - name: Install Playwright
+      run: npx playwright install --with-deps chromium
+      
+    - name: Download existing baseline
+      uses: actions/download-artifact@v4
+      with:
+        name: regression-baseline
+        path: test-baselines/
+      continue-on-error: true
+      
+    - name: Capture new baseline (if requested)
+      if: github.event.inputs.capture_baseline == 'true'
+      run: |
+        npm run baseline:capture
+        echo "✅ New baseline captured"
+        
+    - name: Run baseline comparison
+      if: github.event.inputs.capture_baseline != 'true'
+      run: |
+        # Check if baseline exists
+        if [ ! -f "test-baselines/baseline.json" ]; then
+          echo "No baseline found. Capturing initial baseline..."
+          npm run baseline:capture
+        else
+          echo "Running baseline comparison..."
+          npm run baseline:compare || true
+        fi
+        
+    - name: Run full regression tests
+      if: github.event.inputs.compare_only != 'true' && github.event.inputs.capture_baseline != 'true'
+      run: |
+        npm run test:regression
+      env:
+        CI: true
+        BASE_URL: https://linknode.com
+        
+    - name: Upload baseline artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: regression-baseline
+        path: test-baselines/
+        retention-days: 90
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: regression-test-results
+        path: |
+          test-results/
+          test-baselines/comparison-report.json
+          test-baselines/COMPARISON_REPORT.md
+        retention-days: 30
+        
+    - name: Generate summary
+      if: always()
+      run: |
+        echo "## 📊 Regression Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "test-baselines/COMPARISON_REPORT.md" ]; then
+          cat test-baselines/COMPARISON_REPORT.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No comparison report generated" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+    - name: Comment PR with regression results
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          let comment = '## 🔍 Regression Test Results\n\n';
+          
+          // Read comparison report if exists
+          const reportPath = path.join(process.cwd(), 'test-baselines', 'comparison-report.json');
+          if (fs.existsSync(reportPath)) {
+            const report = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+            
+            comment += `- **Total Checks**: ${report.summary.total}\n`;
+            comment += `- **✅ Passed**: ${report.summary.passed}\n`;
+            comment += `- **⚠️ Warnings**: ${report.summary.warnings}\n`;
+            comment += `- **❌ Failed**: ${report.summary.failed}\n\n`;
+            
+            if (report.summary.failed > 0) {
+              comment += '### ❌ Failures\n';
+              report.results
+                .filter(r => r.status === 'fail')
+                .forEach(r => {
+                  comment += `- ${r.category} > ${r.item}: ${r.difference}\n`;
+                });
+            } else {
+              comment += '✅ All regression checks passed!\n';
+            }
+          } else {
+            comment += 'No regression comparison performed.\n';
+          }
+          
+          // Find and update or create comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const botComment = comments.find(comment => 
+            comment.user.type === 'Bot' && comment.body.includes('Regression Test Results')
+          );
+          
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: comment
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+          }
+
+  update-baseline:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: regression-testing
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download regression artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: regression-baseline
+        path: test-baselines/
+        
+    - name: Check if baseline needs update
+      id: check
+      run: |
+        # Check if this is a significant release
+        if git log -1 --pretty=%B | grep -E "(feat|fix|BREAKING):" > /dev/null; then
+          echo "should_update=true" >> $GITHUB_OUTPUT
+          echo "Significant change detected - baseline will be updated"
+        else
+          echo "should_update=false" >> $GITHUB_OUTPUT
+          echo "No significant changes - keeping existing baseline"
+        fi
+        
+    - name: Create baseline update PR
+      if: steps.check.outputs.should_update == 'true'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        commit-message: 'chore: Update regression testing baseline'
+        title: 'Update Regression Testing Baseline'
+        body: |
+          This PR updates the regression testing baseline after recent changes.
+          
+          Please review the visual and performance baselines to ensure they reflect the intended state.
+          
+          Generated from commit: ${{ github.sha }}
+        branch: update-regression-baseline
+        delete-branch: true
