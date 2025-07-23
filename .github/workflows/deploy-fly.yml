@@ -125,3 +125,38 @@ jobs:
         curl -sf https://linknode-web.fly.dev > /dev/null && echo "✅ Web interface is healthy" || echo "❌ Web interface is not responding"
         curl -sf https://linknode-grafana.fly.dev/api/health > /dev/null && echo "✅ Grafana is healthy" || echo "❌ Grafana is not responding"
         curl -sf https://linknode-eagle-monitor.fly.dev/health > /dev/null && echo "✅ Eagle Monitor is healthy" || echo "❌ Eagle Monitor is not responding"
+
+    - name: Slack Notification - Success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: |
+          ✅ *Fly.io Deployment Successful*
+          
+          *Service:* ${{ github.event.inputs.service || 'all' }}
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Author:* ${{ github.actor }}
+          
+          *Live URLs:*
+          • Main Site: https://linknode.com
+          • Grafana: https://linknode-grafana.fly.dev
+          • API Health: https://linknode-eagle-monitor.fly.dev/health
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        
+    - name: Slack Notification - Failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: |
+          ❌ *Fly.io Deployment Failed*
+          
+          *Service:* ${{ github.event.inputs.service || 'all' }}
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Author:* ${{ github.actor }}
+          
+          *Error:* Check the <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|workflow logs>
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

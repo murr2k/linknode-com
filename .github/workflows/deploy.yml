@@ -146,3 +146,41 @@ jobs:
         echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+
+    - name: Slack Notification - Success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: |
+          ✅ *Kubernetes Deployment Successful*
+          
+          *Environment:* Rackspace K8s
+          *Namespace:* ${{ env.KUBE_NAMESPACE }}
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Author:* ${{ github.actor }}
+          
+          *Access URLs:*
+          • Main Site: https://linknode.com
+          • Direct: http://119.9.118.22:32304
+          • Grafana: http://119.9.118.22:30300
+          • Power API: http://119.9.118.22:30500/api/power-data
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        
+    - name: Slack Notification - Failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: |
+          ❌ *Kubernetes Deployment Failed*
+          
+          *Environment:* Rackspace K8s
+          *Namespace:* ${{ env.KUBE_NAMESPACE }}
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Author:* ${{ github.actor }}
+          
+          *Error:* Check the <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|workflow logs>
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -289,3 +289,51 @@ jobs:
           merged-results/**/*.xml
         check_name: E2E Test Results - Phase 2
         comment_mode: always
+        
+    - name: Slack Notification - Success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: |
+          ✅ *E2E Tests Passed*
+          
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Author:* ${{ github.actor }}
+          *Test Type:* ${{ github.event.inputs.test_type || 'all' }}
+          
+          *Test Coverage:*
+          • ✅ Smoke Tests
+          • ✅ API Integration Tests
+          • ✅ Visual Regression Tests
+          • ✅ Performance Tests
+          • ✅ Accessibility Tests
+          • ✅ Mobile Tests
+          
+          View <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|test results>
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        
+    - name: Slack Notification - Failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: |
+          ❌ *E2E Tests Failed*
+          
+          *Branch:* ${{ github.ref_name }}
+          *Commit:* `${{ github.sha.substring(0, 7) }}`
+          *Author:* ${{ github.actor }}
+          *Test Type:* ${{ github.event.inputs.test_type || 'all' }}
+          
+          *Failed Jobs:*
+          ${{ needs.test.result == 'failure' && '• ❌ Browser Tests' || '• ✅ Browser Tests' }}
+          ${{ needs.api-tests.result == 'failure' && '• ❌ API Tests' || '• ✅ API Tests' }}
+          ${{ needs.visual-tests.result == 'failure' && '• ❌ Visual Tests' || '• ✅ Visual Tests' }}
+          ${{ needs.performance-tests.result == 'failure' && '• ❌ Performance Tests' || '• ✅ Performance Tests' }}
+          ${{ needs.accessibility-tests.result == 'failure' && '• ❌ Accessibility Tests' || '• ✅ Accessibility Tests' }}
+          ${{ needs.mobile-tests.result == 'failure' && '• ❌ Mobile Tests' || '• ✅ Mobile Tests' }}
+          
+          View <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed tests>
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

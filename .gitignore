@@ -66,6 +66,8 @@ cloudflare-setup/auto-setup.sh
 test/
 tests/
 *.test
+# But keep our e2e tests
+!e2e/tests/
 
 # OS
 Thumbs.db
