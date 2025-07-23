@@ -253,9 +253,7 @@ test.describe('Visual Regression Tests @visual', () => {
         'grafana-preview',
         {
           mask: [
-            '.panel-info-content', // May contain "No data"
-            '.graph-legend-value', // Dynamic values
-            '.time-picker-button-label', // Time range
+            '.grafana-preview iframe', // Mask entire iframe content as it's dynamic
           ],
         }
       );

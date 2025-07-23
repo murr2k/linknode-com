@@ -1,17 +1,17 @@
 # Regression Testing Baseline Report
-Generated: 7/23/2025, 8:30:45 AM
+Generated: 7/23/2025, 10:52:43 AM
 
 ## Summary
-- **Capture Date**: 2025-07-23T15:30:45.444Z
+- **Capture Date**: 2025-07-23T17:52:43.355Z
 - **Visual Snapshots**: 8
 - **Performance Metrics**: 4
-- **API Endpoints**: 6
+- **API Endpoints**: 7
 
 ## Build Information
 
-- **Version**: v1.0.19
+- **Version**: v1.0.20
 - **Build Date**: 2025-07-23
-- **Commit**: ad36846
+- **Commit**: 24e570a
 - **Environment**: production
 
 
@@ -51,16 +51,16 @@ Generated: 7/23/2025, 8:30:45 AM
 ### Navigation Timing
 - **domContentLoaded**: 0ms
 - **loadComplete**: 0ms
-- **totalDuration**: 86.29999999701977ms
+- **totalDuration**: 84.10000000149012ms
 - **dnsLookup**: 0ms
 - **tcpConnection**: 0ms
-- **serverResponse**: 72.70000000298023ms
-- **domInteractive**: 10.600000001490116ms
-- **domComplete**: 2.1999999955296516ms
+- **serverResponse**: 69.20000000298023ms
+- **domInteractive**: 11.599999994039536ms
+- **domComplete**: 2.3000000044703484ms
 
 ### Paint Timing
-- **firstPaint**: 148ms
-- **firstContentfulPaint**: 148ms
+- **firstPaint**: 156ms
+- **firstContentfulPaint**: 156ms
 
 ### Core Web Vitals
 - **LCP**: N/Ams
@@ -68,13 +68,14 @@ Generated: 7/23/2025, 8:30:45 AM
 - **FID**: N/Ams
 
 ### Resource Loading
-- **Total Resources**: 5
+- **Total Resources**: 8
 - **Total Size**: 0.00MB
 
 ## API Endpoints
 - **GET https://linknode-eagle-monitor.fly.dev/health**: 200
 - **GET https://linknode-eagle-monitor.fly.dev/api/stats**: 200
 - **GET https://linknode-eagle-monitor.fly.dev/health**: 200
+- **GET https://linknode-eagle-monitor.fly.dev/api/stats**: 200
 - **GET https://linknode.com/api/stats**: 200
 - **GET https://linknode.com/api/current**: 200
 - **GET https://linknode.com/health**: 200

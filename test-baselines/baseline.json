@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-07-23T15:30:31.040Z",
+  "timestamp": "2025-07-23T17:52:09.044Z",
   "version": "1.0.0",
   "features": {
     "pageStructure": {
@@ -38,16 +38,16 @@
     "navigation": {
       "domContentLoaded": 0,
       "loadComplete": 0,
-      "totalDuration": 86.29999999701977,
+      "totalDuration": 84.10000000149012,
       "dnsLookup": 0,
       "tcpConnection": 0,
-      "serverResponse": 72.70000000298023,
-      "domInteractive": 10.600000001490116,
-      "domComplete": 2.1999999955296516
+      "serverResponse": 69.20000000298023,
+      "domInteractive": 11.599999994039536,
+      "domComplete": 2.3000000044703484
     },
     "paint": {
-      "firstPaint": 148,
-      "firstContentfulPaint": 148
+      "firstPaint": 156,
+      "firstContentfulPaint": 156
     },
     "webVitals": {
       "lcp": 0,
@@ -55,12 +55,12 @@
       "fid": 0
     },
     "resources": {
-      "total": 5,
+      "total": 8,
       "breakdown": {
         "iframe": 1,
-        "fetch": 4
+        "fetch": 7
       },
-      "totalSize": 444
+      "totalSize": 442
     }
   },
   "visual": {
@@ -83,11 +83,11 @@
           "content-encoding": "zstd",
           "via": "2 fly.io, 2 fly.io",
           "access-control-allow-origin": "https://linknode.com",
-          "date": "Wed, 23 Jul 2025 15:30:41 GMT",
+          "date": "Wed, 23 Jul 2025 17:52:35 GMT",
           "content-type": "application/json",
           "vary": "Origin",
           "server": "Fly/8ba38a0c6 (2025-07-22)",
-          "fly-request-id": "01K0VYH0KCRWSCPREDW4KY432X-sea"
+          "fly-request-id": "01K0W6MV0NPEM9WBCR9SRKM2J6-sea"
         }
       },
       {
@@ -98,11 +98,11 @@
           "content-encoding": "zstd",
           "via": "2 fly.io, 2 fly.io",
           "access-control-allow-origin": "https://linknode.com",
-          "date": "Wed, 23 Jul 2025 15:30:41 GMT",
+          "date": "Wed, 23 Jul 2025 17:52:35 GMT",
           "content-type": "application/json",
           "vary": "Origin",
           "server": "Fly/8ba38a0c6 (2025-07-22)",
-          "fly-request-id": "01K0VYH0KC2W39NGZ1XD3DGYAX-sea"
+          "fly-request-id": "01K0W6MV0NY54WJ7GDH795AB0Z-sea"
         }
       },
       {
@@ -113,11 +113,26 @@
           "content-encoding": "zstd",
           "via": "2 fly.io, 2 fly.io",
           "access-control-allow-origin": "https://linknode.com",
-          "date": "Wed, 23 Jul 2025 15:30:41 GMT",
+          "date": "Wed, 23 Jul 2025 17:52:35 GMT",
           "content-type": "application/json",
           "vary": "Origin",
           "server": "Fly/8ba38a0c6 (2025-07-22)",
-          "fly-request-id": "01K0VYH0NTX498NZEV1C7T3S2S-sea"
+          "fly-request-id": "01K0W6MV2XRFQHFN0PKN54ZSNS-sea"
+        }
+      },
+      {
+        "url": "https://linknode-eagle-monitor.fly.dev/api/stats",
+        "status": 200,
+        "method": "GET",
+        "headers": {
+          "content-encoding": "zstd",
+          "via": "2 fly.io, 2 fly.io",
+          "access-control-allow-origin": "https://linknode.com",
+          "date": "Wed, 23 Jul 2025 17:52:40 GMT",
+          "content-type": "application/json",
+          "vary": "Origin",
+          "server": "Fly/8ba38a0c6 (2025-07-22)",
+          "fly-request-id": "01K0W6MZWEHNZHWV71N68H0PQR-sea"
         }
       },
       {
@@ -126,13 +141,13 @@
         "method": "GET",
         "headers": {
           "content-encoding": "zstd",
-          "etag": "\"6880f231-b186\"",
+          "etag": "\"68811fe7-b1eb\"",
           "x-content-type-options": "nosniff",
           "access-control-allow-methods": "GET, POST, OPTIONS",
-          "date": "Wed, 23 Jul 2025 15:30:45 GMT",
+          "date": "Wed, 23 Jul 2025 17:52:43 GMT",
           "content-type": "text/html",
-          "last-modified": "Wed, 23 Jul 2025 14:31:13 GMT",
-          "fly-request-id": "01K0VYH47173B8N8ZFXDJFG2XN-sea",
+          "last-modified": "Wed, 23 Jul 2025 17:46:15 GMT",
+          "fly-request-id": "01K0W6N2GXHY5J5Z1Q3D0744SF-sea",
           "access-control-allow-headers": "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range",
           "x-frame-options": "SAMEORIGIN",
           "referrer-policy": "no-referrer-when-downgrade",
@@ -149,13 +164,13 @@
         "method": "GET",
         "headers": {
           "content-encoding": "zstd",
-          "etag": "\"6880f231-b186\"",
+          "etag": "\"68811fe7-b1eb\"",
           "x-content-type-options": "nosniff",
           "access-control-allow-methods": "GET, POST, OPTIONS",
-          "date": "Wed, 23 Jul 2025 15:30:45 GMT",
+          "date": "Wed, 23 Jul 2025 17:52:43 GMT",
           "content-type": "text/html",
-          "last-modified": "Wed, 23 Jul 2025 14:31:13 GMT",
-          "fly-request-id": "01K0VYH49DJ11G7Y0R0SFACK1T-sea",
+          "last-modified": "Wed, 23 Jul 2025 17:46:15 GMT",
+          "fly-request-id": "01K0W6N2K625WQ7HKNXRY6PE6W-sea",
           "access-control-allow-headers": "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range",
           "x-frame-options": "SAMEORIGIN",
           "referrer-policy": "no-referrer-when-downgrade",
@@ -173,10 +188,10 @@
         "headers": {
           "via": "2 fly.io, 2 fly.io",
           "content-encoding": "zstd",
-          "date": "Wed, 23 Jul 2025 15:30:45 GMT",
+          "date": "Wed, 23 Jul 2025 17:52:43 GMT",
           "content-type": "application/octet-stream, text/plain",
           "server": "Fly/8ba38a0c6 (2025-07-22)",
-          "fly-request-id": "01K0VYH4BQ5W5P3A9E459Q9H30-sea"
+          "fly-request-id": "01K0W6N2NE0SPF3EWVMMN2K644-sea"
         }
       }
     ],
@@ -203,20 +218,20 @@
   },
   "metadata": {
     "buildInfo": {
-      "version": "v1.0.19",
+      "version": "v1.0.20",
       "buildDate": "2025-07-23",
-      "commit": "ad36846",
+      "commit": "24e570a",
       "environment": "production",
       "branch": "main",
-      "buildNumber": "19",
+      "buildNumber": "20",
       "actor": "murr2k"
     }
   },
   "summary": {
-    "captureDate": "2025-07-23T15:30:45.444Z",
+    "captureDate": "2025-07-23T17:52:43.355Z",
     "features": 4,
     "visualSnapshots": 8,
     "performanceMetrics": 4,
-    "apiEndpoints": 6
+    "apiEndpoints": 7
   }
 }
