@@ -1,0 +1,78 @@
+# Reusable Slack Notification Workflow
+name: Slack Notification
+
+on:
+  workflow_call:
+    inputs:
+      status:
+        required: true
+        type: string
+      workflow_name:
+        required: true
+        type: string
+      service_name:
+        required: false
+        type: string
+        default: 'all'
+      environment:
+        required: false
+        type: string
+        default: 'production'
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+    # For users who want custom webhooks (optional)
+    - name: Custom Slack Webhook Notification
+      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+      run: |
+        if [ "${{ inputs.status }}" == "success" ]; then
+          EMOJI="✅"
+          COLOR="good"
+          TITLE="${{ inputs.workflow_name }} Successful"
+        else
+          EMOJI="❌"
+          COLOR="danger"
+          TITLE="${{ inputs.workflow_name }} Failed"
+        fi
+        
+        curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          -H 'Content-type: application/json' \
+          --data @- <<EOF
+        {
+          "attachments": [{
+            "color": "${COLOR}",
+            "title": "${EMOJI} ${TITLE}",
+            "fields": [
+              {"title": "Workflow", "value": "${{ inputs.workflow_name }}", "short": true},
+              {"title": "Status", "value": "${{ inputs.status }}", "short": true},
+              {"title": "Service", "value": "${{ inputs.service_name }}", "short": true},
+              {"title": "Environment", "value": "${{ inputs.environment }}", "short": true},
+              {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+              {"title": "Commit", "value": "${{ github.sha }}", "short": true},
+              {"title": "Author", "value": "${{ github.actor }}", "short": true},
+              {"title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": true}
+            ]
+          }]
+        }
+        EOF
+    
+    # Always add a workflow summary (visible in GitHub)
+    - name: Add Workflow Summary
+      if: always()
+      run: |
+        if [ "${{ inputs.status }}" == "success" ]; then
+          echo "## ✅ ${{ inputs.workflow_name }} Successful" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ❌ ${{ inputs.workflow_name }} Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Service:** ${{ inputs.service_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
