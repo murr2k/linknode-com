@@ -1,0 +1,222 @@
+{
+  "timestamp": "2025-07-23T15:30:31.040Z",
+  "version": "1.0.0",
+  "features": {
+    "pageStructure": {
+      "header": true,
+      "mainHeading": "Linknode Energy Monitor",
+      "metricsSection": true,
+      "powerWidget": true,
+      "apiStatusWidget": true,
+      "grafanaPreview": true,
+      "buildStatus": true,
+      "footer": true
+    },
+    "functionality": {
+      "powerMonitoring": {
+        "currentPower": true,
+        "powerStats": true,
+        "metricsDisplay": true
+      },
+      "apiStatus": {
+        "influxStatus": true,
+        "eagleStatus": true,
+        "webStatus": true
+      },
+      "buildInfo": {
+        "version": true,
+        "buildDate": true,
+        "commit": true,
+        "environment": true
+      },
+      "grafana": {
+        "iframe": true
+      }
+    }
+  },
+  "performance": {
+    "navigation": {
+      "domContentLoaded": 0,
+      "loadComplete": 0,
+      "totalDuration": 86.29999999701977,
+      "dnsLookup": 0,
+      "tcpConnection": 0,
+      "serverResponse": 72.70000000298023,
+      "domInteractive": 10.600000001490116,
+      "domComplete": 2.1999999955296516
+    },
+    "paint": {
+      "firstPaint": 148,
+      "firstContentfulPaint": 148
+    },
+    "webVitals": {
+      "lcp": 0,
+      "cls": 0,
+      "fid": 0
+    },
+    "resources": {
+      "total": 5,
+      "breakdown": {
+        "iframe": 1,
+        "fetch": 4
+      },
+      "totalSize": 444
+    }
+  },
+  "visual": {
+    "desktop-1080p": "/home/murr2k/projects/rackspace/test-baselines/visual/baseline-desktop-1080p.png",
+    "desktop-900p": "/home/murr2k/projects/rackspace/test-baselines/visual/baseline-desktop-900p.png",
+    "tablet-portrait": "/home/murr2k/projects/rackspace/test-baselines/visual/baseline-tablet-portrait.png",
+    "mobile": "/home/murr2k/projects/rackspace/test-baselines/visual/baseline-mobile.png",
+    "component-power-widget": "/home/murr2k/projects/rackspace/test-baselines/visual/component-power-widget.png",
+    "component-api-status-widget": "/home/murr2k/projects/rackspace/test-baselines/visual/component-api-status-widget.png",
+    "component-build-status": "/home/murr2k/projects/rackspace/test-baselines/visual/component-build-status.png",
+    "component-metrics-section": "/home/murr2k/projects/rackspace/test-baselines/visual/component-metrics-section.png"
+  },
+  "api": {
+    "endpoints": [
+      {
+        "url": "https://linknode-eagle-monitor.fly.dev/health",
+        "status": 200,
+        "method": "GET",
+        "headers": {
+          "content-encoding": "zstd",
+          "via": "2 fly.io, 2 fly.io",
+          "access-control-allow-origin": "https://linknode.com",
+          "date": "Wed, 23 Jul 2025 15:30:41 GMT",
+          "content-type": "application/json",
+          "vary": "Origin",
+          "server": "Fly/8ba38a0c6 (2025-07-22)",
+          "fly-request-id": "01K0VYH0KCRWSCPREDW4KY432X-sea"
+        }
+      },
+      {
+        "url": "https://linknode-eagle-monitor.fly.dev/api/stats",
+        "status": 200,
+        "method": "GET",
+        "headers": {
+          "content-encoding": "zstd",
+          "via": "2 fly.io, 2 fly.io",
+          "access-control-allow-origin": "https://linknode.com",
+          "date": "Wed, 23 Jul 2025 15:30:41 GMT",
+          "content-type": "application/json",
+          "vary": "Origin",
+          "server": "Fly/8ba38a0c6 (2025-07-22)",
+          "fly-request-id": "01K0VYH0KC2W39NGZ1XD3DGYAX-sea"
+        }
+      },
+      {
+        "url": "https://linknode-eagle-monitor.fly.dev/health",
+        "status": 200,
+        "method": "GET",
+        "headers": {
+          "content-encoding": "zstd",
+          "via": "2 fly.io, 2 fly.io",
+          "access-control-allow-origin": "https://linknode.com",
+          "date": "Wed, 23 Jul 2025 15:30:41 GMT",
+          "content-type": "application/json",
+          "vary": "Origin",
+          "server": "Fly/8ba38a0c6 (2025-07-22)",
+          "fly-request-id": "01K0VYH0NTX498NZEV1C7T3S2S-sea"
+        }
+      },
+      {
+        "url": "https://linknode.com/api/stats",
+        "status": 200,
+        "method": "GET",
+        "headers": {
+          "content-encoding": "zstd",
+          "etag": "\"6880f231-b186\"",
+          "x-content-type-options": "nosniff",
+          "access-control-allow-methods": "GET, POST, OPTIONS",
+          "date": "Wed, 23 Jul 2025 15:30:45 GMT",
+          "content-type": "text/html",
+          "last-modified": "Wed, 23 Jul 2025 14:31:13 GMT",
+          "fly-request-id": "01K0VYH47173B8N8ZFXDJFG2XN-sea",
+          "access-control-allow-headers": "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range",
+          "x-frame-options": "SAMEORIGIN",
+          "referrer-policy": "no-referrer-when-downgrade",
+          "via": "2 fly.io, 2 fly.io",
+          "accept-ranges": "bytes",
+          "access-control-allow-origin": "*",
+          "x-xss-protection": "1; mode=block",
+          "server": "Fly/8ba38a0c6 (2025-07-22)"
+        }
+      },
+      {
+        "url": "https://linknode.com/api/current",
+        "status": 200,
+        "method": "GET",
+        "headers": {
+          "content-encoding": "zstd",
+          "etag": "\"6880f231-b186\"",
+          "x-content-type-options": "nosniff",
+          "access-control-allow-methods": "GET, POST, OPTIONS",
+          "date": "Wed, 23 Jul 2025 15:30:45 GMT",
+          "content-type": "text/html",
+          "last-modified": "Wed, 23 Jul 2025 14:31:13 GMT",
+          "fly-request-id": "01K0VYH49DJ11G7Y0R0SFACK1T-sea",
+          "access-control-allow-headers": "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range",
+          "x-frame-options": "SAMEORIGIN",
+          "referrer-policy": "no-referrer-when-downgrade",
+          "via": "2 fly.io, 2 fly.io",
+          "accept-ranges": "bytes",
+          "access-control-allow-origin": "*",
+          "x-xss-protection": "1; mode=block",
+          "server": "Fly/8ba38a0c6 (2025-07-22)"
+        }
+      },
+      {
+        "url": "https://linknode.com/health",
+        "status": 200,
+        "method": "GET",
+        "headers": {
+          "via": "2 fly.io, 2 fly.io",
+          "content-encoding": "zstd",
+          "date": "Wed, 23 Jul 2025 15:30:45 GMT",
+          "content-type": "application/octet-stream, text/plain",
+          "server": "Fly/8ba38a0c6 (2025-07-22)",
+          "fly-request-id": "01K0VYH4BQ5W5P3A9E459Q9H30-sea"
+        }
+      }
+    ],
+    "/api/stats": {
+      "status": 200,
+      "contentType": "text/html",
+      "ok": true
+    },
+    "/api/current": {
+      "status": 200,
+      "contentType": "text/html",
+      "ok": true
+    },
+    "/health": {
+      "status": 200,
+      "contentType": "application/octet-stream, text/plain",
+      "ok": true
+    },
+    "/build-info.json": {
+      "status": 200,
+      "contentType": "application/json, application/json",
+      "ok": true
+    }
+  },
+  "metadata": {
+    "buildInfo": {
+      "version": "v1.0.19",
+      "buildDate": "2025-07-23",
+      "commit": "ad36846",
+      "environment": "production",
+      "branch": "main",
+      "buildNumber": "19",
+      "actor": "murr2k"
+    }
+  },
+  "summary": {
+    "captureDate": "2025-07-23T15:30:45.444Z",
+    "features": 4,
+    "visualSnapshots": 8,
+    "performanceMetrics": 4,
+    "apiEndpoints": 6
+  }
+}

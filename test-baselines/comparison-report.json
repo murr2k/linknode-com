@@ -1,0 +1,262 @@
+{
+  "timestamp": "2025-07-23T15:30:45.492Z",
+  "summary": {
+    "total": 34,
+    "passed": 30,
+    "warnings": 0,
+    "failed": 4
+  },
+  "baselineDate": "2025-07-23T15:29:39.045Z",
+  "results": [
+    {
+      "category": "Page Structure",
+      "item": "header",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Page Structure",
+      "item": "mainHeading",
+      "status": "pass",
+      "baseline": "Linknode Energy Monitor",
+      "current": "Linknode Energy Monitor"
+    },
+    {
+      "category": "Page Structure",
+      "item": "metricsSection",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Page Structure",
+      "item": "powerWidget",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Page Structure",
+      "item": "apiStatusWidget",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Page Structure",
+      "item": "grafanaPreview",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Page Structure",
+      "item": "buildStatus",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Page Structure",
+      "item": "footer",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - powerMonitoring",
+      "item": "currentPower",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - powerMonitoring",
+      "item": "powerStats",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - powerMonitoring",
+      "item": "metricsDisplay",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - apiStatus",
+      "item": "influxStatus",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - apiStatus",
+      "item": "eagleStatus",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - apiStatus",
+      "item": "webStatus",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - buildInfo",
+      "item": "version",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - buildInfo",
+      "item": "buildDate",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - buildInfo",
+      "item": "commit",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - buildInfo",
+      "item": "environment",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Functionality - grafana",
+      "item": "iframe",
+      "status": "pass",
+      "baseline": true,
+      "current": true
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "domContentLoaded",
+      "status": "fail",
+      "baseline": "0ms",
+      "current": "0ms",
+      "difference": "NaN% change"
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "loadComplete",
+      "status": "fail",
+      "baseline": "0ms",
+      "current": "0ms",
+      "difference": "NaN% change"
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "totalDuration",
+      "status": "pass",
+      "baseline": "84.60000000149012ms",
+      "current": "86.29999999701977ms",
+      "difference": "2.0% change"
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "dnsLookup",
+      "status": "fail",
+      "baseline": "0ms",
+      "current": "0ms",
+      "difference": "NaN% change"
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "tcpConnection",
+      "status": "fail",
+      "baseline": "0ms",
+      "current": "0ms",
+      "difference": "NaN% change"
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "serverResponse",
+      "status": "pass",
+      "baseline": "70ms",
+      "current": "72.70000000298023ms",
+      "difference": "3.9% change"
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "domInteractive",
+      "status": "pass",
+      "baseline": "11.699999995529652ms",
+      "current": "10.600000001490116ms",
+      "difference": "-9.4% change"
+    },
+    {
+      "category": "Navigation Timing",
+      "item": "domComplete",
+      "status": "pass",
+      "baseline": "2.100000001490116ms",
+      "current": "2.1999999955296516ms",
+      "difference": "4.8% change"
+    },
+    {
+      "category": "Paint Timing",
+      "item": "firstPaint",
+      "status": "pass",
+      "baseline": "144ms",
+      "current": "148ms",
+      "difference": "2.8% change"
+    },
+    {
+      "category": "Paint Timing",
+      "item": "firstContentfulPaint",
+      "status": "pass",
+      "baseline": "144ms",
+      "current": "148ms",
+      "difference": "2.8% change"
+    },
+    {
+      "category": "Resources",
+      "item": "Total Size",
+      "status": "pass",
+      "baseline": "0.00MB",
+      "current": "0.00MB",
+      "difference": "0.0% change"
+    },
+    {
+      "category": "Resources",
+      "item": "Request Count",
+      "status": "pass",
+      "baseline": 5,
+      "current": 5,
+      "difference": "0 requests"
+    },
+    {
+      "category": "API Endpoints",
+      "item": "/api/stats",
+      "status": "pass",
+      "baseline": "Status 200",
+      "current": "Status 200"
+    },
+    {
+      "category": "API Endpoints",
+      "item": "/health",
+      "status": "pass",
+      "baseline": "Status 200",
+      "current": "Status 200"
+    },
+    {
+      "category": "API Endpoints",
+      "item": "/build-info.json",
+      "status": "pass",
+      "baseline": "Status 200",
+      "current": "Status 200"
+    }
+  ]
+}
