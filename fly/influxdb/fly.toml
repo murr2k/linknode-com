@@ -16,6 +16,15 @@ primary_region = "ord"
 [[services]]
   internal_port = 8086
   protocol = "tcp"
+  
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = false
+  
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
 
 [[vm]]
   cpu_kind = "shared"

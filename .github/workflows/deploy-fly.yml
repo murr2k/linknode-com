@@ -33,6 +33,16 @@ jobs:
 
     - name: Setup Fly CLI
       uses: superfly/flyctl-actions/setup-flyctl@master
+    
+    - name: Verify Fly.io Authentication
+      run: |
+        echo "Checking Fly.io authentication..."
+        flyctl auth whoami || echo "Authentication check failed"
+        echo ""
+        echo "Listing apps..."
+        flyctl apps list | grep linknode || echo "No linknode apps found"
+      env:
+        FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
     - name: Deploy InfluxDB
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'influxdb' || github.event.inputs.service == ''
