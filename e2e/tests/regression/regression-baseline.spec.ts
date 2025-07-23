@@ -161,19 +161,36 @@ test.describe('Regression Tests Against Baseline @regression', () => {
 
       // Navigation timing should not regress significantly
       if (baselinePerf.navigation) {
-        expect(metrics.domContentLoaded).toBeLessThan(
-          baselinePerf.navigation.domContentLoaded * tolerance
-        );
-        expect(metrics.loadComplete).toBeLessThan(
-          baselinePerf.navigation.loadComplete * tolerance
-        );
+        // Handle zero baseline values
+        if (baselinePerf.navigation.domContentLoaded === 0) {
+          // When baseline is 0, just check that current is reasonable
+          expect(metrics.domContentLoaded).toBeLessThan(1000); // 1 second max
+        } else {
+          expect(metrics.domContentLoaded).toBeLessThan(
+            baselinePerf.navigation.domContentLoaded * tolerance
+          );
+        }
+        
+        if (baselinePerf.navigation.loadComplete === 0) {
+          // When baseline is 0, just check that current is reasonable
+          expect(metrics.loadComplete).toBeLessThan(2000); // 2 seconds max
+        } else {
+          expect(metrics.loadComplete).toBeLessThan(
+            baselinePerf.navigation.loadComplete * tolerance
+          );
+        }
       }
 
       // Paint timing should not regress
       if (baselinePerf.paint) {
-        expect(metrics.firstContentfulPaint).toBeLessThan(
-          baselinePerf.paint.firstContentfulPaint * tolerance
-        );
+        if (baselinePerf.paint.firstContentfulPaint === 0) {
+          // When baseline is 0, just check that current is reasonable
+          expect(metrics.firstContentfulPaint).toBeLessThan(3000); // 3 seconds max
+        } else {
+          expect(metrics.firstContentfulPaint).toBeLessThan(
+            baselinePerf.paint.firstContentfulPaint * tolerance
+          );
+        }
       }
 
       // Core Web Vitals should not regress

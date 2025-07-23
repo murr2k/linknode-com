@@ -96,15 +96,34 @@ class BaselineComparison {
       Object.keys(baselinePerf.navigation).forEach(metric => {
         const baseline = baselinePerf.navigation[metric];
         const current = currentPerf.navigation[metric];
-        const ratio = current / baseline;
+        
+        let status: 'pass' | 'warning' | 'fail';
+        let difference: string;
+        
+        // Handle zero baseline cases
+        if (baseline === 0) {
+          if (current === 0) {
+            status = 'pass';
+            difference = 'No change (0ms)';
+          } else {
+            // When baseline is 0 but current is not, show absolute difference
+            status = current <= 10 ? 'pass' : current <= 50 ? 'warning' : 'fail';
+            difference = `+${current}ms from 0ms`;
+          }
+        } else {
+          // Normal percentage calculation when baseline is not zero
+          const ratio = current / baseline;
+          status = ratio <= tolerance ? 'pass' : ratio <= 1.5 ? 'warning' : 'fail';
+          difference = `${((ratio - 1) * 100).toFixed(1)}% change`;
+        }
         
         this.results.push({
           category: 'Navigation Timing',
           item: metric,
-          status: ratio <= tolerance ? 'pass' : ratio <= 1.5 ? 'warning' : 'fail',
+          status,
           baseline: `${baseline}ms`,
           current: `${current}ms`,
-          difference: `${((ratio - 1) * 100).toFixed(1)}% change`
+          difference
         });
       });
     }
@@ -114,15 +133,34 @@ class BaselineComparison {
       Object.keys(baselinePerf.paint).forEach(metric => {
         const baseline = baselinePerf.paint[metric];
         const current = currentPerf.paint[metric];
-        const ratio = current / baseline;
+        
+        let status: 'pass' | 'warning' | 'fail';
+        let difference: string;
+        
+        // Handle zero baseline cases
+        if (baseline === 0) {
+          if (current === 0) {
+            status = 'pass';
+            difference = 'No change (0ms)';
+          } else {
+            // When baseline is 0 but current is not, show absolute difference
+            status = current <= 10 ? 'pass' : current <= 50 ? 'warning' : 'fail';
+            difference = `+${current}ms from 0ms`;
+          }
+        } else {
+          // Normal percentage calculation when baseline is not zero
+          const ratio = current / baseline;
+          status = ratio <= tolerance ? 'pass' : ratio <= 1.5 ? 'warning' : 'fail';
+          difference = `${((ratio - 1) * 100).toFixed(1)}% change`;
+        }
         
         this.results.push({
           category: 'Paint Timing',
           item: metric,
-          status: ratio <= tolerance ? 'pass' : ratio <= 1.5 ? 'warning' : 'fail',
+          status,
           baseline: `${baseline}ms`,
           current: `${current}ms`,
-          difference: `${((ratio - 1) * 100).toFixed(1)}% change`
+          difference
         });
       });
     }
@@ -131,15 +169,35 @@ class BaselineComparison {
     if (baselinePerf.resources && currentPerf.resources) {
       const baselineSize = baselinePerf.resources.totalSize;
       const currentSize = currentPerf.resources.totalSize;
-      const sizeRatio = currentSize / baselineSize;
+      
+      let sizeStatus: 'pass' | 'warning' | 'fail';
+      let sizeDifference: string;
+      
+      // Handle zero baseline cases for size
+      if (baselineSize === 0) {
+        if (currentSize === 0) {
+          sizeStatus = 'pass';
+          sizeDifference = 'No change (0MB)';
+        } else {
+          // When baseline is 0 but current is not, show absolute difference
+          const currentMB = currentSize / 1024 / 1024;
+          sizeStatus = currentMB <= 1 ? 'pass' : currentMB <= 5 ? 'warning' : 'fail';
+          sizeDifference = `+${currentMB.toFixed(2)}MB from 0MB`;
+        }
+      } else {
+        // Normal percentage calculation when baseline is not zero
+        const sizeRatio = currentSize / baselineSize;
+        sizeStatus = sizeRatio <= 1.1 ? 'pass' : sizeRatio <= 1.2 ? 'warning' : 'fail';
+        sizeDifference = `${((sizeRatio - 1) * 100).toFixed(1)}% change`;
+      }
       
       this.results.push({
         category: 'Resources',
         item: 'Total Size',
-        status: sizeRatio <= 1.1 ? 'pass' : sizeRatio <= 1.2 ? 'warning' : 'fail',
+        status: sizeStatus,
         baseline: `${(baselineSize / 1024 / 1024).toFixed(2)}MB`,
         current: `${(currentSize / 1024 / 1024).toFixed(2)}MB`,
-        difference: `${((sizeRatio - 1) * 100).toFixed(1)}% change`
+        difference: sizeDifference
       });
 
       const baselineCount = baselinePerf.resources.total;
