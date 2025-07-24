@@ -44,7 +44,7 @@ All resources are in the `demo-app` namespace:
 - Embedded Grafana dashboard (no login required)
 - API status indicators for all services
 - Real-time pod count display
-- Fallback to simulated data when APIs unavailable
+- Returns zero values when no real data available
 
 ### 2. Eagle-200 XML Support
 - Parses XML data wrapped in `<rainforest>` tags

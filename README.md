@@ -47,7 +47,7 @@ This project features:
   - Time-series data storage (InfluxDB)
   - XML data ingestion endpoint
   - Automatic dashboard updates via CI/CD
-  - Fallback to simulated data when APIs unavailable
+  - Returns zero values when no real data available
 - **Secure Access Options**: 
   - SSH tunnel access for development
   - NodePort for cost-effective public access
