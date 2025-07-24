@@ -55,6 +55,23 @@ This project features:
   - Public dashboards with read-only access
 - **WSL2 Compatible**: Optimized for Windows Subsystem for Linux
 
+## 📝 Recent Updates
+
+### Grafana Dashboard Fixes (2025-07-24)
+- Fixed utility meter reading display to show "86733 kWh" instead of "87 MWh"
+- Prevented Grafana's automatic unit scaling by using "none" unit with hardcoded suffix
+- See [GRAFANA_METER_FIX.md](./GRAFANA_METER_FIX.md) for details
+
+### Regression Testing Enhancement
+- Implemented blackout feature for dynamic content during visual regression tests
+- Added debug mode for development and troubleshooting
+- See [REGRESSION_BLACKOUT_FEATURE.md](./REGRESSION_BLACKOUT_FEATURE.md) for usage
+
+### Known Issues
+- Grafana frontend loading error: "Invalid language tag: en-US@posix"
+- Backend rendering plugin not available (shows error in screenshots)
+- See [GRAFANA_BLACKOUT_SOLUTION.md](./GRAFANA_BLACKOUT_SOLUTION.md) for investigation details
+
 ## 🤖 Claude Flow Development
 
 This project is optimized for development with [claude-flow](https://github.com/ruvnet/claude-flow). State files are maintained for seamless session continuity.

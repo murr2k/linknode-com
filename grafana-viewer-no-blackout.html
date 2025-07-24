@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grafana Dashboard Viewer - No Blackout</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .controls {
+            background: #f0f0f0;
+            padding: 20px;
+            border-bottom: 2px solid #333;
+        }
+        .controls h1 {
+            margin: 0 0 10px 0;
+        }
+        .controls button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        .controls button:hover {
+            background: #0056b3;
+        }
+        .info {
+            background: #e8f4f8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        #dashboard-frame {
+            width: 100%;
+            height: calc(100vh - 200px);
+            border: none;
+        }
+        .blackout-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1a1a;
+            color: #ff6600;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            z-index: 9999;
+        }
+        .blackout-overlay.active {
+            display: flex;
+        }
+        .render-image {
+            max-width: 100%;
+            height: auto;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <h1>Grafana Dashboard Control Panel</h1>
+        <button onclick="toggleBlackout()">Toggle Blackout</button>
+        <button onclick="reloadDashboard()">Reload Dashboard</button>
+        <button onclick="loadRenderImage()">Load Rendered Image</button>
+        <button onclick="checkPanelData()">Check Panel Data</button>
+        
+        <div class="info">
+            <strong>Dashboard URL:</strong> https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor
+            <br>
+            <strong>Expected:</strong> Utility Meter Reading should show "86733 kWh"
+            <br>
+            <strong>Issue:</strong> Currently showing "87 MWh" (wrong value and unit)
+        </div>
+        
+        <div id="status" class="info"></div>
+    </div>
+    
+    <iframe id="dashboard-frame" 
+            src="https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor?orgId=1&refresh=5s">
+    </iframe>
+    
+    <div id="render-container"></div>
+    
+    <div class="blackout-overlay" id="blackout">
+        <div>
+            <h2>🚫 Regression Blackout Active</h2>
+            <p>Click "Toggle Blackout" to view dashboard</p>
+        </div>
+    </div>
+    
+    <script>
+        let blackoutActive = false;
+        
+        function toggleBlackout() {
+            blackoutActive = !blackoutActive;
+            document.getElementById('blackout').classList.toggle('active');
+            updateStatus(`Blackout ${blackoutActive ? 'enabled' : 'disabled'}`);
+        }
+        
+        function reloadDashboard() {
+            document.getElementById('dashboard-frame').src = 
+                'https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor?orgId=1&refresh=5s&_t=' + Date.now();
+            updateStatus('Dashboard reloaded');
+        }
+        
+        function loadRenderImage() {
+            updateStatus('Loading rendered image...');
+            const img = new Image();
+            img.className = 'render-image';
+            img.src = 'https://linknode-grafana.fly.dev/render/d/power-monitoring/eagle-energy-monitor?orgId=1&panelId=3&width=800&height=400&_t=' + Date.now();
+            img.onload = () => {
+                document.getElementById('render-container').innerHTML = '<h3>Backend Rendered Panel 3:</h3>';
+                document.getElementById('render-container').appendChild(img);
+                updateStatus('Rendered image loaded');
+            };
+            img.onerror = () => {
+                updateStatus('Failed to load rendered image');
+            };
+        }
+        
+        async function checkPanelData() {
+            updateStatus('Checking panel data...');
+            try {
+                const response = await fetch('https://linknode-grafana.fly.dev/api/dashboards/uid/power-monitoring');
+                const data = await response.json();
+                const panel3 = data.dashboard.panels.find(p => p.id === 3);
+                
+                updateStatus(`Panel 3: ${panel3.title}, Unit: ${panel3.fieldConfig.defaults.unit}, Query: ${panel3.targets[0].query.substring(0, 50)}...`);
+            } catch (e) {
+                updateStatus('Error checking panel data: ' + e.message);
+            }
+        }
+        
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = `<strong>Status:</strong> ${message} (${new Date().toLocaleTimeString()})`;
+        }
+        
+        // Initial status
+        updateStatus('Page loaded - Dashboard should be visible below if no blackout is active');
+    </script>
+</body>
+</html>

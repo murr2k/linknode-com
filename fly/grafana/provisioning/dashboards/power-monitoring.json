@@ -142,24 +142,27 @@
     },
     {
       "datasource": "InfluxDB",
-      "description": "Total energy consumed today",
+      "description": "Cumulative meter reading from the utility meter",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 2,
+          "decimals": 0,
           "mappings": [],
+          "max": 100000,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {"color": "green", "value": null},
-              {"color": "yellow", "value": 10},
-              {"color": "orange", "value": 20}
+              {"color": "yellow", "value": 50000},
+              {"color": "orange", "value": 100000}
             ]
           },
-          "unit": "kwatth"
-        }
+          "unit": "none"  
+        },
+        "overrides": []
       },
       "gridPos": {"h": 4, "w": 8, "x": 0, "y": 8},
       "id": 3,
@@ -168,21 +171,26 @@
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
+        "text": {
+          "titleSize": 14,
+          "valueSize": 24,
+          "suffix": " kWh"
+        },
         "reduceOptions": {
-          "calcs": ["sum"],
+          "calcs": ["last"],
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "textMode": "value"
       },
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\") |> range(start: today()) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"energy_delivered_kwh\") |> sum()",
+          "query": "from(bucket: \"energy\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"energy_delivered_kwh\") |> last()",
           "refId": "A"
         }
       ],
-      "title": "Today's Total Energy",
+      "title": "Utility Meter Reading (kWh)",
       "type": "stat"
     },
     {

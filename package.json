@@ -22,7 +22,9 @@
     "clean:results": "rm -rf test-results",
     "baseline:capture": "npx ts-node scripts/capture-baseline.ts",
     "baseline:compare": "npx ts-node scripts/compare-baseline.ts",
-    "test:regression": "playwright test regression-baseline.spec.ts"
+    "test:regression": "playwright test regression-baseline.spec.ts",
+    "test:regression:blackout": "playwright test tests/regression/power-monitoring-regression.spec.ts",
+    "test:regression:debug": "playwright test tests/regression/power-monitoring-regression.spec.ts --grep 'debug mode'"
   },
   "keywords": [
     "e2e",
