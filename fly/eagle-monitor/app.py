@@ -15,6 +15,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import time
 from functools import wraps
 import hashlib
+import base64
 from security_monitor import security_monitor, require_api_key_with_monitoring
 
 # Configure logging
@@ -40,7 +41,9 @@ INFLUXDB_ORG = os.getenv('INFLUXDB_ORG', 'linknode')
 INFLUXDB_BUCKET = os.getenv('INFLUXDB_BUCKET', 'energy')
 
 # API Authentication
-API_KEY = os.getenv('EAGLE_API_KEY')  # Set via fly secrets
+API_KEY = os.getenv('EAGLE_API_KEY')  # Set via fly secrets for API endpoints
+EAGLE_USERNAME = os.getenv('EAGLE_USERNAME', 'eagle')  # Basic auth username for Eagle device
+EAGLE_PASSWORD = os.getenv('EAGLE_PASSWORD')  # Basic auth password for Eagle device
 PUBLIC_API_ENDPOINTS = ['/health', '/']  # Endpoints that don't require auth
 
 # Rate limiting configuration
@@ -83,30 +86,54 @@ def check_rate_limit(identifier):
         rate_limit_storage[identifier].append(current_time)
         return True
 
-def require_api_key(f):
-    """Decorator to require API key for endpoints"""
+def check_basic_auth():
+    """Check HTTP Basic Authentication"""
+    auth = request.authorization
+    if not auth:
+        return False
+    
+    # Check if credentials match
+    return auth.username == EAGLE_USERNAME and auth.password == EAGLE_PASSWORD
+
+def require_auth(f):
+    """Decorator to require authentication (Basic Auth for Eagle, API key for others)"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # Skip auth for public endpoints
         if request.endpoint in PUBLIC_API_ENDPOINTS or request.path in PUBLIC_API_ENDPOINTS:
             return f(*args, **kwargs)
         
-        # Check for API key
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        
-        if not API_KEY:
-            # If no API key is configured, log warning but allow access
-            logger.warning("API_KEY not configured - authentication disabled")
-            return f(*args, **kwargs)
-        
-        if not api_key:
-            return jsonify({'error': 'API key required'}), 401
-        
-        if api_key != API_KEY:
-            return jsonify({'error': 'Invalid API key'}), 401
+        # For Eagle webhook endpoint, use Basic Auth
+        if request.endpoint == 'eagle_webhook':
+            # Check if Basic Auth password is configured
+            if not EAGLE_PASSWORD:
+                logger.warning("EAGLE_PASSWORD not configured - authentication disabled for Eagle")
+                return f(*args, **kwargs)
+            
+            # Check Basic Auth
+            if not check_basic_auth():
+                # Return 401 with WWW-Authenticate header for Basic Auth
+                return jsonify({'error': 'Authentication required'}), 401, {
+                    'WWW-Authenticate': 'Basic realm="Eagle Monitor"'
+                }
+        else:
+            # For API endpoints, use API key
+            api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+            
+            if not API_KEY:
+                # If no API key is configured, log warning but allow access
+                logger.warning("API_KEY not configured - authentication disabled for API")
+                return f(*args, **kwargs)
+            
+            if not api_key:
+                return jsonify({'error': 'API key required'}), 401
+            
+            if api_key != API_KEY:
+                return jsonify({'error': 'Invalid API key'}), 401
         
         # Check rate limit
-        client_id = request.remote_addr + ':' + api_key
+        auth_id = request.authorization.username if request.authorization else (request.headers.get('X-API-Key') or request.remote_addr)
+        client_id = request.remote_addr + ':' + auth_id
         if not check_rate_limit(client_id):
             # Record rate limit violation for security monitoring
             security_monitor.record_rate_limit_violation(request.remote_addr)
@@ -114,6 +141,9 @@ def require_api_key(f):
         
         return f(*args, **kwargs)
     return decorated_function
+
+# Keep the old decorator for backward compatibility
+require_api_key = require_auth
 
 def init_influxdb():
     """Initialize InfluxDB connection"""
@@ -273,7 +303,7 @@ def parse_eagle_xml(xml_data):
         return None
 
 @app.route('/eagle', methods=['POST'])
-@require_api_key
+@require_auth
 def eagle_webhook():
     """Handle Eagle-200 XML POST requests"""
     global stats
