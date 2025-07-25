@@ -75,9 +75,9 @@ This project features:
 - See [GRAFANA_METER_FIX.md](./GRAFANA_METER_FIX.md) for details
 
 ### Regression Testing Enhancement
-- Implemented blackout feature for dynamic content during visual regression tests
-- Added debug mode for development and troubleshooting
-- See [REGRESSION_BLACKOUT_FEATURE.md](./REGRESSION_BLACKOUT_FEATURE.md) for usage
+- Visual regression tests use Playwright's built-in screenshot comparison
+- Dynamic content is handled with pixel tolerance and element masking
+- Fixed time ranges prevent false positives from changing data
 
 ### Known Issues
 - Grafana frontend loading error: "Invalid language tag: en-US@posix"
