@@ -1,0 +1,81 @@
+{
+  "sessionId": "session-1753401395883-oylp997ge",
+  "checkpointId": "checkpoint-1753401425980-br3s8g0bf",
+  "checkpointName": "auto-save-1753401425980",
+  "timestamp": "2025-07-24T23:57:05.981Z",
+  "data": {
+    "timestamp": "2025-07-24T23:57:05.980Z",
+    "changeCount": 5,
+    "changesByType": {
+      "swarm_created": [
+        {
+          "type": "swarm_created",
+          "data": {
+            "swarmId": "swarm-1753401395878-g7i9va7pf",
+            "swarmName": "hive-1753401395848",
+            "objective": "Resume development on this project by first reading CLAUDE_FLOW_RESTART.md. Then orchestrate security improvements of linknode.com as recommended by ~/projects/pentest/linknode-security-tester/LINKNODE_SECURITY_ASSESSMENT_REPORT.md",
+            "workerCount": 8
+          },
+          "timestamp": "2025-07-24T23:56:35.884Z"
+        }
+      ],
+      "agent_activity": [
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753401395878-g7i9va7pf-0",
+            "activity": "spawned",
+            "data": {
+              "type": "researcher",
+              "name": "Researcher Worker 1"
+            }
+          },
+          "timestamp": "2025-07-24T23:56:35.893Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753401395878-g7i9va7pf-1",
+            "activity": "spawned",
+            "data": {
+              "type": "coder",
+              "name": "Coder Worker 2"
+            }
+          },
+          "timestamp": "2025-07-24T23:56:35.897Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753401395878-g7i9va7pf-2",
+            "activity": "spawned",
+            "data": {
+              "type": "analyst",
+              "name": "Analyst Worker 3"
+            }
+          },
+          "timestamp": "2025-07-24T23:56:35.901Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753401395878-g7i9va7pf-3",
+            "activity": "spawned",
+            "data": {
+              "type": "tester",
+              "name": "Tester Worker 4"
+            }
+          },
+          "timestamp": "2025-07-24T23:56:35.905Z"
+        }
+      ]
+    },
+    "statistics": {
+      "tasksProcessed": 0,
+      "tasksCompleted": 0,
+      "memoryUpdates": 0,
+      "agentActivities": 4,
+      "consensusDecisions": 0
+    }
+  }
+}

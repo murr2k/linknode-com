@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grafana Dashboard Viewer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        iframe {
+            width: 100%;
+            height: 800px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .panel-info {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Grafana Dashboard Viewer - Test Page</h1>
+    
+    <div class="info">
+        <h2>Dashboard Information</h2>
+        <p><strong>URL:</strong> <code>https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor</code></p>
+        <p><strong>Panel ID 3:</strong> Utility Meter Reading</p>
+        <p><strong>Expected Value:</strong> 86733 kWh (not 87 kWh)</p>
+        <p><strong>Current Configuration:</strong></p>
+        <ul>
+            <li>Unit: watth (Watt-hours)</li>
+            <li>Decimals: 0</li>
+            <li>Query: Shows last value of energy_delivered_kwh</li>
+        </ul>
+    </div>
+    
+    <div class="info">
+        <h2>Note about Blackouts</h2>
+        <p>If you see a black screen below, it's because the test environment is applying a blackout to prevent false positive regression test failures from dynamic data.</p>
+        <p>The actual Grafana dashboard is running correctly - the blackout is applied at the browser/screenshot level.</p>
+    </div>
+    
+    <h2>Dashboard Preview:</h2>
+    <iframe src="https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor?orgId=1&refresh=5s" 
+            frameborder="0"
+            allowfullscreen>
+    </iframe>
+    
+    <div class="panel-info">
+        <h3>What to Look For:</h3>
+        <p>The Utility Meter Reading panel should display:</p>
+        <ul>
+            <li>Value: <strong>86733</strong> (without comma)</li>
+            <li>Units: <strong>kWh</strong> (should be visible)</li>
+        </ul>
+        <p>If it shows "87 kWh" or "86733 Wh", the configuration needs adjustment.</p>
+    </div>
+</body>
+</html>
