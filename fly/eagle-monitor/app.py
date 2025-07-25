@@ -13,6 +13,9 @@ import xml.etree.ElementTree as ET
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 import time
+from functools import wraps
+import hashlib
+from security_monitor import security_monitor, require_api_key_with_monitoring
 
 # Configure logging
 logging.basicConfig(
@@ -23,13 +26,30 @@ logger = logging.getLogger(__name__)
 
 # Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Configure CORS with specific origins
+CORS(app, origins=[
+    "https://linknode.com",
+    "https://linknode-grafana.fly.dev",
+    "https://linknode-web.fly.dev"
+])
 
 # InfluxDB configuration
 INFLUXDB_URL = os.getenv('INFLUXDB_URL', 'http://linknode-influxdb.internal:8086')
 INFLUXDB_TOKEN = os.getenv('INFLUXDB_TOKEN')  # Required - must be set via fly secrets
 INFLUXDB_ORG = os.getenv('INFLUXDB_ORG', 'linknode')
 INFLUXDB_BUCKET = os.getenv('INFLUXDB_BUCKET', 'energy')
+
+# API Authentication
+API_KEY = os.getenv('EAGLE_API_KEY')  # Set via fly secrets
+PUBLIC_API_ENDPOINTS = ['/health', '/']  # Endpoints that don't require auth
+
+# Rate limiting configuration
+from collections import defaultdict
+from threading import Lock
+rate_limit_storage = defaultdict(list)
+rate_limit_lock = Lock()
+RATE_LIMIT = 60  # requests per minute
+RATE_WINDOW = 60  # seconds
 
 # Statistics
 stats = {
@@ -44,6 +64,56 @@ stats = {
 # Initialize InfluxDB client
 influx_client = None
 write_api = None
+
+def check_rate_limit(identifier):
+    """Check if request exceeds rate limit"""
+    current_time = time.time()
+    with rate_limit_lock:
+        # Clean old entries
+        rate_limit_storage[identifier] = [
+            timestamp for timestamp in rate_limit_storage[identifier]
+            if current_time - timestamp < RATE_WINDOW
+        ]
+        
+        # Check rate limit
+        if len(rate_limit_storage[identifier]) >= RATE_LIMIT:
+            return False
+        
+        # Add current request
+        rate_limit_storage[identifier].append(current_time)
+        return True
+
+def require_api_key(f):
+    """Decorator to require API key for endpoints"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip auth for public endpoints
+        if request.endpoint in PUBLIC_API_ENDPOINTS or request.path in PUBLIC_API_ENDPOINTS:
+            return f(*args, **kwargs)
+        
+        # Check for API key
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        
+        if not API_KEY:
+            # If no API key is configured, log warning but allow access
+            logger.warning("API_KEY not configured - authentication disabled")
+            return f(*args, **kwargs)
+        
+        if not api_key:
+            return jsonify({'error': 'API key required'}), 401
+        
+        if api_key != API_KEY:
+            return jsonify({'error': 'Invalid API key'}), 401
+        
+        # Check rate limit
+        client_id = request.remote_addr + ':' + api_key
+        if not check_rate_limit(client_id):
+            # Record rate limit violation for security monitoring
+            security_monitor.record_rate_limit_violation(request.remote_addr)
+            return jsonify({'error': 'Rate limit exceeded'}), 429
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 def init_influxdb():
     """Initialize InfluxDB connection"""
@@ -132,16 +202,16 @@ def parse_eagle_xml(xml_data):
                 div_val = int(divisor, 16) if divisor.startswith('0x') else int(divisor)
                 
                 # Calculate actual energy in kWh
-                # Eagle typically reports in Wh, so divide by 1000 to get kWh
+                # Note: Check your Eagle device settings - some report in Wh, others in kWh
                 if div_val != 0:
-                    data['energy_delivered_kwh'] = (delivered_val * mult_val) / div_val / 1000
+                    data['energy_delivered_kwh'] = (delivered_val * mult_val) / div_val
                     data['message_type'] = 'current_summation_delivered'
             
             # Handle energy received (for solar)
             if summation_received:
                 received_val = int(summation_received, 16) if summation_received.startswith('0x') else int(summation_received)
                 if div_val != 0:
-                    data['energy_received_kwh'] = (received_val * mult_val) / div_val / 1000
+                    data['energy_received_kwh'] = (received_val * mult_val) / div_val
         
         # 3. TimeCluster - Time synchronization
         elif root.find('.//TimeCluster') is not None:
@@ -203,6 +273,7 @@ def parse_eagle_xml(xml_data):
         return None
 
 @app.route('/eagle', methods=['POST'])
+@require_api_key
 def eagle_webhook():
     """Handle Eagle-200 XML POST requests"""
     global stats
@@ -283,6 +354,7 @@ def health_check():
     return jsonify(health_status), 200 if health_status['status'] == 'healthy' else 503
 
 @app.route('/api/stats', methods=['GET'])
+@require_api_key
 def get_stats():
     """Get power statistics with min/max/avg calculations"""
     hours = int(request.args.get('hours', 24))
@@ -347,9 +419,24 @@ def index():
         'endpoints': {
             '/eagle': 'POST - Receive Eagle-200 XML data',
             '/api/stats': 'GET - Monitor statistics',
-            '/health': 'GET - Health check'
+            '/health': 'GET - Health check',
+            '/api/security/stats': 'GET - Security monitoring statistics'
         }
     }), 200
+
+@app.route('/api/security/stats', methods=['GET'])
+@require_api_key
+def get_security_stats():
+    """Get security monitoring statistics (requires special admin API key)"""
+    # Check for admin API key
+    admin_key = os.getenv('ADMIN_API_KEY')
+    provided_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+    
+    if not admin_key or provided_key != admin_key:
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    stats = security_monitor.get_security_stats()
+    return jsonify(stats), 200
 
 if __name__ == '__main__':
     # Wait for InfluxDB to be ready

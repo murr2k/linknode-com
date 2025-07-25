@@ -1,10 +1,11 @@
 # Linknode Energy Monitor
 
-A real-time energy monitoring dashboard that tracks power consumption using Eagle-200 smart meter data. Built with modern web technologies, comprehensive testing, and deployed on Fly.io.
+A real-time energy monitoring dashboard that tracks power consumption using Eagle-200 smart meter data. Built with modern web technologies, comprehensive testing, enhanced security, and deployed on Fly.io.
 
 ![Playwright](https://img.shields.io/badge/Playwright-45ba4b?style=for-the-badge&logo=playwright&logoColor=white)
 ![Fly.io](https://img.shields.io/badge/Fly.io-8B5CF6?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdOb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyUzYuNDggMjIgMTIgMjJTMjIgMTcuNTIgMjIgMTJTMTcuNTIgMiAxMiAyWk0xMiAyMEMxMiAyMCAxMiAyMCAxMiAyMFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPg==&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
+![Security](https://img.shields.io/badge/Security-Enhanced-green?style=for-the-badge&logo=shield&logoColor=white)
 
 ## 🚀 Live Demo
 
@@ -16,14 +17,16 @@ A real-time energy monitoring dashboard that tracks power consumption using Eagl
 
 ### Current Status
 
-✅ **All systems operational** | 🔖 **Version: v1.0.0-baseline**
+✅ **All systems operational** | 🔖 **Version: v1.1.0-security** | 🔒 **Security Enhanced**
 
 This project features:
 - Comprehensive E2E testing with Playwright (3 phases, 30+ test scenarios)
 - Regression testing baseline established for quality assurance
-- Automated CI/CD with GitHub Actions
+- Automated CI/CD with GitHub Actions and security scanning
 - Real-time power monitoring with Eagle-200 integration
 - Professional UI with dark theme and responsive design
+- Enhanced security with CSP headers, API authentication, and rate limiting
+- Security monitoring and automated vulnerability scanning
 
 ## 📋 Features
 
@@ -33,13 +36,13 @@ This project features:
   - Embedded Grafana dashboard (no login required!)
   - API status indicators for monitoring services
   - Real-time pod/connection counter
-- **Kubernetes Native**: Demonstrates key K8s concepts including:
-  - Deployments and ReplicaSets
-  - Services (ClusterIP, NodePort, LoadBalancer)
-  - ConfigMaps for configuration management
-  - Horizontal Pod Autoscaling (HPA)
-  - Health checks and probes
-  - Resource limits and requests
+- **Cloud Native on Fly.io** (Migrated from Kubernetes):
+  - Simplified deployment with fly.toml configurations
+  - Global edge network deployment
+  - Built-in SSL/TLS termination
+  - Automatic health checks and restarts
+  - Easy secrets management
+  - Legacy Kubernetes configs archived in k8s-archive-*
 - **Real-time Power Monitoring**:
   - Eagle-200 smart meter integration (XML format)
   - Live power consumption dashboard (Grafana)
@@ -56,6 +59,15 @@ This project features:
 - **WSL2 Compatible**: Optimized for Windows Subsystem for Linux
 
 ## 📝 Recent Updates
+
+### Security Enhancements (2025-07-24)
+- Implemented comprehensive security headers (CSP, HSTS, X-Frame-Options, etc.)
+- Fixed CORS configuration - replaced wildcards with specific allowed origins
+- Added API authentication with configurable API keys
+- Implemented rate limiting (60 requests/minute per API key)
+- Created security monitoring system with suspicious IP detection
+- Added automated security scanning to CI/CD pipeline
+- See [SECURITY_IMPROVEMENTS.md](./SECURITY_IMPROVEMENTS.md) for details
 
 ### Grafana Dashboard Fixes (2025-07-24)
 - Fixed utility meter reading display to show "86733 kWh" instead of "87 MWh"
@@ -266,6 +278,8 @@ Required secrets in GitHub:
 - `FLY_API_TOKEN` - Fly.io deployment token
 - `INFLUXDB_TOKEN` - InfluxDB authentication
 - `EAGLE_IP` - Eagle-200 device IP address
+- `EAGLE_API_KEY` - API authentication key for Eagle monitor
+- `ADMIN_API_KEY` - Admin key for security monitoring (optional)
 
 ## 🤝 Contributing
 
@@ -335,10 +349,11 @@ See [REGRESSION_TEST_CHECKLIST.md](REGRESSION_TEST_CHECKLIST.md) for pre-release
 
 ### Technical Stack
 - **Frontend**: Vanilla JS with dark theme
-- **Backend**: Node.js Eagle Monitor API
+- **Backend**: Python Flask Eagle Monitor API with authentication
 - **Database**: InfluxDB for time-series data
 - **Visualization**: Grafana dashboards
 - **Hosting**: Fly.io global edge network
+- **Security**: CSP headers, API auth, rate limiting, monitoring
 
 ## 🚀 CI/CD Workflows
 
@@ -364,9 +379,18 @@ See [REGRESSION_TEST_CHECKLIST.md](REGRESSION_TEST_CHECKLIST.md) for pre-release
    - Visual, performance, and feature validation
    - Automatic PR comments with results
 
+5. **Security Scans** (`security-scan.yml`)
+   - Automated security header validation
+   - Dependency vulnerability scanning
+   - Code security analysis with Semgrep
+   - Docker image scanning with Trivy
+   - Secrets detection with Gitleaks
+
 ## 📚 Documentation
 
 - [CLAUDE_FLOW_STATE.md](CLAUDE_FLOW_STATE.md) - Session continuity and project history
+- [SECURITY_IMPROVEMENTS.md](SECURITY_IMPROVEMENTS.md) - Security implementation guide
+- [FLY_MIGRATION_COMPLETE.md](FLY_MIGRATION_COMPLETE.md) - Kubernetes to Fly.io migration
 - [REGRESSION_TEST_CHECKLIST.md](REGRESSION_TEST_CHECKLIST.md) - Pre-release validation checklist
 - [BASELINE_ESTABLISHMENT.md](BASELINE_ESTABLISHMENT.md) - Regression baseline guide
 - [E2E_TESTING_README.md](E2E_TESTING_README.md) - Comprehensive testing documentation

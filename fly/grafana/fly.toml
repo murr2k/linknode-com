@@ -27,7 +27,6 @@ primary_region = "ord"
   GF_PATHS_LOGS = "/var/log/grafana"
   GF_PATHS_PLUGINS = "/var/lib/grafana/plugins"
   GF_PATHS_PROVISIONING = "/etc/grafana/provisioning"
-  GF_SERVER_STATIC_ROOT_PATH = "public"
   GF_SERVER_ENABLE_GZIP = "true"
   GF_DATABASE_WAL = "true"
   GF_DATABASE_CACHE_MODE = "shared"
@@ -53,13 +52,13 @@ primary_region = "ord"
     port = 443
 
   [[services.http_checks]]
-    grace_period = "5s"
+    grace_period = "30s"
     interval = "15s"
     method = "get"
     path = "/api/health"
     protocol = "http"
     restart_limit = 0
-    timeout = "2s"
+    timeout = "5s"
 
 [[vm]]
   cpu_kind = "shared"
