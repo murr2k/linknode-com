@@ -1,0 +1,81 @@
+{
+  "sessionId": "session-1753415055245-s3a0gvk0w",
+  "checkpointId": "checkpoint-1753415085259-wgrec84xk",
+  "checkpointName": "auto-save-1753415085259",
+  "timestamp": "2025-07-25T03:44:45.259Z",
+  "data": {
+    "timestamp": "2025-07-25T03:44:45.259Z",
+    "changeCount": 5,
+    "changesByType": {
+      "swarm_created": [
+        {
+          "type": "swarm_created",
+          "data": {
+            "swarmId": "swarm-1753415055243-i1c2xb333",
+            "swarmName": "hive-1753415055226",
+            "objective": "Orchestrate remidation of security vulnerabilities based on security assessment available at ~/projects/pentest/LINKNODE_COMPREHENSIVE_SECURITY_REPORT.md - Full executive summary with remediation steps and ~/projects/pentest/LINKNODE_ACTIVE_SCAN_REPORT_20250724_193103.md and ~/projects/pentest/linknode_active_scan_results_20250724_193103.json",
+            "workerCount": 8
+          },
+          "timestamp": "2025-07-25T03:44:15.245Z"
+        }
+      ],
+      "agent_activity": [
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753415055243-i1c2xb333-0",
+            "activity": "spawned",
+            "data": {
+              "type": "researcher",
+              "name": "Researcher Worker 1"
+            }
+          },
+          "timestamp": "2025-07-25T03:44:15.246Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753415055243-i1c2xb333-1",
+            "activity": "spawned",
+            "data": {
+              "type": "coder",
+              "name": "Coder Worker 2"
+            }
+          },
+          "timestamp": "2025-07-25T03:44:15.246Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753415055243-i1c2xb333-2",
+            "activity": "spawned",
+            "data": {
+              "type": "analyst",
+              "name": "Analyst Worker 3"
+            }
+          },
+          "timestamp": "2025-07-25T03:44:15.246Z"
+        },
+        {
+          "type": "agent_activity",
+          "data": {
+            "agentId": "worker-swarm-1753415055243-i1c2xb333-3",
+            "activity": "spawned",
+            "data": {
+              "type": "tester",
+              "name": "Tester Worker 4"
+            }
+          },
+          "timestamp": "2025-07-25T03:44:15.246Z"
+        }
+      ]
+    },
+    "statistics": {
+      "tasksProcessed": 0,
+      "tasksCompleted": 0,
+      "memoryUpdates": 0,
+      "agentActivities": 4,
+      "consensusDecisions": 0
+    }
+  }
+}
