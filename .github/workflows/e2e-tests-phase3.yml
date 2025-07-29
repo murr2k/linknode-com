@@ -38,6 +38,11 @@ concurrency:
   group: e2e-phase3-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  checks: write  # For test result publishing
+  issues: write  # For creating issues on failure
+  
 jobs:
   phase3-visual-tests:
     timeout-minutes: 45
@@ -66,11 +71,23 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
           
+    - name: Cache Playwright browsers
+      uses: actions/cache@v3
+      id: playwright-cache
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+        
     - name: Install dependencies
       run: npm install
       
     - name: Install Playwright Browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
       run: npx playwright install --with-deps
+      
+    - name: Install Playwright deps only
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      run: npx playwright install-deps
       
     - name: Create directories
       run: |
@@ -103,7 +120,7 @@ jobs:
       with:
         name: phase3-visual-videos-${{ matrix.browser }}
         path: test-results/phase3/videos/
-        retention-days: 7
+        retention-days: 7  # Videos and traces - large files
 
   phase3-performance-tests:
     timeout-minutes: 60
@@ -179,7 +196,7 @@ jobs:
       with:
         name: phase3-performance-traces
         path: test-results/phase3/traces/
-        retention-days: 7
+        retention-days: 7  # Videos and traces - large files
 
   phase3-cross-browser-tests:
     timeout-minutes: 90
