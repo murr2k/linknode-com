@@ -40,7 +40,7 @@ jobs:
   # Monitor queue time before tests
   queue-monitor:
     name: Queue Time Monitor
-    uses: ./.github/workflows/includes/queue-monitor.yml
+    uses: ./.github/workflows/queue-monitor-reusable.yml
     
   regression-testing:
     runs-on: ubuntu-latest

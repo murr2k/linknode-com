@@ -39,7 +39,7 @@ jobs:
   # Monitor queue time before scans
   queue-monitor:
     name: Queue Time Monitor
-    uses: ./.github/workflows/includes/queue-monitor.yml
+    uses: ./.github/workflows/queue-monitor-reusable.yml
     
   security-headers-check:
     name: Security Headers Validation
