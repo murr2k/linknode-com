@@ -43,10 +43,16 @@ permissions:
   checks: write  # For test result publishing
   
 jobs:
+  # Monitor queue time before tests
+  queue-monitor:
+    name: Queue Time Monitor
+    uses: ./.github/workflows/includes/queue-monitor.yml
+    
   # Browser matrix tests remain separate for true parallelism
   browser-tests:
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    needs: [queue-monitor]
     strategy:
       fail-fast: false
       matrix:

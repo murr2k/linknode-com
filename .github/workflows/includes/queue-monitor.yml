@@ -1,0 +1,54 @@
+name: Queue Time Monitor
+
+on:
+  workflow_call:
+
+jobs:
+  monitor-queue:
+    name: Monitor Queue Time
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Calculate and Report Queue Time
+        run: |
+          # Get timestamps
+          CREATED_AT="${{ github.event.workflow_run.created_at || github.run_created_at }}"
+          STARTED_AT="${{ github.event.workflow_run.run_started_at || github.run_started_at }}"
+          
+          # Convert to epoch seconds
+          CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || echo 0)
+          STARTED_EPOCH=$(date -d "$STARTED_AT" +%s 2>/dev/null || echo 0)
+          
+          # Calculate queue time
+          if [ $CREATED_EPOCH -gt 0 ] && [ $STARTED_EPOCH -gt 0 ]; then
+            QUEUE_TIME=$((STARTED_EPOCH - CREATED_EPOCH))
+            QUEUE_MINUTES=$((QUEUE_TIME / 60))
+            
+            echo "⏱️ Queue Time Analysis:"
+            echo "- Created: $CREATED_AT"
+            echo "- Started: $STARTED_AT"
+            echo "- Queue Time: ${QUEUE_MINUTES} minutes (${QUEUE_TIME} seconds)"
+            
+            # Add to job summary
+            echo "## ⏱️ Workflow Queue Time" >> $GITHUB_STEP_SUMMARY
+            echo "- **Queue Duration**: ${QUEUE_MINUTES} minutes" >> $GITHUB_STEP_SUMMARY
+            echo "- **Created**: $CREATED_AT" >> $GITHUB_STEP_SUMMARY
+            echo "- **Started**: $STARTED_AT" >> $GITHUB_STEP_SUMMARY
+            
+            # Warnings for long queue times
+            if [ $QUEUE_TIME -gt 900 ]; then  # 15 minutes
+              echo "::warning::Workflow was queued for ${QUEUE_MINUTES} minutes (exceeds 15 minute threshold)"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **Warning**: Queue time exceeded 15 minutes!" >> $GITHUB_STEP_SUMMARY
+            elif [ $QUEUE_TIME -gt 600 ]; then  # 10 minutes
+              echo "::warning::Workflow was queued for ${QUEUE_MINUTES} minutes (exceeds 10 minute threshold)"
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **Warning**: Queue time exceeded 10 minutes!" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Output for other jobs to use
+            echo "queue_time=$QUEUE_TIME" >> $GITHUB_OUTPUT
+            echo "queue_minutes=$QUEUE_MINUTES" >> $GITHUB_OUTPUT
+          else
+            echo "::notice::Unable to calculate queue time (timestamps not available)"
+          fi
