@@ -64,17 +64,27 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
           
+    - name: Install dependencies
+      run: |
+        npm install
+        npm install -D ts-node typescript
+        
+    - name: Get Playwright Version
+      id: playwright-version
+      run: |
+        PLAYWRIGHT_VERSION=$(npm list @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')
+        echo "version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
+        echo "Playwright version: $PLAYWRIGHT_VERSION"
+        
     - name: Cache Playwright browsers
       uses: actions/cache@v3
       id: playwright-cache
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
-        
-    - name: Install dependencies
-      run: |
-        npm install
-        npm install -D ts-node typescript
+        key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}-
+          ${{ runner.os }}-playwright-
         
     - name: Install Playwright
       if: steps.playwright-cache.outputs.cache-hit != 'true'
