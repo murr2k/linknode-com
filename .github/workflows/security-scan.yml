@@ -3,8 +3,27 @@ name: Security Scanning
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - '**/*.py'
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/requirements.txt'
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/Dockerfile'
+      - 'fly/web/nginx.conf'
+      - '.github/workflows/security-scan.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - '**/*.py'
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/requirements.txt'
+      - '**/package.json'
+      - '**/Dockerfile'
+      - 'fly/web/nginx.conf'
+      - '.github/workflows/security-scan.yml'
   schedule:
     # Run security scans daily at 2 AM UTC
     - cron: '0 2 * * *'
