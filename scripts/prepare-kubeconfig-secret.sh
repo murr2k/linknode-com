@@ -3,7 +3,9 @@
 # This script prepares the kubeconfig for GitHub Actions secret
 # Run this locally to generate the base64 encoded kubeconfig
 
-KUBECONFIG_PATH="${1:-/home/murr2k/projects/rackspace/kubeconfig.yaml}"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+KUBECONFIG_PATH="${1:-$PROJECT_ROOT/kubeconfig.yaml}"
 
 if [ ! -f "$KUBECONFIG_PATH" ]; then
     echo "❌ Error: Kubeconfig file not found at $KUBECONFIG_PATH"

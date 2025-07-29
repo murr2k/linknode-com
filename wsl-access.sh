@@ -3,7 +3,8 @@
 # Direct access script for WSL environment
 # No SSH tunnel needed - we're already on the same machine!
 
-KUBECONFIG="/home/murr2k/projects/rackspace/kubeconfig.yaml"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+KUBECONFIG="$SCRIPT_DIR/kubeconfig.yaml"
 export KUBECONFIG=$KUBECONFIG
 
 echo "🚀 Starting Kubernetes port forward for WSL..."

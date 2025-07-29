@@ -1,5 +1,8 @@
 #!/bin/bash
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
 echo "🛠️ Fixing EAGLE 404 Error"
 echo "========================"
 echo ""
@@ -18,11 +21,11 @@ echo ""
 echo "Commands to run:"
 echo ""
 echo "# First, connect to your cluster:"
-echo "cd /home/murr2k/projects/rackspace/scripts"
+echo "cd $PROJECT_ROOT/scripts"
 echo "./rackspace-connect.sh"
 echo ""
 echo "# Then deploy the monitoring stack:"
-echo "cd /home/murr2k/projects/rackspace/demo-app/monitoring"
+echo "cd $PROJECT_ROOT/demo-app/monitoring"
 echo "./deploy-monitoring.sh"
 echo ""
 echo "Press Enter when you've completed this step..."
@@ -37,7 +40,7 @@ echo "1. Go to: https://dash.cloudflare.com"
 echo "2. Navigate to: Workers & Pages → linknode.com"
 echo "3. Click 'Quick Edit' or 'Edit Code'"
 echo "4. Copy the ENTIRE contents from the file below:"
-echo "   /home/murr2k/projects/rackspace/demo-app/cloudflare-setup/worker.js"
+echo "   $PROJECT_ROOT/demo-app/cloudflare-setup/worker.js"
 echo "5. Paste it into the Cloudflare editor (replacing ALL existing code)"
 echo "6. Click 'Save and Deploy'"
 echo ""
@@ -47,7 +50,7 @@ read -r show_code
 if [[ "$show_code" =~ ^[Yy]$ ]]; then
     echo ""
     echo "========== COPY THIS ENTIRE CODE =========="
-    cat /home/murr2k/projects/rackspace/demo-app/cloudflare-setup/worker.js
+    cat "$PROJECT_ROOT/demo-app/cloudflare-setup/worker.js"
     echo ""
     echo "=========================================="
 fi

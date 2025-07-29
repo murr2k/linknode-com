@@ -2,7 +2,8 @@
 
 # Quick start script for secure SSH-only access
 
-KUBECONFIG="/home/murr2k/projects/rackspace/kubeconfig.yaml"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+KUBECONFIG="$SCRIPT_DIR/kubeconfig.yaml"
 export KUBECONFIG=$KUBECONFIG
 
 echo "🔒 Starting secure SSH-only access to demo application..."

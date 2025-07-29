@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-KUBECONFIG_PATH="${KUBECONFIG:-/home/murr2k/projects/rackspace/kubeconfig.yaml}"
+KUBECONFIG_PATH="${KUBECONFIG:-$PROJECT_ROOT/kubeconfig.yaml}"
 NAMESPACE="demo-app"
 
 echo "🚀 Deploying to Rackspace Kubernetes..."

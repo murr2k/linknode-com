@@ -6,7 +6,8 @@
 echo "🔒 Setting up SSH-only access to Kubernetes application..."
 
 # Configuration
-KUBECONFIG="/home/murr2k/projects/rackspace/kubeconfig.yaml"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+KUBECONFIG="$SCRIPT_DIR/kubeconfig.yaml"
 NAMESPACE="demo-app"
 SERVICE="demo-app-service"
 LOCAL_PORT="8081"
