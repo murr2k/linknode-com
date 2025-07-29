@@ -1,0 +1,15 @@
+name: Test Simple Workflow
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simple test
+        run: |
+          echo "Testing if workflows are functional"
+          echo "Time: $(date)"
