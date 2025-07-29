@@ -41,8 +41,16 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version-file: '.nvmrc'
         
+    - name: Cache npm dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
     - name: Install dependencies
       run: npm install
       
@@ -90,8 +98,16 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version-file: '.nvmrc'
         
+    - name: Cache npm dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
     - name: Install dependencies
       run: npm install
       
@@ -122,8 +138,16 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version-file: '.nvmrc'
         
+    - name: Cache npm dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
     - name: Install dependencies
       run: npm install
       
@@ -157,8 +181,16 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version-file: '.nvmrc'
         
+    - name: Cache npm dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
     - name: Install dependencies
       run: npm install
       
@@ -189,8 +221,16 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version-file: '.nvmrc'
         
+    - name: Cache npm dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
     - name: Install dependencies
       run: npm install
       
@@ -221,8 +261,16 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version-file: '.nvmrc'
         
+    - name: Cache npm dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
     - name: Install dependencies
       run: npm install
       
@@ -299,51 +347,62 @@ jobs:
       run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
         
     - name: Slack Notification - Success
-      if: success()
-      uses: 8398a7/action-slack@v3
+      if: success() && env.SLACK_WEBHOOK_URL != ''
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      with:
-        status: success
-        text: |
-          ✅ *E2E Tests Passed*
-          
-          *Branch:* ${{ github.ref_name }}
-          *Commit:* `${{ steps.short-sha.outputs.sha }}`
-          *Author:* ${{ github.actor }}
-          *Test Type:* ${{ github.event.inputs.test_type || 'all' }}
-          
-          *Test Coverage:*
-          • ✅ Smoke Tests
-          • ✅ API Integration Tests
-          • ✅ Visual Regression Tests
-          • ✅ Performance Tests
-          • ✅ Accessibility Tests
-          • ✅ Mobile Tests
-          
-          View <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|test results>
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+      run: |
+        if [ -n "$SLACK_WEBHOOK_URL" ]; then
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            --data '{
+              "text": "✅ E2E Tests Passed",
+              "attachments": [{
+                "color": "good",
+                "fields": [
+                  {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
+                  {"title": "Commit", "value": "'"${{ steps.short-sha.outputs.sha }}"'", "short": true},
+                  {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
+                  {"title": "Test Type", "value": "'"${{ github.event.inputs.test_type || 'all' }}"'", "short": true}
+                ],
+                "footer": "Test Coverage: Smoke ✅ | API ✅ | Visual ✅ | Performance ✅ | A11y ✅ | Mobile ✅",
+                "actions": [
+                  {"type": "button", "text": "View Results", "url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"}
+                ]
+              }]
+            }'
+        fi
         
     - name: Slack Notification - Failure
-      if: failure()
-      uses: 8398a7/action-slack@v3
+      if: failure() && env.SLACK_WEBHOOK_URL != ''
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      with:
-        status: failure
-        text: |
-          ❌ *E2E Tests Failed*
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+      run: |
+        if [ -n "$SLACK_WEBHOOK_URL" ]; then
+          # Build failed jobs list
+          FAILED_JOBS=""
+          [ "${{ needs.test.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Browser Tests ❌\\n"
+          [ "${{ needs.api-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}API Tests ❌\\n"
+          [ "${{ needs.visual-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Visual Tests ❌\\n"
+          [ "${{ needs.performance-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Performance Tests ❌\\n"
+          [ "${{ needs.accessibility-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Accessibility Tests ❌\\n"
+          [ "${{ needs.mobile-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Mobile Tests ❌\\n"
           
-          *Branch:* ${{ github.ref_name }}
-          *Commit:* `${{ steps.short-sha.outputs.sha }}`
-          *Author:* ${{ github.actor }}
-          *Test Type:* ${{ github.event.inputs.test_type || 'all' }}
-          
-          *Failed Jobs:*
-          ${{ needs.test.result == 'failure' && '• ❌ Browser Tests' || '• ✅ Browser Tests' }}
-          ${{ needs.api-tests.result == 'failure' && '• ❌ API Tests' || '• ✅ API Tests' }}
-          ${{ needs.visual-tests.result == 'failure' && '• ❌ Visual Tests' || '• ✅ Visual Tests' }}
-          ${{ needs.performance-tests.result == 'failure' && '• ❌ Performance Tests' || '• ✅ Performance Tests' }}
-          ${{ needs.accessibility-tests.result == 'failure' && '• ❌ Accessibility Tests' || '• ✅ Accessibility Tests' }}
-          ${{ needs.mobile-tests.result == 'failure' && '• ❌ Mobile Tests' || '• ✅ Mobile Tests' }}
-          
-          View <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|failed tests>
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            --data '{
+              "text": "❌ E2E Tests Failed",
+              "attachments": [{
+                "color": "danger",
+                "fields": [
+                  {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
+                  {"title": "Commit", "value": "'"${{ steps.short-sha.outputs.sha }}"'", "short": true},
+                  {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
+                  {"title": "Test Type", "value": "'"${{ github.event.inputs.test_type || 'all' }}"'", "short": true},
+                  {"title": "Failed Jobs", "value": "'"${FAILED_JOBS}"'", "short": false}
+                ],
+                "actions": [
+                  {"type": "button", "text": "View Failed Tests", "url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"}
+                ]
+              }]
+            }'
+        fi
