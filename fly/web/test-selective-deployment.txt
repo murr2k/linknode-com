@@ -1,0 +1,3 @@
+This file is created to test selective deployment.
+Only the web service should be deployed when this file is committed.
+Time: 2025-07-29T22:40:00Z

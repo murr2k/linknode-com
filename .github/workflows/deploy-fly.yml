@@ -46,6 +46,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Detect changed services
+      uses: dorny/paths-filter@v3
+      id: changes
+      with:
+        filters: |
+          web:
+            - 'fly/web/**'
+          influxdb:
+            - 'fly/influxdb/**'
+          grafana:
+            - 'fly/grafana/**'
+          eagle:
+            - 'fly/eagle-monitor/**'
+          workflow:
+            - '.github/workflows/deploy-fly.yml'
+
     - name: Setup Fly CLI
       uses: superfly/flyctl-actions/setup-flyctl@master
     
@@ -114,7 +130,9 @@ jobs:
 
     - name: Deploy InfluxDB
       id: deploy-influxdb
-      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'influxdb' || github.event.inputs.service == ''
+      if: |
+        (github.event_name == 'push' && steps.changes.outputs.influxdb == 'true') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'influxdb'))
       run: |
         cd fly/influxdb
         
@@ -178,7 +196,9 @@ jobs:
 
     - name: Deploy Eagle Monitor
       id: deploy-eagle
-      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'eagle-monitor' || github.event.inputs.service == ''
+      if: |
+        (github.event_name == 'push' && steps.changes.outputs.eagle == 'true') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'eagle-monitor'))
       run: |
         cd fly/eagle-monitor
         
@@ -224,7 +244,9 @@ jobs:
 
     - name: Deploy Grafana
       id: deploy-grafana
-      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'grafana' || github.event.inputs.service == ''
+      if: |
+        (github.event_name == 'push' && steps.changes.outputs.grafana == 'true') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'grafana'))
       run: |
         cd fly/grafana
         
@@ -270,7 +292,9 @@ jobs:
 
     - name: Deploy Web Interface
       id: deploy-web
-      if: github.event.inputs.service == 'all' || github.event.inputs.service == 'web' || github.event.inputs.service == ''
+      if: |
+        (github.event_name == 'push' && steps.changes.outputs.web == 'true') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'web'))
       run: |
         cd fly/web
         
@@ -350,6 +374,22 @@ jobs:
       run: |
         echo "## 🚀 Fly.io Deployment Status" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Show which services were deployed
+        echo "### Deployed Services" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "- **Mode**: Manual deployment (${{ github.event.inputs.service }})" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Mode**: Automatic deployment based on changed files" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Services deployed:**" >> $GITHUB_STEP_SUMMARY
+          [ "${{ steps.changes.outputs.web }}" = "true" ] && echo "- ✅ Web Interface" >> $GITHUB_STEP_SUMMARY
+          [ "${{ steps.changes.outputs.grafana }}" = "true" ] && echo "- ✅ Grafana" >> $GITHUB_STEP_SUMMARY
+          [ "${{ steps.changes.outputs.eagle }}" = "true" ] && echo "- ✅ Eagle Monitor" >> $GITHUB_STEP_SUMMARY
+          [ "${{ steps.changes.outputs.influxdb }}" = "true" ] && echo "- ✅ InfluxDB" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Public Access URLs" >> $GITHUB_STEP_SUMMARY
         echo "- **Main Site**: https://linknode.com" >> $GITHUB_STEP_SUMMARY
         echo "- **Direct Fly URL**: https://linknode-web.fly.dev" >> $GITHUB_STEP_SUMMARY
@@ -360,7 +400,6 @@ jobs:
         echo "- **Health Check**: https://linknode-eagle-monitor.fly.dev/health" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Service**: ${{ github.event.inputs.service || 'all' }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
@@ -369,45 +408,69 @@ jobs:
     - name: Final Health Check
       if: success()
       run: |
-        echo "Performing final health checks..."
+        echo "Performing final health checks for deployed services..."
         FAILED_SERVICES=""
         
-        # Check each service with detailed output
-        echo "🔍 Checking Web Interface..."
-        if curl -sf https://linknode-web.fly.dev -m 10 | grep -q "Linknode"; then
-          echo "✅ Web interface is healthy"
-        else
-          echo "❌ Web interface is not responding correctly"
-          FAILED_SERVICES="${FAILED_SERVICES}web "
+        # Function to check if service was deployed
+        was_deployed() {
+          local service=$1
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            [ "${{ github.event.inputs.service }}" = "all" ] || [ "${{ github.event.inputs.service }}" = "$service" ]
+          else
+            # For push events, check if service files changed
+            case $service in
+              web) [ "${{ steps.changes.outputs.web }}" = "true" ] ;;
+              grafana) [ "${{ steps.changes.outputs.grafana }}" = "true" ] ;;
+              eagle-monitor) [ "${{ steps.changes.outputs.eagle }}" = "true" ] ;;
+              influxdb) [ "${{ steps.changes.outputs.influxdb }}" = "true" ] ;;
+            esac
+          fi
+        }
+        
+        # Check only deployed services
+        if was_deployed "web"; then
+          echo "🔍 Checking Web Interface..."
+          if curl -sf https://linknode-web.fly.dev -m 10 | grep -q "Linknode"; then
+            echo "✅ Web interface is healthy"
+          else
+            echo "❌ Web interface is not responding correctly"
+            FAILED_SERVICES="${FAILED_SERVICES}web "
+          fi
         fi
         
-        echo "🔍 Checking Grafana..."
-        if curl -sf https://linknode-grafana.fly.dev/api/health -m 10; then
-          echo "✅ Grafana is healthy"
-        else
-          echo "❌ Grafana is not responding"
-          FAILED_SERVICES="${FAILED_SERVICES}grafana "
+        if was_deployed "grafana"; then
+          echo "🔍 Checking Grafana..."
+          if curl -sf https://linknode-grafana.fly.dev/api/health -m 10; then
+            echo "✅ Grafana is healthy"
+          else
+            echo "❌ Grafana is not responding"
+            FAILED_SERVICES="${FAILED_SERVICES}grafana "
+          fi
         fi
         
-        echo "🔍 Checking Eagle Monitor..."
-        if curl -sf https://linknode-eagle-monitor.fly.dev/health -m 10; then
-          echo "✅ Eagle Monitor is healthy"
-        else
-          echo "❌ Eagle Monitor is not responding"
-          FAILED_SERVICES="${FAILED_SERVICES}eagle-monitor "
+        if was_deployed "eagle-monitor"; then
+          echo "🔍 Checking Eagle Monitor..."
+          if curl -sf https://linknode-eagle-monitor.fly.dev/health -m 10; then
+            echo "✅ Eagle Monitor is healthy"
+          else
+            echo "❌ Eagle Monitor is not responding"
+            FAILED_SERVICES="${FAILED_SERVICES}eagle-monitor "
+          fi
         fi
         
-        echo "🔍 Checking InfluxDB..."
-        # InfluxDB health check - try multiple approaches
-        if flyctl status -a linknode-influxdb --json 2>/dev/null | jq -r '.Allocations[0].Status' 2>/dev/null | grep -q "running"; then
-          echo "✅ InfluxDB is healthy (verified via flyctl)"
-        elif curl -sf https://linknode-influxdb.fly.dev/ping -m 10 2>/dev/null; then
-          echo "✅ InfluxDB is healthy (HTTPS)"
-        elif curl -sf http://linknode-influxdb.fly.dev/ping -m 10 2>/dev/null; then
-          echo "✅ InfluxDB is healthy (HTTP)"
-        else
-          echo "❌ InfluxDB is not responding"
-          FAILED_SERVICES="${FAILED_SERVICES}influxdb "
+        if was_deployed "influxdb"; then
+          echo "🔍 Checking InfluxDB..."
+          # InfluxDB health check - try multiple approaches
+          if flyctl status -a linknode-influxdb --json 2>/dev/null | jq -r '.Allocations[0].Status' 2>/dev/null | grep -q "running"; then
+            echo "✅ InfluxDB is healthy (verified via flyctl)"
+          elif curl -sf https://linknode-influxdb.fly.dev/ping -m 10 2>/dev/null; then
+            echo "✅ InfluxDB is healthy (HTTPS)"
+          elif curl -sf http://linknode-influxdb.fly.dev/ping -m 10 2>/dev/null; then
+            echo "✅ InfluxDB is healthy (HTTP)"
+          else
+            echo "❌ InfluxDB is not responding"
+            FAILED_SERVICES="${FAILED_SERVICES}influxdb "
+          fi
         fi
         
         # Exit with error if any services failed
