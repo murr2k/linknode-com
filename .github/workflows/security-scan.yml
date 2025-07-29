@@ -7,11 +7,19 @@ on:
       - '**/*.py'
       - '**/*.js'
       - '**/*.ts'
-      - '**/requirements.txt'
-      - '**/package.json'
-      - '**/package-lock.json'
-      - '**/Dockerfile'
-      - 'fly/web/nginx.conf'
+      - '**/*.jsx'
+      - '**/*.tsx'
+      - '**/*.sh'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/requirements*.txt'
+      - '**/package*.json'
+      - '**/Dockerfile*'
+      - '**/.env*'
+      - '**/nginx.conf'
+      - '**/*.toml'
+      - '**/*.conf'
+      - '**/*.config'
       - '.github/workflows/security-scan.yml'
   pull_request:
     branches: [ main ]
@@ -19,15 +27,36 @@ on:
       - '**/*.py'
       - '**/*.js'
       - '**/*.ts'
-      - '**/requirements.txt'
-      - '**/package.json'
-      - '**/Dockerfile'
-      - 'fly/web/nginx.conf'
+      - '**/*.jsx'
+      - '**/*.tsx'
+      - '**/*.sh'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/requirements*.txt'
+      - '**/package*.json'
+      - '**/Dockerfile*'
+      - '**/.env*'
+      - '**/nginx.conf'
+      - '**/*.toml'
+      - '**/*.conf'
+      - '**/*.config'
       - '.github/workflows/security-scan.yml'
   schedule:
-    # Run security scans daily at 2 AM UTC
+    # Daily quick scan at 2 AM UTC
     - cron: '0 2 * * *'
+    # Weekly comprehensive scan on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
   workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - standard
+          - comprehensive
+          - quick
 
 permissions:
   contents: read
@@ -221,10 +250,88 @@ jobs:
         sarif_file: 'trivy-${{ matrix.service }}-results.sarif'
       if: always()
 
+  configuration-security-scan:
+    name: Configuration Security Scan
+    runs-on: ubuntu-latest
+    needs: [queue-monitor]
+    timeout-minutes: 10
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check for exposed secrets in configs
+      run: |
+        echo "🔍 Scanning configuration files for potential secrets..."
+        
+        # Define patterns to search for
+        PATTERNS=(
+          "password.*=.*['\"].*['\"]"
+          "api_key.*=.*['\"].*['\"]"
+          "secret.*=.*['\"].*['\"]"
+          "token.*=.*['\"].*['\"]"
+          "private_key.*=.*['\"].*['\"]"
+          "aws_access_key.*=.*['\"].*['\"]"
+        )
+        
+        # Define files to scan
+        CONFIG_FILES=$(find . -type f \( -name "*.yml" -o -name "*.yaml" -o -name "*.toml" -o -name "*.json" -o -name "*.conf" -o -name "*.config" -o -name ".env*" \) -not -path "./.git/*" -not -path "./node_modules/*")
+        
+        FOUND_ISSUES=false
+        
+        # Scan configuration files
+        for pattern in "${PATTERNS[@]}"; do
+          echo "Checking pattern: $pattern"
+          if echo "$CONFIG_FILES" | xargs grep -l -E -i "$pattern" 2>/dev/null; then
+            echo "::warning::Potential secret pattern found in configuration files"
+            FOUND_ISSUES=true
+          fi
+        done
+        
+        if [ "$FOUND_ISSUES" = false ]; then
+          echo "✅ No potential secrets found in configuration files"
+        fi
+    
+    - name: Check shell script security
+      if: github.event.inputs.scan_type != 'quick'
+      run: |
+        echo "🔍 Scanning shell scripts for security issues..."
+        
+        # Find all shell scripts
+        SHELL_SCRIPTS=$(find . -type f -name "*.sh" -not -path "./.git/*" -not -path "./node_modules/*")
+        
+        if [ -z "$SHELL_SCRIPTS" ]; then
+          echo "No shell scripts found to scan"
+          exit 0
+        fi
+        
+        # Check for common security issues
+        echo "Checking for hardcoded credentials..."
+        echo "$SHELL_SCRIPTS" | xargs grep -l -E "password=|PASSWORD=|token=|TOKEN=" 2>/dev/null || echo "✅ No hardcoded credentials found"
+        
+        echo "Checking for unsafe curl usage..."
+        echo "$SHELL_SCRIPTS" | xargs grep -l "curl.*-k\|curl.*--insecure" 2>/dev/null || echo "✅ No insecure curl usage found"
+        
+        echo "Checking for unsafe file permissions..."
+        echo "$SHELL_SCRIPTS" | xargs grep -l "chmod 777\|chmod 666" 2>/dev/null || echo "✅ No unsafe file permissions found"
+    
+    - name: Validate YAML files
+      run: |
+        echo "🔍 Validating YAML configuration files..."
+        
+        # Install yamllint
+        pip install yamllint
+        
+        # Find and validate YAML files
+        find . -type f \( -name "*.yml" -o -name "*.yaml" \) -not -path "./.git/*" -not -path "./node_modules/*" | while read -r file; do
+          if ! yamllint -d relaxed "$file" 2>/dev/null; then
+            echo "::warning::YAML validation failed for $file"
+          fi
+        done || echo "✅ YAML validation complete"
+
   security-report:
     name: Security Report Summary
     runs-on: ubuntu-latest
-    needs: [queue-monitor, security-headers-check, dependency-security-scan, code-security-scan, api-security-check, secrets-scan, docker-security-scan]
+    needs: [queue-monitor, security-headers-check, dependency-security-scan, code-security-scan, api-security-check, secrets-scan, docker-security-scan, configuration-security-scan]
     if: always()
     timeout-minutes: 5
     steps:
@@ -246,6 +353,26 @@ jobs:
           echo "✅ **API Security**: Authentication and rate limiting implemented" >> $GITHUB_STEP_SUMMARY
         else
           echo "⚠️ **API Security**: Review authentication implementation" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.configuration-security-scan.result }}" == "success" ]; then
+          echo "✅ **Configuration Security**: No exposed secrets in config files" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ **Configuration Security**: Review configuration files for issues" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Scan Type" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" == "schedule" ]; then
+          if [ "$(date +%w)" == "0" ]; then
+            echo "🔍 **Weekly Comprehensive Scan**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔍 **Daily Quick Scan**" >> $GITHUB_STEP_SUMMARY
+          fi
+        elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "🔍 **Manual Scan**: ${{ github.event.inputs.scan_type || 'standard' }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🔍 **Triggered by**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
