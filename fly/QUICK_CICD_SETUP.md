@@ -7,7 +7,7 @@ The CI/CD pipeline has been fixed to properly authenticate with Fly.io by adding
 
 ## Add the Fly.io Token to GitHub
 
-1. Go to: https://github.com/murr2k/rackspace-k8s-demo/settings/secrets/actions
+1. Go to: https://github.com/murr2k/linknode-com/settings/secrets/actions
 2. Click "New repository secret"
 3. Add:
    - **Name**: `FLY_API_TOKEN`
@@ -32,7 +32,7 @@ git push origin main
 ```
 
 Then watch the deployment at:
-https://github.com/murr2k/rackspace-k8s-demo/actions
+https://github.com/murr2k/linknode-com/actions
 
 ## That's it! 🎉
 

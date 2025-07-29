@@ -16,7 +16,7 @@ This command will create a new authentication token and output it. Note: The old
 
 ### Step 2: Update GitHub Secret
 1. Copy the entire token output (it will start with `FlyV1`)
-2. Go to: https://github.com/murr2k/rackspace-k8s-demo/settings/secrets/actions
+2. Go to: https://github.com/murr2k/linknode-com/settings/secrets/actions
 3. Click on `FLY_API_TOKEN`
 4. Click "Update secret"
 5. Paste the new token

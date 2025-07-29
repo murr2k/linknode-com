@@ -25,7 +25,7 @@ This will open a browser window to connect your GitHub account.
 
 In your desired channel (e.g., #deployments), type:
 ```
-/github subscribe murr2k/rackspace-k8s-demo workflows
+/github subscribe murr2k/linknode-com workflows
 ```
 
 That's it! You'll now receive notifications for:
@@ -37,22 +37,22 @@ That's it! You'll now receive notifications for:
 
 Filter by workflow name:
 ```
-/github subscribe murr2k/rackspace-k8s-demo workflows:{name:"deploy-fly"}
+/github subscribe murr2k/linknode-com workflows:{name:"deploy-fly"}
 ```
 
 Filter by branch:
 ```
-/github subscribe murr2k/rackspace-k8s-demo workflows:{branch:"main"}
+/github subscribe murr2k/linknode-com workflows:{branch:"main"}
 ```
 
 Filter by event:
 ```
-/github subscribe murr2k/rackspace-k8s-demo workflows:{event:"push"}
+/github subscribe murr2k/linknode-com workflows:{event:"push"}
 ```
 
 Combine filters:
 ```
-/github subscribe murr2k/rackspace-k8s-demo workflows:{name:"deploy-fly" branch:"main"}
+/github subscribe murr2k/linknode-com workflows:{name:"deploy-fly" branch:"main"}
 ```
 
 ### Available Commands
@@ -64,7 +64,7 @@ List subscriptions:
 
 Unsubscribe:
 ```
-/github unsubscribe murr2k/rackspace-k8s-demo workflows
+/github unsubscribe murr2k/linknode-com workflows
 ```
 
 Get help:
@@ -112,12 +112,12 @@ Subscribe to multiple repos in one channel:
 ### Different Channels for Different Workflows
 In #deployments:
 ```
-/github subscribe murr2k/rackspace-k8s-demo workflows:{name:"deploy-*"}
+/github subscribe murr2k/linknode-com workflows:{name:"deploy-*"}
 ```
 
 In #testing:
 ```
-/github subscribe murr2k/rackspace-k8s-demo workflows:{name:"e2e-tests"}
+/github subscribe murr2k/linknode-com workflows:{name:"e2e-tests"}
 ```
 
 ## Fallback: Custom Webhooks

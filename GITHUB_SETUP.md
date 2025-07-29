@@ -19,7 +19,7 @@ fly tokens create deploy
 
 ### 2. Add the Token to GitHub Secrets
 
-1. Go to your GitHub repository: https://github.com/murr2k/rackspace-k8s-demo
+1. Go to your GitHub repository: https://github.com/murr2k/linknode-com
 2. Click on **Settings** → **Secrets and variables** → **Actions**
 3. Click **New repository secret**
 4. Add the following secret:
@@ -150,5 +150,5 @@ fly deploy --remote-only
 
 - **Main Site**: https://linknode.com
 - **Fly.io Dashboard**: https://fly.io/dashboard
-- **GitHub Actions**: https://github.com/murr2k/rackspace-k8s-demo/actions
+- **GitHub Actions**: https://github.com/murr2k/linknode-com/actions
 - **Fly.io Docs**: https://fly.io/docs/

@@ -27,7 +27,7 @@ npx claude-flow@alpha --resume \
    
 2. 🔄 Project uses Fly.io but retains Kubernetes artifacts
    - `/k8s` directory contains ~30 unused YAML files
-   - Repository still named "rackspace-k8s-demo"
+   - Repository still named "linknode-com"
 
 ### Key Files Modified
 - `/fly/grafana/provisioning/dashboards/power-monitoring.json` - Meter display fix

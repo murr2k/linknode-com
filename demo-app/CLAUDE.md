@@ -44,7 +44,7 @@ This project implements a complete energy monitoring solution using Eagle-200 XM
 - CI/CD Pipeline: `.github/workflows/deploy.yml`
 
 ## GitHub Repository
-- URL: https://github.com/murr2k/rackspace-k8s-demo
+- URL: https://github.com/murr2k/linknode-com
 - Main branch deploys automatically via GitHub Actions
 
 ## Next Steps for Contributors

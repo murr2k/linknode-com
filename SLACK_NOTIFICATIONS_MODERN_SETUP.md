@@ -20,7 +20,7 @@ This is the simplest approach using GitHub's official Slack app.
 
 3. **Subscribe to Your Repository**
    - In your desired channel, type: `/github subscribe owner/repo`
-   - Example: `/github subscribe murr2k/rackspace-k8s-demo`
+   - Example: `/github subscribe murr2k/linknode-com`
 
 3. **Configure Notifications**
    - Subscribe to workflow runs: `/github subscribe owner/repo workflows`

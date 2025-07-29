@@ -48,9 +48,9 @@ Add Slack notifications to `.github/workflows/deploy.yml`:
 ### 4. Alternative: Using Slack GitHub App
 
 1. Install the Slack GitHub app: https://slack.github.com/
-2. In Slack, type: `/github subscribe murr2k/rackspace-k8s-demo`
+2. In Slack, type: `/github subscribe murr2k/linknode-com`
 3. Select notification preferences:
-   - `/github subscribe murr2k/rackspace-k8s-demo workflows:{name:"Deploy to Rackspace Kubernetes"}`
+   - `/github subscribe murr2k/linknode-com workflows:{name:"Deploy to Rackspace Kubernetes"}`
 
 ### 5. Testing the Integration
 

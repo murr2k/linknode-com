@@ -19,7 +19,7 @@ cat "$KUBECONFIG_PATH" | base64 -w 0
 echo ""
 echo "================================="
 echo ""
-echo "2. Go to: https://github.com/murr2k/rackspace-k8s-demo/settings/secrets/actions"
+echo "2. Go to: https://github.com/murr2k/linknode-com/settings/secrets/actions"
 echo ""
 echo "3. Click 'New repository secret'"
 echo ""

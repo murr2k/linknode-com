@@ -36,7 +36,7 @@ if [ "$RESPONSE" = "ok" ]; then
     echo ""
     echo "Or use Slack GitHub App (recommended):"
     echo "1. Install: https://slack.github.com/"
-    echo "2. In Slack: /github subscribe murr2k/rackspace-k8s-demo"
+    echo "2. In Slack: /github subscribe murr2k/linknode-com"
 else
     echo "❌ Webhook test failed. Please check your URL."
     exit 1

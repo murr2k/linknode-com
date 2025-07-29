@@ -73,7 +73,7 @@ The user needs to update the FLY_API_TOKEN with a token that has access to all a
    ```
 
 2. Update the secret at:
-   https://github.com/murr2k/rackspace-k8s-demo/settings/secrets/actions
+   https://github.com/murr2k/linknode-com/settings/secrets/actions
 
 3. The token should have access to all four apps:
    - linknode-influxdb
@@ -92,7 +92,7 @@ The user needs to update the FLY_API_TOKEN with a token that has access to all a
 ### How to Verify Fix
 Once the token is updated:
 1. Push any change to the `fly/` directory
-2. Check GitHub Actions: https://github.com/murr2k/rackspace-k8s-demo/actions
+2. Check GitHub Actions: https://github.com/murr2k/linknode-com/actions
 3. All four services should deploy successfully
 
 ## Workflow Improvements Made

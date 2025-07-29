@@ -72,7 +72,7 @@ eagle.yourdomain.com    -> 119.9.118.22
 
 ### GitHub Repository Structure
 ```
-rackspace-k8s-demo/
+linknode-com/
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml              # CI/CD pipeline
@@ -125,8 +125,8 @@ Required GitHub Secrets:
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/murr2k/rackspace-k8s-demo.git
-   cd rackspace-k8s-demo
+   git clone https://github.com/murr2k/linknode-com.git
+   cd linknode-com
    ```
 
 2. **Configure Kubernetes Access**

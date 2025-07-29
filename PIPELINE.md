@@ -16,7 +16,7 @@ Automatically deploys to Rackspace when you push changes to the `main` branch.
    ```
 
 2. **Add secret to GitHub**:
-   - Go to: https://github.com/murr2k/rackspace-k8s-demo/settings/secrets/actions
+   - Go to: https://github.com/murr2k/linknode-com/settings/secrets/actions
    - Click "New repository secret"
    - Name: `KUBECONFIG`
    - Value: Paste the base64 string from step 1
@@ -35,7 +35,7 @@ The pipeline will automatically:
 - ✅ Restart pods to pick up ConfigMap changes
 
 #### Monitoring Deployments:
-- View runs: https://github.com/murr2k/rackspace-k8s-demo/actions
+- View runs: https://github.com/murr2k/linknode-com/actions
 - Each deployment shows the application URL
 - Failed deployments show error details
 
