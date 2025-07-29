@@ -144,36 +144,47 @@ export class VisualTester {
     waitForFonts?: boolean;
     hideScrollbars?: boolean;
   } = {}) {
-    // Hide cursor
-    if (options.hideCursor ?? true) {
-      await this.page.addStyleTag({
-        content: '* { cursor: none !important; }',
-      });
-    }
-
-    // Disable animations
-    if (options.disableAnimations ?? true) {
-      await this.page.addStyleTag({
-        content: `
+    // Use JavaScript evaluation to inject styles to avoid CSP issues
+    await this.page.evaluate(({ hideCursor, disableAnimations, hideScrollbars }) => {
+      const style = document.createElement('style');
+      style.setAttribute('data-visual-test', 'true');
+      
+      let css = '';
+      
+      // Hide cursor
+      if (hideCursor) {
+        css += '* { cursor: none !important; }\n';
+      }
+      
+      // Disable animations
+      if (disableAnimations) {
+        css += `
           *, *::before, *::after {
             animation-duration: 0s !important;
             animation-delay: 0s !important;
             transition-duration: 0s !important;
             transition-delay: 0s !important;
           }
-        `,
-      });
-    }
-
-    // Hide scrollbars
-    if (options.hideScrollbars ?? true) {
-      await this.page.addStyleTag({
-        content: `
+        `;
+      }
+      
+      // Hide scrollbars
+      if (hideScrollbars) {
+        css += `
           ::-webkit-scrollbar { display: none !important; }
           * { scrollbar-width: none !important; }
-        `,
-      });
-    }
+        `;
+      }
+      
+      if (css) {
+        style.textContent = css;
+        document.head.appendChild(style);
+      }
+    }, {
+      hideCursor: options.hideCursor ?? true,
+      disableAnimations: options.disableAnimations ?? true,
+      hideScrollbars: options.hideScrollbars ?? true,
+    });
 
     // Wait for fonts
     if (options.waitForFonts ?? true) {
