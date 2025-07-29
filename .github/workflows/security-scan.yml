@@ -79,6 +79,15 @@ jobs:
         cd fly/eagle-monitor
         safety check -r requirements.txt || true
     
+    - name: Cache npm dependencies
+      uses: actions/cache@v3
+      if: hashFiles('package-lock.json') != ''
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+          
     - name: Run npm audit
       run: |
         echo "🔍 Checking npm dependencies for vulnerabilities..."
