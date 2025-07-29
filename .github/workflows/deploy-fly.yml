@@ -148,7 +148,7 @@ jobs:
     # For Slack notifications, we recommend using GitHub's native Slack integration:
     # 1. Install GitHub Slack app: https://slack.com/apps/A01BP7R4KNY-github
     # 2. In Slack: /github signin (to connect your account)
-    # 3. In Slack: /github subscribe murr2k/rackspace-k8s-demo workflows
+    # 3. In Slack: /github subscribe murr2k/linknode-com workflows
     # This provides automatic notifications without any code or secrets!
     
     # Optional: Custom webhook notification (if SLACK_WEBHOOK_URL secret is set)

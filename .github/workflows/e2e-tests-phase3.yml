@@ -272,7 +272,7 @@ jobs:
         comment_mode: always
         
     # Slack notifications (using GitHub native integration)
-    # Setup: /github subscribe murr2k/rackspace-k8s-demo workflows:{name:"E2E Tests - Phase 3"}
+    # Setup: /github subscribe murr2k/linknode-com workflows:{name:"E2E Tests - Phase 3"}
     
     - name: Create issue for visual differences
       if: failure()

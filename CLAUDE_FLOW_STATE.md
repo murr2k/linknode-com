@@ -86,11 +86,11 @@ rackspace/
 - **Production**: https://linknode.com
 - **Grafana**: https://linknode-grafana.fly.dev
 - **Eagle API**: https://linknode-eagle-monitor.fly.dev/api/stats
-- **GitHub**: https://github.com/murr2k/rackspace-k8s-demo
+- **GitHub**: https://github.com/murr2k/linknode-com
 
 ### Slack Integration
 - Using GitHub's native Slack app
-- Subscribe command: `/github subscribe murr2k/rackspace-k8s-demo workflows`
+- Subscribe command: `/github subscribe murr2k/linknode-com workflows`
 
 ### Environment Variables/Secrets
 - `FLY_API_TOKEN` - Fly.io deployment token

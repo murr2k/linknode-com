@@ -155,8 +155,8 @@ claude-flow --project linknode \
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/murr2k/rackspace-k8s-demo.git
-   cd rackspace-k8s-demo
+   git clone https://github.com/murr2k/linknode-com.git
+   cd linknode-com
    ```
 
 2. **Install dependencies**
