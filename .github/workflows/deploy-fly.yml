@@ -43,35 +43,171 @@ jobs:
         flyctl apps list | grep linknode || echo "No linknode apps found"
       env:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    
+    - name: Capture Current Versions
+      id: versions
+      run: |
+        echo "Capturing current deployment versions for potential rollback..."
+        
+        # Get current image versions
+        INFLUXDB_VERSION=$(flyctl image show -a linknode-influxdb -j 2>/dev/null | jq -r .Tag || echo "none")
+        EAGLE_VERSION=$(flyctl image show -a linknode-eagle-monitor -j 2>/dev/null | jq -r .Tag || echo "none")
+        GRAFANA_VERSION=$(flyctl image show -a linknode-grafana -j 2>/dev/null | jq -r .Tag || echo "none")
+        WEB_VERSION=$(flyctl image show -a linknode-web -j 2>/dev/null | jq -r .Tag || echo "none")
+        
+        echo "influxdb_version=$INFLUXDB_VERSION" >> $GITHUB_OUTPUT
+        echo "eagle_version=$EAGLE_VERSION" >> $GITHUB_OUTPUT
+        echo "grafana_version=$GRAFANA_VERSION" >> $GITHUB_OUTPUT
+        echo "web_version=$WEB_VERSION" >> $GITHUB_OUTPUT
+        
+        echo "Current versions:"
+        echo "- InfluxDB: $INFLUXDB_VERSION"
+        echo "- Eagle Monitor: $EAGLE_VERSION"
+        echo "- Grafana: $GRAFANA_VERSION"
+        echo "- Web: $WEB_VERSION"
+      env:
+        FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
     - name: Deploy InfluxDB
+      id: deploy-influxdb
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'influxdb' || github.event.inputs.service == ''
       run: |
         cd fly/influxdb
-        flyctl deploy --remote-only --wait-timeout 300
+        
+        # Deploy with retry logic
+        RETRY_COUNT=0
+        MAX_RETRIES=2
+        
+        while [ $RETRY_COUNT -le $MAX_RETRIES ]; do
+          echo "Deployment attempt $((RETRY_COUNT + 1)) of $((MAX_RETRIES + 1))..."
+          
+          if flyctl deploy --remote-only --wait-timeout 300; then
+            echo "✅ InfluxDB deployed successfully"
+            
+            # Verify deployment health
+            sleep 10
+            if flyctl status -a linknode-influxdb | grep -q "running"; then
+              echo "✅ InfluxDB health check passed"
+              break
+            else
+              echo "⚠️ InfluxDB not healthy after deployment"
+              if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                echo "❌ Maximum retries reached"
+                exit 1
+              fi
+            fi
+          else
+            echo "❌ Deployment failed"
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "🔄 Attempting rollback to version ${{ steps.versions.outputs.influxdb_version }}"
+              if [ "${{ steps.versions.outputs.influxdb_version }}" != "none" ]; then
+                flyctl deploy --image "${{ steps.versions.outputs.influxdb_version }}" -a linknode-influxdb --yes || true
+              fi
+              exit 1
+            fi
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          [ $RETRY_COUNT -le $MAX_RETRIES ] && echo "Waiting 30 seconds before retry..." && sleep 30
+        done
       env:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       continue-on-error: false
 
     - name: Deploy Eagle Monitor
+      id: deploy-eagle
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'eagle-monitor' || github.event.inputs.service == ''
       run: |
         cd fly/eagle-monitor
-        flyctl deploy --remote-only --wait-timeout 300
+        
+        # Deploy with retry logic
+        RETRY_COUNT=0
+        MAX_RETRIES=2
+        
+        while [ $RETRY_COUNT -le $MAX_RETRIES ]; do
+          echo "Deployment attempt $((RETRY_COUNT + 1)) of $((MAX_RETRIES + 1))..."
+          
+          if flyctl deploy --remote-only --wait-timeout 300; then
+            echo "✅ Eagle Monitor deployed successfully"
+            
+            # Verify deployment health
+            sleep 10
+            if curl -sf https://linknode-eagle-monitor.fly.dev/health -m 10; then
+              echo "✅ Eagle Monitor health check passed"
+              break
+            else
+              echo "⚠️ Eagle Monitor health check failed"
+              if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                echo "❌ Maximum retries reached"
+                exit 1
+              fi
+            fi
+          else
+            echo "❌ Deployment failed"
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "🔄 Attempting rollback to version ${{ steps.versions.outputs.eagle_version }}"
+              if [ "${{ steps.versions.outputs.eagle_version }}" != "none" ]; then
+                flyctl deploy --image "${{ steps.versions.outputs.eagle_version }}" -a linknode-eagle-monitor --yes || true
+              fi
+              exit 1
+            fi
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          [ $RETRY_COUNT -le $MAX_RETRIES ] && echo "Waiting 30 seconds before retry..." && sleep 30
+        done
       env:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       continue-on-error: false
 
     - name: Deploy Grafana
+      id: deploy-grafana
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'grafana' || github.event.inputs.service == ''
       run: |
         cd fly/grafana
-        flyctl deploy --remote-only --wait-timeout 300
+        
+        # Deploy with retry logic
+        RETRY_COUNT=0
+        MAX_RETRIES=2
+        
+        while [ $RETRY_COUNT -le $MAX_RETRIES ]; do
+          echo "Deployment attempt $((RETRY_COUNT + 1)) of $((MAX_RETRIES + 1))..."
+          
+          if flyctl deploy --remote-only --wait-timeout 300; then
+            echo "✅ Grafana deployed successfully"
+            
+            # Verify deployment health
+            sleep 10
+            if curl -sf https://linknode-grafana.fly.dev/api/health -m 10; then
+              echo "✅ Grafana health check passed"
+              break
+            else
+              echo "⚠️ Grafana health check failed"
+              if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                echo "❌ Maximum retries reached"
+                exit 1
+              fi
+            fi
+          else
+            echo "❌ Deployment failed"
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "🔄 Attempting rollback to version ${{ steps.versions.outputs.grafana_version }}"
+              if [ "${{ steps.versions.outputs.grafana_version }}" != "none" ]; then
+                flyctl deploy --image "${{ steps.versions.outputs.grafana_version }}" -a linknode-grafana --yes || true
+              fi
+              exit 1
+            fi
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          [ $RETRY_COUNT -le $MAX_RETRIES ] && echo "Waiting 30 seconds before retry..." && sleep 30
+        done
       env:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       continue-on-error: false
 
     - name: Deploy Web Interface
+      id: deploy-web
       if: github.event.inputs.service == 'all' || github.event.inputs.service == 'web' || github.event.inputs.service == ''
       run: |
         cd fly/web
@@ -93,7 +229,42 @@ jobs:
         echo "Build info:"
         cat build-info.json
         
-        flyctl deploy --remote-only --wait-timeout 300
+        # Deploy with retry logic
+        RETRY_COUNT=0
+        MAX_RETRIES=2
+        
+        while [ $RETRY_COUNT -le $MAX_RETRIES ]; do
+          echo "Deployment attempt $((RETRY_COUNT + 1)) of $((MAX_RETRIES + 1))..."
+          
+          if flyctl deploy --remote-only --wait-timeout 300; then
+            echo "✅ Web interface deployed successfully"
+            
+            # Verify deployment health
+            sleep 10
+            if curl -sf https://linknode-web.fly.dev -m 10 | grep -q "Linknode"; then
+              echo "✅ Web interface health check passed"
+              break
+            else
+              echo "⚠️ Web interface health check failed"
+              if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+                echo "❌ Maximum retries reached"
+                exit 1
+              fi
+            fi
+          else
+            echo "❌ Deployment failed"
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "🔄 Attempting rollback to version ${{ steps.versions.outputs.web_version }}"
+              if [ "${{ steps.versions.outputs.web_version }}" != "none" ]; then
+                flyctl deploy --image "${{ steps.versions.outputs.web_version }}" -a linknode-web --yes || true
+              fi
+              exit 1
+            fi
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          [ $RETRY_COUNT -le $MAX_RETRIES ] && echo "Waiting 30 seconds before retry..." && sleep 30
+        done
       env:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       continue-on-error: false
@@ -133,16 +304,45 @@ jobs:
         echo "- **Time**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
         echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
 
-    - name: Check service health
+    - name: Final Health Check
       if: success()
       run: |
-        echo "Checking service health..."
-        sleep 30  # Wait for services to stabilize
+        echo "Performing final health checks..."
+        FAILED_SERVICES=""
         
-        # Check each service
-        curl -sf https://linknode-web.fly.dev > /dev/null && echo "✅ Web interface is healthy" || echo "❌ Web interface is not responding"
-        curl -sf https://linknode-grafana.fly.dev/api/health > /dev/null && echo "✅ Grafana is healthy" || echo "❌ Grafana is not responding"
-        curl -sf https://linknode-eagle-monitor.fly.dev/health > /dev/null && echo "✅ Eagle Monitor is healthy" || echo "❌ Eagle Monitor is not responding"
+        # Check each service with detailed output
+        echo "🔍 Checking Web Interface..."
+        if curl -sf https://linknode-web.fly.dev -m 10 | grep -q "Linknode"; then
+          echo "✅ Web interface is healthy"
+        else
+          echo "❌ Web interface is not responding correctly"
+          FAILED_SERVICES="${FAILED_SERVICES}web "
+        fi
+        
+        echo "🔍 Checking Grafana..."
+        if curl -sf https://linknode-grafana.fly.dev/api/health -m 10; then
+          echo "✅ Grafana is healthy"
+        else
+          echo "❌ Grafana is not responding"
+          FAILED_SERVICES="${FAILED_SERVICES}grafana "
+        fi
+        
+        echo "🔍 Checking Eagle Monitor..."
+        if curl -sf https://linknode-eagle-monitor.fly.dev/health -m 10; then
+          echo "✅ Eagle Monitor is healthy"
+        else
+          echo "❌ Eagle Monitor is not responding"
+          FAILED_SERVICES="${FAILED_SERVICES}eagle-monitor "
+        fi
+        
+        # Exit with error if any services failed
+        if [ -n "$FAILED_SERVICES" ]; then
+          echo "⚠️ Failed services: $FAILED_SERVICES"
+          echo "Consider manual intervention or rollback"
+          exit 1
+        else
+          echo "✅ All services are healthy!"
+        fi
 
     # Slack Notifications
     # For Slack notifications, we recommend using GitHub's native Slack integration:
