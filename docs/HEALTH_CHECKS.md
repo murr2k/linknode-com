@@ -6,14 +6,21 @@ This document lists all health check endpoints for Linknode services and how to 
 ## Service Endpoints
 
 ### InfluxDB
-- **URL**: `http://linknode-influxdb.fly.dev:8086/ping`
+- **URL**: `https://linknode-influxdb.fly.dev/ping` (Note: Port 8086 is not exposed externally on Fly.io)
 - **Expected Response**: 204 No Content
 - **Method**: GET
 - **Timeout**: 10 seconds
+- **Alternative Check**: Use `flyctl status -a linknode-influxdb` for deployment verification
 - **Example**:
   ```bash
-  curl -sf http://linknode-influxdb.fly.dev:8086/ping
-  echo $?  # Should return 0 for success
+  # Option 1: Check via HTTPS (may not work if InfluxDB doesn't have HTTPS configured)
+  curl -sf https://linknode-influxdb.fly.dev/ping
+  
+  # Option 2: Check via HTTP
+  curl -sf http://linknode-influxdb.fly.dev/ping
+  
+  # Option 3: Check via flyctl (most reliable)
+  flyctl status -a linknode-influxdb --json | jq -r '.Allocations[0].Status'
   ```
 
 ### Eagle Monitor API

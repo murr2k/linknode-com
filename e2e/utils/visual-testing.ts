@@ -35,30 +35,44 @@ export class VisualTester {
    * Take a screenshot for visual comparison
    */
   async captureScreenshot(name: string, options?: VisualTestOptions) {
-    // Wait for animations to complete
-    if (options?.animations === 'disabled') {
-      await this.page.addStyleTag({
-        content: `
-          *, *::before, *::after {
-            animation-duration: 0s !important;
-            animation-delay: 0s !important;
-            transition-duration: 0s !important;
-            transition-delay: 0s !important;
-          }
-        `,
-      });
-    }
-
-    // Hide caret if requested
-    if (options?.caret === 'hide') {
-      await this.page.addStyleTag({
-        content: `
-          * {
-            caret-color: transparent !important;
-          }
-        `,
-      });
-    }
+    // Inject styles using JavaScript evaluation to avoid CSP issues
+    await this.page.evaluate(({ disableAnimations, hideCaret }) => {
+      if (disableAnimations || hideCaret) {
+        const style = document.createElement('style');
+        style.setAttribute('data-visual-test', 'capture');
+        
+        let css = '';
+        
+        // Wait for animations to complete
+        if (disableAnimations) {
+          css += `
+            *, *::before, *::after {
+              animation-duration: 0s !important;
+              animation-delay: 0s !important;
+              transition-duration: 0s !important;
+              transition-delay: 0s !important;
+            }
+          `;
+        }
+        
+        // Hide caret if requested
+        if (hideCaret) {
+          css += `
+            * {
+              caret-color: transparent !important;
+            }
+          `;
+        }
+        
+        if (css) {
+          style.textContent = css;
+          document.head.appendChild(style);
+        }
+      }
+    }, {
+      disableAnimations: options?.animations === 'disabled',
+      hideCaret: options?.caret === 'hide',
+    });
 
     // Mask dynamic elements
     if (options?.mask && options.mask.length > 0) {
