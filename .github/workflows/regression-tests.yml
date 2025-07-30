@@ -230,8 +230,15 @@ jobs:
     - name: Check if baseline needs update
       id: check
       run: |
+        # Check for explicit baseline update request
+        if [[ "${{ github.event.head_commit.message }}" == *"[update-baseline]"* ]]; then
+          echo "should_update=true" >> $GITHUB_OUTPUT
+          echo "Baseline update requested via commit message [update-baseline]"
+          exit 0
+        fi
+        
         # Check if this is a significant release
-        if git log -1 --pretty=%B | grep -E "(feat|fix|BREAKING):" > /dev/null; then
+        if git log -1 --pretty=%B | grep -E "(feat|fix|style|refactor|BREAKING):" > /dev/null; then
           echo "should_update=true" >> $GITHUB_OUTPUT
           echo "Significant change detected - baseline will be updated"
         else

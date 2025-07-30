@@ -396,6 +396,8 @@ See [REGRESSION_TEST_CHECKLIST.md](REGRESSION_TEST_CHECKLIST.md) for pre-release
 - [E2E_TESTING_README.md](E2E_TESTING_README.md) - Comprehensive testing documentation
 - [E2E_PHASE2_GUIDE.md](E2E_PHASE2_GUIDE.md) - Phase 2 testing details
 - [E2E_PHASE3_GUIDE.md](E2E_PHASE3_GUIDE.md) - Phase 3 advanced testing
+- [docs/REGRESSION_TESTING.md](docs/REGRESSION_TESTING.md) - Regression test baseline management guide
+- [docs/HEALTH_CHECKS.md](docs/HEALTH_CHECKS.md) - Service health check endpoints and monitoring
 
 ---
 
