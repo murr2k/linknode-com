@@ -341,64 +341,6 @@ jobs:
         check_name: E2E Test Results
         comment_mode: always
         
-    - name: Generate short SHA
-      id: short-sha
-      run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-        
-    - name: Slack Notification - Success
-      if: success() && env.SLACK_WEBHOOK_URL != ''
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
-      run: |
-        if [ -n "$SLACK_WEBHOOK_URL" ]; then
-          curl -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-type: application/json' \
-            --data '{
-              "text": "✅ E2E Tests Passed",
-              "attachments": [{
-                "color": "good",
-                "fields": [
-                  {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
-                  {"title": "Commit", "value": "'"${{ steps.short-sha.outputs.sha }}"'", "short": true},
-                  {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
-                  {"title": "Test Type", "value": "'"${{ github.event.inputs.test_type || 'all' }}"'", "short": true}
-                ],
-                "footer": "All test suites passed",
-                "actions": [
-                  {"type": "button", "text": "View Results", "url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"}
-                ]
-              }]
-            }'
-        fi
-        
-    - name: Slack Notification - Failure
-      if: failure() && env.SLACK_WEBHOOK_URL != ''
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
-      run: |
-        if [ -n "$SLACK_WEBHOOK_URL" ]; then
-          # Build failed jobs list
-          FAILED_JOBS=""
-          [ "${{ needs.browser-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Browser Tests ❌\\n"
-          [ "${{ needs.specialized-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Specialized Tests ❌\\n"
-          [ "${{ needs.mobile-tests.result }}" = "failure" ] && FAILED_JOBS="${FAILED_JOBS}Mobile Tests ❌\\n"
-          
-          curl -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-type: application/json' \
-            --data '{
-              "text": "❌ E2E Tests Failed",
-              "attachments": [{
-                "color": "danger",
-                "fields": [
-                  {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
-                  {"title": "Commit", "value": "'"${{ steps.short-sha.outputs.sha }}"'", "short": true},
-                  {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
-                  {"title": "Test Type", "value": "'"${{ github.event.inputs.test_type || 'all' }}"'", "short": true},
-                  {"title": "Failed Jobs", "value": "'"${FAILED_JOBS}"'", "short": false}
-                ],
-                "actions": [
-                  {"type": "button", "text": "View Failed Tests", "url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"}
-                ]
-              }]
-            }'
-        fi
+    # Slack notifications configured via GitHub native integration
+    # Channel: #linknode-com
+    # Subscribed to: /github subscribe murr2k/linknode-com workflows

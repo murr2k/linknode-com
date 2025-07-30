@@ -482,61 +482,16 @@ jobs:
           echo "✅ All services are healthy!"
         fi
 
-    # Slack Notifications
-    # For Slack notifications, we recommend using GitHub's native Slack integration:
-    # 1. Install GitHub Slack app: https://slack.com/apps/A01BP7R4KNY-github
-    # 2. In Slack: /github signin (to connect your account)
-    # 3. In Slack: /github subscribe murr2k/linknode-com workflows
-    # This provides automatic notifications without any code or secrets!
-    
-    # Optional: Custom webhook notification (if SLACK_WEBHOOK_URL secret is set)
-    - name: Slack Notification - Success
-      if: success() && env.SLACK_WEBHOOK_URL != ''
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
-      run: |
-        if [ -n "$SLACK_WEBHOOK_URL" ]; then
-          curl -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-type: application/json' \
-            --data '{
-              "text": "✅ Fly.io Deployment Successful",
-              "attachments": [{
-                "color": "good",
-                "fields": [
-                  {"title": "Service", "value": "'"${{ github.event.inputs.service || 'all' }}"'", "short": true},
-                  {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
-                  {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
-                  {"title": "Commit", "value": "'"$(echo ${{ github.sha }} | cut -c1-7)"'", "short": true}
-                ],
-                "actions": [
-                  {"type": "button", "text": "View Site", "url": "https://linknode.com"},
-                  {"type": "button", "text": "View Logs", "url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"}
-                ]
-              }]
-            }'
-        fi
-        
-    - name: Slack Notification - Failure
-      if: failure() && env.SLACK_WEBHOOK_URL != ''
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
-      run: |
-        if [ -n "$SLACK_WEBHOOK_URL" ]; then
-          curl -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-type: application/json' \
-            --data '{
-              "text": "❌ Fly.io Deployment Failed",
-              "attachments": [{
-                "color": "danger",
-                "fields": [
-                  {"title": "Service", "value": "'"${{ github.event.inputs.service || 'all' }}"'", "short": true},
-                  {"title": "Branch", "value": "'"${{ github.ref_name }}"'", "short": true},
-                  {"title": "Author", "value": "'"${{ github.actor }}"'", "short": true},
-                  {"title": "Commit", "value": "'"$(echo ${{ github.sha }} | cut -c1-7)"'", "short": true}
-                ],
-                "actions": [
-                  {"type": "button", "text": "View Logs", "url": "'"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"}
-                ]
-              }]
-            }'
-        fi
+    # Slack Notifications via GitHub Native Integration
+    # This workflow is configured to send notifications through GitHub's native Slack integration.
+    # 
+    # Setup completed in #linknode-com channel:
+    # - GitHub Slack app installed: https://slack.com/apps/A01BP7R4KNY-github
+    # - Subscribed to: /github subscribe murr2k/linknode-com workflows
+    # 
+    # Notifications are sent automatically for:
+    # - Workflow failures
+    # - Deployment completions
+    # - Status changes
+    # 
+    # No secrets or webhook configuration needed!

@@ -398,6 +398,7 @@ See [REGRESSION_TEST_CHECKLIST.md](REGRESSION_TEST_CHECKLIST.md) for pre-release
 - [E2E_PHASE3_GUIDE.md](E2E_PHASE3_GUIDE.md) - Phase 3 advanced testing
 - [docs/REGRESSION_TESTING.md](docs/REGRESSION_TESTING.md) - Regression test baseline management guide
 - [docs/HEALTH_CHECKS.md](docs/HEALTH_CHECKS.md) - Service health check endpoints and monitoring
+- [docs/WORKFLOW_NOTIFICATIONS.md](docs/WORKFLOW_NOTIFICATIONS.md) - GitHub Slack integration for workflow notifications
 
 ---
 

@@ -335,8 +335,9 @@ jobs:
         check_name: E2E Test Results - Phase 3
         comment_mode: always
         
-    # Slack notifications (using GitHub native integration)
-    # Setup: /github subscribe murr2k/linknode-com workflows:{name:"E2E Tests - Phase 3"}
+    # Slack notifications configured via GitHub native integration
+    # Channel: #linknode-com
+    # Subscribed to: /github subscribe murr2k/linknode-com workflows
     
     - name: Create issue for visual differences
       if: failure()
