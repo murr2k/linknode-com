@@ -1,0 +1,8 @@
+# Root fly.toml for quick access to linknode-web app
+# This allows running 'fly status' from the project root
+# For actual deployment configs, see fly/web/fly.toml
+
+app = 'linknode-web'
+
+# Note: This is a convenience file for CLI commands
+# The actual deployment configuration is in fly/web/fly.toml
