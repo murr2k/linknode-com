@@ -1119,32 +1119,75 @@
                 if (response.ok) {
                     const data = await response.json();
                     
-                    // Update current power
-                    document.getElementById('current-power').textContent = Math.round(data.current_power || 0);
+                    // Check data staleness (2 minutes = 120 seconds)
+                    const lastUpdateTime = new Date(data.last_update);
+                    const now = new Date();
+                    const ageInSeconds = Math.floor((now - lastUpdateTime) / 1000);
+                    const isStale = ageInSeconds > 120;
                     
-                    // Update power color based on value
                     const powerElement = document.getElementById('current-power');
-                    const currentPower = data.current_power || 0;
-                    if (currentPower < 1000) {
-                        powerElement.style.background = 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)';
-                    } else if (currentPower < 2000) {
-                        powerElement.style.background = 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)';
+                    const statusElement = document.getElementById('power-status');
+                    
+                    if (isStale) {
+                        // Data is stale - show dashes
+                        powerElement.textContent = '--';
+                        powerElement.style.background = 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+                        powerElement.style.webkitBackgroundClip = 'text';
+                        powerElement.style.webkitTextFillColor = 'transparent';
+                        powerElement.style.backgroundClip = 'text';
+                        
+                        // Show how old the data is
+                        const ageMinutes = Math.floor(ageInSeconds / 60);
+                        const ageHours = Math.floor(ageMinutes / 60);
+                        let ageText = '';
+                        if (ageHours > 0) {
+                            ageText = `No data for ${ageHours}h ${ageMinutes % 60}m`;
+                        } else {
+                            ageText = `No data for ${ageMinutes}m`;
+                        }
+                        statusElement.textContent = ageText;
+                        statusElement.style.color = '#ef4444';
+                        
+                        // Also clear the 24h stats when data is stale
+                        document.getElementById('power-min').textContent = '--';
+                        document.getElementById('power-max').textContent = '--';
+                        document.getElementById('power-avg').textContent = '--';
+                        document.getElementById('power-cost').textContent = '--';
                     } else {
-                        powerElement.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                        // Data is fresh - show actual values
+                        document.getElementById('current-power').textContent = Math.round(data.current_power || 0);
+                        
+                        // Update power color based on value
+                        const currentPower = data.current_power || 0;
+                        if (currentPower < 1000) {
+                            powerElement.style.background = 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)';
+                        } else if (currentPower < 2000) {
+                            powerElement.style.background = 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)';
+                        } else {
+                            powerElement.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                        }
+                        powerElement.style.webkitBackgroundClip = 'text';
+                        powerElement.style.webkitTextFillColor = 'transparent';
+                        powerElement.style.backgroundClip = 'text';
+                        
+                        // Update 24h stats
+                        document.getElementById('power-min').textContent = Math.round(data.min_24h || 0) + 'W';
+                        document.getElementById('power-max').textContent = Math.round(data.max_24h || 0) + 'W';
+                        document.getElementById('power-avg').textContent = Math.round(data.avg_24h || 0) + 'W';
+                        document.getElementById('power-cost').textContent = '$' + (data.cost_24h || 0).toFixed(2);
+                        
+                        // Show data age if less than 30 seconds, otherwise show "Live"
+                        if (ageInSeconds < 30) {
+                            statusElement.textContent = 'Live';
+                            statusElement.style.color = '#22c55e';
+                        } else if (ageInSeconds < 60) {
+                            statusElement.textContent = `Updated ${ageInSeconds}s ago`;
+                            statusElement.style.color = '#fbbf24';
+                        } else {
+                            statusElement.textContent = `Updated ${Math.floor(ageInSeconds / 60)}m ago`;
+                            statusElement.style.color = '#f59e0b';
+                        }
                     }
-                    powerElement.style.webkitBackgroundClip = 'text';
-                    powerElement.style.webkitTextFillColor = 'transparent';
-                    powerElement.style.backgroundClip = 'text';
-                    
-                    // Update 24h stats
-                    document.getElementById('power-min').textContent = Math.round(data.min_24h || 0) + 'W';
-                    document.getElementById('power-max').textContent = Math.round(data.max_24h || 0) + 'W';
-                    document.getElementById('power-avg').textContent = Math.round(data.avg_24h || 0) + 'W';
-                    document.getElementById('power-cost').textContent = '$' + (data.cost_24h || 0).toFixed(2);
-                    
-                    // Update status
-                    document.getElementById('power-status').textContent = 'Live';
-                    document.getElementById('power-status').style.color = '#4ade80';
                 } else {
                     throw new Error('API returned status ' + response.status);
                 }
