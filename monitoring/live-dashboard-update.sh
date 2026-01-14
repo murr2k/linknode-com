@@ -17,7 +17,7 @@ echo "Updating dashboard via API..."
 kubectl exec -n demo-app deployment/grafana -- curl -X POST \
   -H "Content-Type: application/json" \
   -d "{\"dashboard\": $DASHBOARD_JSON, \"overwrite\": true}" \
-  http://admin:admin@localhost:3000/api/dashboards/db
+  "http://admin:\${GRAFANA_ADMIN_PASSWORD}@localhost:3000/api/dashboards/db"
 
 echo ""
 echo "✓ Dashboard updated live! Just refresh your browser."

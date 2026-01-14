@@ -9,7 +9,10 @@ This directory contains the Grafana configuration for visualizing energy monitor
 fly deploy
 
 # Set the InfluxDB token (must match the token used by InfluxDB and Eagle monitor)
-fly secrets set INFLUXDB_TOKEN="my-super-secret-auth-token" -a linknode-grafana
+fly secrets set INFLUXDB_TOKEN="your-influxdb-token" -a linknode-grafana
+
+# Set the admin password
+fly secrets set GF_SECURITY_ADMIN_PASSWORD="your-secure-password" -a linknode-grafana
 
 # Verify deployment
 fly status -a linknode-grafana
@@ -17,17 +20,80 @@ fly status -a linknode-grafana
 
 ## Configuration Files
 
-- `grafana.ini` - Main Grafana configuration with embedding enabled
-- `Dockerfile` - Container configuration (uses grafana.ini, NOT grafana-minimal.ini)
-- `fly.toml` - Fly.io deployment configuration
+- `grafana.ini` - Main Grafana configuration with security and embedding settings
+- `Dockerfile` - Container configuration (uses Grafana 11.4.0)
+- `fly.toml` - Fly.io deployment configuration with environment variables
 - `provisioning/datasources/influxdb.yaml` - InfluxDB datasource configuration
 - `provisioning/dashboards/power-monitoring.json` - Energy monitoring dashboard
 
-## Important Configuration Details
+## Security Configuration
 
-### 1. Embedding Settings
+### Authentication Model
 
-The `grafana.ini` file must include these settings for iframe embedding to work:
+The Grafana instance uses a **public read-only** model:
+
+| User Type | Role | Capabilities |
+|-----------|------|--------------|
+| Anonymous (public) | Viewer | View dashboards only |
+| Authenticated admin | Admin | Full access |
+
+### Secrets Storage
+
+| Secret | Storage Location | Purpose |
+|--------|------------------|---------|
+| `GF_SECURITY_ADMIN_PASSWORD` | Fly.io secrets | Admin login password |
+| `GRAFANA_ADMIN_PASSWORD` | GitHub repository secrets | Backup/CI reference |
+| `INFLUXDB_TOKEN` | Fly.io secrets | InfluxDB authentication |
+
+**Admin Credentials:**
+- Username: `admin`
+- Password: Stored in `GF_SECURITY_ADMIN_PASSWORD` Fly secret
+- Login URL: https://linknode-grafana.fly.dev/login
+
+### Access Control Settings
+
+```ini
+# Anonymous access (Viewer role - read-only)
+[auth.anonymous]
+enabled = true
+org_role = Viewer
+
+# Features disabled for security
+[explore]
+enabled = false
+
+[alerting]
+enabled = false
+
+[unified_alerting]
+enabled = false
+```
+
+### Dashboard Permissions
+
+The power-monitoring dashboard has explicit permissions set:
+- **Viewer role**: Can view (permission level 1)
+- **Editor role**: Can view (permission level 1)
+- **Admin role**: Full access
+
+Permissions were set via API:
+```bash
+curl -u "admin:PASSWORD" -X POST \
+  "https://linknode-grafana.fly.dev/api/dashboards/id/1/permissions" \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"role":"Editor","permission":1},{"role":"Viewer","permission":1}]}'
+```
+
+### Public Dashboard
+
+A public dashboard share is also available (no authentication required):
+```
+https://linknode-grafana.fly.dev/public-dashboards/cbdf956d4ab84932bf6841531f6524d9
+```
+
+## Embedding Settings
+
+The `grafana.ini` file includes these settings for iframe embedding:
 
 ```ini
 [security]
@@ -37,9 +103,9 @@ cookie_secure = true
 content_security_policy = false
 ```
 
-### 2. Datasource Configuration
+## Datasource Configuration
 
-The InfluxDB datasource must be configured for Flux queries:
+The InfluxDB datasource is configured for Flux queries:
 
 ```yaml
 jsonData:
@@ -49,13 +115,13 @@ jsonData:
   httpMode: POST         # Required for Flux queries
 ```
 
-### 3. Dashboard Queries
+## Dashboard Queries
 
-All queries must use the correct measurement and field names:
+All queries use these measurement and field names:
 
-- Measurement: `energy_monitor` (NOT `power_data`)
-- Power field: `power_w` (NOT `power`)
-- Energy field: `energy_delivered_kwh` (NOT `energy`)
+- Measurement: `energy_monitor`
+- Power field: `power_w`
+- Energy field: `energy_delivered_kwh`
 
 Example query:
 ```flux
@@ -65,21 +131,47 @@ from(bucket: "energy")
   |> filter(fn: (r) => r._field == "power_w")
 ```
 
-## Troubleshooting
-
-If you encounter issues, see [GRAFANA_TROUBLESHOOTING.md](../GRAFANA_TROUBLESHOOTING.md) for detailed solutions to common problems.
-
 ## Access Points
 
 - **Direct Dashboard**: https://linknode-grafana.fly.dev/d/power-monitoring/eagle-energy-monitor
-- **Embedded View**: https://linknode-web.fly.dev/ (iframe in web interface)
+- **Public Dashboard**: https://linknode-grafana.fly.dev/public-dashboards/cbdf956d4ab84932bf6841531f6524d9
+- **Embedded View**: https://linknode.com (iframe in web interface)
+- **Admin Login**: https://linknode-grafana.fly.dev/login
 - **API Health Check**: https://linknode-grafana.fly.dev/api/health
 
 ## Environment Variables
 
-Required secrets:
-- `INFLUXDB_TOKEN` - Authentication token for InfluxDB (must match across all services)
+**Required secrets (set via `fly secrets set`):**
+- `INFLUXDB_TOKEN` - Authentication token for InfluxDB
+- `GF_SECURITY_ADMIN_PASSWORD` - Admin user password
 
-Optional environment variables (set in fly.toml):
+**Optional environment variables (set in fly.toml):**
 - `GF_LOG_LEVEL` - Logging level (default: "info")
 - `GF_SERVER_ROOT_URL` - Public URL for Grafana
+
+## Troubleshooting
+
+### Reset Admin Password
+
+If you lose admin access:
+```bash
+flyctl ssh console -a linknode-grafana -C "grafana-cli admin reset-admin-password 'NEW_PASSWORD'"
+```
+
+### Check Logs
+
+```bash
+flyctl logs -a linknode-grafana
+```
+
+### Verify Anonymous Access
+
+```bash
+curl -s "https://linknode-grafana.fly.dev/api/dashboards/uid/power-monitoring" | jq '.meta.slug'
+# Should return: "eagle-energy-monitor"
+```
+
+## Version History
+
+- **Grafana 11.4.0** - Current version (fixed DOMPurify CVE-2024-47875)
+- Security hardening applied 2026-01-14

@@ -13,6 +13,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Shows age indicator: "Live" (<30s), "Updated Xs ago" (30-60s), "Updated Xm ago" (1-2m), "No data for Xh Xm" (>2m)
   - Prevents misleading display of outdated power consumption values
   - Automatically resumes showing real values when fresh data arrives
+- Theory of Operation documentation (`docs/THEORY_OF_OPERATION.md`) with comprehensive Mermaid diagrams
+- Public dashboard URL for Grafana: `https://linknode-grafana.fly.dev/public-dashboards/cbdf956d4ab84932bf6841531f6524d9`
+
+### Security
+- **CRITICAL FIX**: Grafana anonymous access changed from `Admin` to `Viewer` role
+  - Previously, any anonymous user had full admin access to Grafana
+  - Could edit/delete dashboards, modify datasources, access admin settings
+  - Reported by Robbie G. (Cloud Security @ Accelerant) via LinkedIn
+- Implemented proper authentication model:
+  - Anonymous users: Viewer role (read-only dashboard access)
+  - Authenticated admin: Full access via login
+- Admin password now stored securely:
+  - Fly.io secret: `GF_SECURITY_ADMIN_PASSWORD`
+  - GitHub secret: `GRAFANA_ADMIN_PASSWORD`
+- Disabled unnecessary Grafana features for anonymous users:
+  - Explore, Alerting, Unified Alerting, News feed, Help, Profile
+- Re-enabled Grafana login form for admin authentication
+- Explicit dashboard permissions set for Viewer/Editor roles via API
+- Updated Grafana security documentation in `fly/grafana/README.md`
+- **Removed hardcoded credentials from scripts**:
+  - `fly/influxdb/verify-influxdb.sh` - removed hardcoded InfluxDB token
+  - `fly/eagle-monitor/deploy.sh` - removed hardcoded InfluxDB token
+  - `clear-energy-data.sh` - removed hardcoded token, added validation
+  - `monitoring/live-dashboard-update.sh` - removed hardcoded Grafana credentials
+- **Rotated InfluxDB API token** (old tokens exposed in git history):
+  - Created new secure token: "Production API Token - Jan 2026"
+  - Updated Fly.io secrets: linknode-influxdb, linknode-eagle-monitor, linknode-grafana
+  - Revoked old compromised token (`my-super-secret-auth-token`)
+  - Added `INFLUXDB_TOKEN` to GitHub repository secrets
 
 ### Fixed
 - Updated remaining hardcoded paths to use relative paths in scripts

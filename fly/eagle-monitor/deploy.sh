@@ -13,7 +13,11 @@ fi
 
 # Set the InfluxDB token secret
 echo "Setting InfluxDB token secret..."
-fly secrets set INFLUXDB_TOKEN='linknode-20250720-7468d2699f48f7f91ee4abbeec90a25f' --app linknode-eagle-monitor
+# IMPORTANT: Set the actual token from your InfluxDB setup
+# Get token from: fly secrets list -a linknode-influxdb
+# fly secrets set INFLUXDB_TOKEN='your-influxdb-token' --app linknode-eagle-monitor
+echo "WARNING: You must manually set INFLUXDB_TOKEN secret before deploying"
+echo "Run: fly secrets set INFLUXDB_TOKEN='your-token' --app linknode-eagle-monitor"
 
 # Deploy the app
 echo "Deploying application..."

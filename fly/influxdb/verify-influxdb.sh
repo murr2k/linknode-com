@@ -4,7 +4,9 @@ echo "Verifying InfluxDB setup..."
 echo ""
 
 # Set the admin token
-ADMIN_TOKEN="linknode-20250720-7468d2699f48f7f91ee4abbeec90a25f"
+# IMPORTANT: Get the actual token from Fly secrets, not hardcoded here
+# To get the token: fly secrets list -a linknode-influxdb
+ADMIN_TOKEN="${INFLUXDB_TOKEN:-your-influxdb-token-here}"
 
 # Test from within the container using localhost
 echo "1. Testing InfluxDB health check..."
