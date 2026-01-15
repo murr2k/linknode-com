@@ -1383,12 +1383,9 @@
                         document.getElementById('power-cost').textContent = '$' + (data.cost_24h || 0).toFixed(2);
 
                         // Update live indicator based on data freshness
-                        if (ageInSeconds < 30) {
+                        // Show "Live" if data is less than 60 seconds old (Eagle reports ~every 9s)
+                        if (ageInSeconds < 60) {
                             liveText.textContent = 'Live';
-                            liveDot.classList.remove('stale');
-                            liveText.classList.remove('stale');
-                        } else if (ageInSeconds < 60) {
-                            liveText.textContent = `${ageInSeconds}s ago`;
                             liveDot.classList.remove('stale');
                             liveText.classList.remove('stale');
                         } else {
