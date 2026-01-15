@@ -6,11 +6,12 @@ This directory contains all GitHub Actions workflows for the Linknode project. E
 
 | Workflow | Purpose | Triggers | Required Secrets |
 |----------|---------|----------|------------------|
-| [deploy-fly.yml](#deploy-flyio) | Deploy services to Fly.io | Push to main, Manual | `FLY_API_TOKEN` |
+| [deploy-fly.yml](#deploy-to-flyio) | Deploy services to Fly.io | Push to main, Manual | `FLY_API_TOKEN` |
 | [e2e-tests.yml](#e2e-tests) | Run comprehensive E2E test suite | PR, Push to main, Manual | None |
 | [e2e-tests-phase3.yml](#e2e-tests-phase-3) | Advanced visual and performance tests | Push to main (specific paths), Manual | None |
 | [regression-tests.yml](#regression-tests) | Compare against baseline for regressions | PR, Push to main, Manual | None |
 | [security-scan.yml](#security-scanning) | Security vulnerability scanning | PR, Push to main, Daily schedule | None |
+| [queue-monitor-reusable.yml](#queue-time-monitor) | Track workflow queue times | Called by other workflows | None |
 
 ## Detailed Documentation
 
@@ -135,6 +136,24 @@ This directory contains all GitHub Actions workflows for the Linknode project. E
 **Issue Creation:**
 - Automatically creates GitHub issues for security findings
 - Tags: `security`, `automated`
+
+### Queue Time Monitor
+**File:** `queue-monitor-reusable.yml`
+
+**Purpose:** Reusable workflow that tracks how long workflows wait in the GitHub Actions queue before execution starts.
+
+**Features:**
+- Calculates queue time from workflow creation to start
+- Reports metrics in job summary
+- Warns when queue exceeds 10 or 15 minutes
+- Outputs queue time for use by calling workflows
+
+**Usage:**
+This is a reusable workflow called by other workflows using `workflow_call`. It's automatically included in all active workflows to monitor CI/CD performance.
+
+**Thresholds:**
+- 10+ minutes: Warning issued
+- 15+ minutes: Critical warning
 
 ## Common Troubleshooting
 
