@@ -195,7 +195,7 @@
     },
     {
       "datasource": "InfluxDB",
-      "description": "Average power demand over last hour",
+      "description": "Average power demand over selected time range",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -231,16 +231,16 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> mean()",
+          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> mean()",
           "refId": "A"
         }
       ],
-      "title": "Average Power (1h)",
+      "title": "Average Power",
       "type": "stat"
     },
     {
       "datasource": "InfluxDB",
-      "description": "Peak power demand in the last hour",
+      "description": "Peak power demand over selected time range",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -276,11 +276,11 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> max()",
+          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> max()",
           "refId": "A"
         }
       ],
-      "title": "Peak Power (1h)",
+      "title": "Peak Power",
       "type": "stat"
     }
   ],
