@@ -23,10 +23,12 @@
 
 ### Recommendations
 
-1. **Turn UP the gas furnace thermostat** - Gas heat is significantly cheaper
+1. **Turn UP the gas furnace thermostat** - Gas heat is significantly cheaper than electric
 2. **Reduce/eliminate electric space heater use** - Your winter electricity spike (+40 kWh/day) suggests heavy space heater usage costing ~$95/month more than equivalent gas heat
 3. **Stay on BC Hydro Tiered Rate** - Seasonal variation makes it nearly equal to Flat Rate
 4. **Consider Time-of-Day pricing** - Potential ~$65-115/year savings if loads can shift overnight
+
+*Note: Your heat pump is cooling-only, so gas furnace is your only efficient heating option.*
 
 ### Potential Monthly Savings: ~$95/month in Winter
 
@@ -44,8 +46,10 @@ By shifting 40 kWh/day of electric space heater load to gas furnace:
 | Component | Type | Notes |
 |-----------|------|-------|
 | **Primary Heat** | Gas-fired forced air furnace | FortisBC natural gas |
-| **Cooling** | Heat pump (in-line heat exchanger) | Outdoor unit, ducted |
+| **Cooling Only** | Heat pump (in-line heat exchanger) | Outdoor unit, cooling mode only |
 | **Supplemental** | Electric space heaters | Portable/baseboard |
+
+*Note: The heat pump is cooling-only and cannot be used for heating.*
 
 ### FortisBC Gas Rates (Effective January 1, 2026)
 
@@ -90,18 +94,16 @@ xychart-beta
 
 **Gas furnace delivers heat at 46% the cost of Tier 1 electric, and 38% the cost of Tier 2.**
 
-### Heat Pump Considerations
+### Bottom Line for Your System
 
-Your heat pump's heating efficiency depends on outdoor temperature:
+Since your heat pump is cooling-only, you have two heating options:
 
-| Outdoor Temp | Heat Pump COP | Electric Cost/kWh Heat | vs Gas |
-|--------------|---------------|------------------------|--------|
-| 10°C (50°F) | ~3.0 | $0.039-$0.047 | Cheaper than gas |
-| 5°C (41°F) | ~2.5 | $0.047-$0.056 | Break-even |
-| 0°C (32°F) | ~2.0 | $0.059-$0.070 | Gas cheaper |
-| -5°C (23°F) | ~1.5 | $0.078-$0.094 | Gas much cheaper |
+| Option | Cost per kWh of Heat | Winner |
+|--------|---------------------|--------|
+| Gas Furnace | $0.054 | **Always cheaper** |
+| Electric Space Heaters | $0.117-$0.141 | 2.2-2.6× more expensive |
 
-**Recommendation:** Use heat pump for heating when temps are above 5°C; rely on gas furnace below 5°C.
+**Recommendation:** Maximize gas furnace usage, minimize electric space heaters.
 
 ---
 
