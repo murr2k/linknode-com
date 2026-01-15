@@ -47,7 +47,22 @@
         "tickWidthMajor": 2,
         "tickLengthMinor": 0.08,
         "tickWidthMinor": 1,
-        "tickMapConfig": {"enabled": false, "tickMaps": []},
+        "tickMapConfig": {
+          "enabled": true,
+          "tickMaps": [
+            {"value": 0, "text": "0"},
+            {"value": 1000, "text": ""},
+            {"value": 2000, "text": ""},
+            {"value": 3000, "text": ""},
+            {"value": 4000, "text": ""},
+            {"value": 5000, "text": ""},
+            {"value": 6000, "text": ""},
+            {"value": 7000, "text": ""},
+            {"value": 8000, "text": ""},
+            {"value": 9000, "text": ""},
+            {"value": 10000, "text": "10k"}
+          ]
+        },
         "tickFont": "Roboto,Helvetica Neue,Arial,sans-serif",
         "tickFontSize": 18,
         "needleWidth": 5,
