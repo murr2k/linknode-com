@@ -6,7 +6,7 @@ Receives XML POST data from Eagle-200 energy monitor and stores in InfluxDB
 
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import xml.etree.ElementTree as ET
@@ -73,6 +73,14 @@ RATE_WINDOW = 60  # seconds
 IGNORED_DEVICE_MACS = [
     'd8d5b9000000ef68',  # HAN radio - only sends empty message_cluster
 ]
+
+# BC Hydro Tiered Rate Configuration
+# https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates/tiered.html
+TIER1_RATE = float(os.getenv('TIER1_RATE', '0.1172'))  # $/kWh - below threshold
+TIER2_RATE = float(os.getenv('TIER2_RATE', '0.1408'))  # $/kWh - above threshold
+DAILY_THRESHOLD_KWH = float(os.getenv('DAILY_THRESHOLD_KWH', '22.1918'))  # kWh/day for tier boundary
+BILLING_CYCLE_START_DAY = int(os.getenv('BILLING_CYCLE_START_DAY', '1'))  # Day of month billing resets
+BASIC_CHARGE_DAILY = float(os.getenv('BASIC_CHARGE_DAILY', '0.2330'))  # $/day fixed charge
 
 # Statistics
 stats = {
@@ -400,6 +408,70 @@ def eagle_webhook():
         logger.error(f"Error processing request: {e}")
         return jsonify({'error': str(e)}), 500
 
+def get_billing_period_start():
+    """Calculate the start of the current billing period based on BILLING_CYCLE_START_DAY"""
+    now = datetime.now(timezone.utc)
+    # If we're past the billing start day this month, use this month
+    # Otherwise, use the previous month
+    if now.day >= BILLING_CYCLE_START_DAY:
+        billing_start = now.replace(day=BILLING_CYCLE_START_DAY, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        # Go to previous month
+        first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_month = first_of_month - timedelta(days=1)
+        billing_start = last_month.replace(day=BILLING_CYCLE_START_DAY, hour=0, minute=0, second=0, microsecond=0)
+    return billing_start
+
+
+def calculate_tiered_cost(energy_kwh, days_in_period, tier1_rate=None, tier2_rate=None):
+    """
+    Calculate cost using BC Hydro tiered rate structure.
+
+    Args:
+        energy_kwh: Total energy consumed in kWh
+        days_in_period: Number of days in the billing period
+        tier1_rate: Rate for consumption below threshold (default: TIER1_RATE)
+        tier2_rate: Rate for consumption above threshold (default: TIER2_RATE)
+
+    Returns:
+        dict with cost breakdown
+    """
+    tier1 = tier1_rate or TIER1_RATE
+    tier2 = tier2_rate or TIER2_RATE
+
+    # Calculate threshold based on days in period
+    threshold_kwh = days_in_period * DAILY_THRESHOLD_KWH
+
+    # Calculate tiered costs
+    if energy_kwh <= threshold_kwh:
+        tier1_kwh = energy_kwh
+        tier2_kwh = 0
+        tier1_cost = tier1_kwh * tier1
+        tier2_cost = 0
+    else:
+        tier1_kwh = threshold_kwh
+        tier2_kwh = energy_kwh - threshold_kwh
+        tier1_cost = tier1_kwh * tier1
+        tier2_cost = tier2_kwh * tier2
+
+    # Basic charge
+    basic_charge = days_in_period * BASIC_CHARGE_DAILY
+
+    total_cost = tier1_cost + tier2_cost + basic_charge
+
+    return {
+        'threshold_kwh': round(threshold_kwh, 2),
+        'tier1_kwh': round(tier1_kwh, 2),
+        'tier2_kwh': round(tier2_kwh, 2),
+        'tier1_cost': round(tier1_cost, 2),
+        'tier2_cost': round(tier2_cost, 2),
+        'basic_charge': round(basic_charge, 2),
+        'total_cost': round(total_cost, 2),
+        'tier1_rate': tier1,
+        'tier2_rate': tier2
+    }
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -425,7 +497,14 @@ def get_stats():
         'cost_24h': 0,
         'price_per_kwh': 0,
         'last_update': stats.get('last_data_received'),
-        'monitor_stats': stats
+        'monitor_stats': stats,
+        # Billing period info (tiered rates)
+        'billing_period': {
+            'start': None,
+            'days': 0,
+            'energy_kwh': 0,
+            'tiered_cost': None
+        }
     }
     
     # Query InfluxDB for statistics if connected
@@ -472,11 +551,40 @@ def get_stats():
             if price_result and price_result[0].records:
                 result['price_per_kwh'] = price_result[0].records[0].get_value()
 
-            # Calculate cost using avg power * hours * actual rate from utility
+            # Calculate cost using avg power * hours * actual rate from utility (simple estimate)
             if result['avg_24h'] > 0 and result['price_per_kwh'] > 0:
                 kwh = (result['avg_24h'] / 1000) * hours  # Convert W to kW and multiply by hours
                 result['cost_24h'] = round(kwh * result['price_per_kwh'], 2)
-                
+
+            # Calculate billing period with tiered rates
+            billing_start = get_billing_period_start()
+            now = datetime.now(timezone.utc)
+            days_in_period = (now - billing_start).days + 1  # Include today
+
+            result['billing_period']['start'] = billing_start.isoformat()
+            result['billing_period']['days'] = days_in_period
+
+            # Query cumulative energy for billing period using integral
+            billing_energy_query = f'''
+            from(bucket: "{INFLUXDB_BUCKET}")
+                |> range(start: {billing_start.strftime("%Y-%m-%dT%H:%M:%SZ")})
+                |> filter(fn: (r) => r["_measurement"] == "energy_monitor")
+                |> filter(fn: (r) => r["_field"] == "power_w")
+                |> integral(unit: 1h)
+                |> group()
+                |> sum()
+                |> map(fn: (r) => ({{r with _value: r._value / 1000.0}}))
+            '''
+            energy_result = query_api.query(org=INFLUXDB_ORG, query=billing_energy_query)
+            if energy_result and energy_result[0].records:
+                energy_kwh = energy_result[0].records[0].get_value()
+                result['billing_period']['energy_kwh'] = round(energy_kwh, 2)
+
+                # Calculate tiered cost using Eagle-reported Tier 1 rate if available
+                tier1_rate = result['price_per_kwh'] if result['price_per_kwh'] > 0 else TIER1_RATE
+                tiered = calculate_tiered_cost(energy_kwh, days_in_period, tier1_rate=tier1_rate)
+                result['billing_period']['tiered_cost'] = tiered
+
         except Exception as e:
             logger.error(f"Error querying InfluxDB: {e}")
     
