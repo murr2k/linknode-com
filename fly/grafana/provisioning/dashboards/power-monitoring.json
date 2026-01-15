@@ -160,7 +160,7 @@
               {"color": "orange", "value": 100000}
             ]
           },
-          "unit": "kwatth"  
+          "unit": "none"  
         },
         "overrides": []
       },
@@ -185,7 +185,7 @@
           "refId": "A"
         }
       ],
-      "title": "Utility Meter Reading",
+      "title": "Meter Reading (kWh)",
       "type": "stat"
     },
     {
