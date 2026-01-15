@@ -12,6 +12,7 @@ datasources:
       defaultBucket: energy
       tlsSkipVerify: true
       httpMode: POST
+      timeout: 10
     secureJsonData:
       token: ${INFLUXDB_TOKEN}
     editable: false
