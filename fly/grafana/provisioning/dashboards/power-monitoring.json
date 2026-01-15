@@ -155,7 +155,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 12},
       "id": 3,
       "options": {
         "colorMode": "value",
@@ -335,7 +335,7 @@
           "unit": "suffix: W"
         }
       },
-      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 12},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
       "id": 7,
       "options": {
         "colorMode": "value",
