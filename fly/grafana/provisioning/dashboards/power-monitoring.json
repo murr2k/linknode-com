@@ -164,7 +164,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 8},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
       "id": 3,
       "options": {
         "colorMode": "value",
@@ -214,7 +214,7 @@
           "unit": "watt"
         }
       },
-      "gridPos": {"h": 4, "w": 8, "x": 8, "y": 8},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
       "id": 4,
       "options": {
         "colorMode": "value",
@@ -259,7 +259,7 @@
           "unit": "watt"
         }
       },
-      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 8},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
       "id": 5,
       "options": {
         "colorMode": "value",
@@ -281,6 +281,51 @@
         }
       ],
       "title": "Peak Power",
+      "type": "stat"
+    },
+    {
+      "datasource": "InfluxDB",
+      "description": "Total energy consumed over selected time range",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 5000},
+              {"color": "orange", "value": 10000}
+            ]
+          },
+          "unit": "watth"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8},
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.2.0",
+      "targets": [
+        {
+          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> integral(unit: 1h)",
+          "refId": "A"
+        }
+      ],
+      "title": "Energy Consumed",
       "type": "stat"
     }
   ],
