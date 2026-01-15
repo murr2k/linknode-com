@@ -197,7 +197,7 @@
               {"color": "orange", "value": 3000}
             ]
           },
-          "unit": "watt"
+          "unit": "suffix: W"
         }
       },
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
@@ -332,7 +332,7 @@
               {"color": "orange", "value": 1000}
             ]
           },
-          "unit": "watt"
+          "unit": "suffix: W"
         }
       },
       "gridPos": {"h": 4, "w": 4, "x": 0, "y": 12},
