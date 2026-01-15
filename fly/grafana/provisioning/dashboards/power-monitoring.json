@@ -22,84 +22,37 @@
   "panels": [
     {
       "datasource": "InfluxDB",
-      "description": "Current power consumption",
+      "description": "Current power with min/max range for selected period",
       "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "max": 10000,
-          "min": 0,
-          "unit": "watt"
-        }
+        "defaults": {}
       },
       "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
       "id": 1,
       "options": {
-        "minValue": 0,
-        "maxValue": 10000,
-        "animateNeedleValueTransition": true,
-        "animateNeedleValueTransitionSpeed": 500,
-        "gaugeRadius": 0,
-        "edgeWidth": 0.05,
-        "showTicks": true,
-        "tickSpacingMajor": 1000,
-        "tickSpacingMinor": 500,
-        "tickLengthMajor": 0.15,
-        "tickWidthMajor": 2,
-        "tickLengthMinor": 0.08,
-        "tickWidthMinor": 1,
-        "tickMapConfig": {
-          "enabled": true,
-          "tickMaps": [
-            {"value": 0, "text": "0"},
-            {"value": 1000, "text": ""},
-            {"value": 2000, "text": ""},
-            {"value": 3000, "text": ""},
-            {"value": 4000, "text": ""},
-            {"value": 5000, "text": ""},
-            {"value": 6000, "text": ""},
-            {"value": 7000, "text": ""},
-            {"value": 8000, "text": ""},
-            {"value": 9000, "text": ""},
-            {"value": 10000, "text": "10k"}
-          ]
+        "renderer": "canvas",
+        "editor": {
+          "height": 600,
+          "format": "auto"
         },
-        "tickFont": "Roboto,Helvetica Neue,Arial,sans-serif",
-        "tickFontSize": 18,
-        "needleWidth": 5,
-        "needleLengthNeg": 0.2,
-        "needleColor": "#ffffff",
-        "outerEdgeColor": "#0099cc",
-        "innerColor": "#131313",
-        "pivotRadius": 0.1,
-        "pivotColor": "#999999",
-        "unitsLabelColor": "#ffffff",
-        "unitsLabelFont": "Roboto,Helvetica Neue,Arial,sans-serif",
-        "unitsLabelFontSize": 22,
-        "showThresholdColorOnValue": true,
-        "showThresholdOnGauge": true,
-        "thresholds": [
-          {"color": "#73BF69", "value": 0},
-          {"color": "#FADE2A", "value": 3000},
-          {"color": "#F2495C", "value": 5000}
-        ],
-        "zeroTickAngle": 60,
-        "maxTickAngle": 300,
-        "zeroNeedleAngle": 40,
-        "maxNeedleAngle": 320,
-        "valueYOffset": -30,
-        "showMinValue": false,
-        "showMaxValue": false,
-        "operatorName": "last"
+        "getOption": "// Helper to get numeric value from a series\nfunction getValue(series) {\n  if (!series || !series.fields) return null;\n  for (const field of series.fields) {\n    if (field.type === 'number' && field.values && field.values.length > 0) {\n      const val = field.values[field.values.length - 1];\n      if (typeof val === 'number' && !isNaN(val)) return val;\n    }\n  }\n  return null;\n}\n\nlet current = 0, minVal = 0, maxVal = 10000;\nconst series = context.panel.data.series;\n\nif (series.length >= 1) current = getValue(series[0]) || 0;\nif (series.length >= 2) minVal = getValue(series[1]) || 0;\nif (series.length >= 3) maxVal = getValue(series[2]) || 10000;\n\n// Ensure max is greater than min\nif (maxVal <= minVal) maxVal = minVal + 1000;\n\n// Convert to percentages for arc coloring\nconst minPct = minVal / 10000;\nconst maxPct = maxVal / 10000;\n\nreturn {\n  series: [{\n    type: 'gauge',\n    min: 0,\n    max: 10000,\n    splitNumber: 10,\n    radius: '85%',\n    axisLine: {\n      lineStyle: {\n        width: 20,\n        color: [\n          [minPct, '#1a1a2e'],\n          [maxPct, '#00b4d8'],\n          [1, '#1a1a2e']\n        ]\n      }\n    },\n    pointer: {\n      icon: 'triangle',\n      length: '70%',\n      width: 8,\n      itemStyle: { color: '#ffffff' }\n    },\n    anchor: {\n      show: true,\n      showAbove: true,\n      size: 18,\n      itemStyle: { borderWidth: 2, borderColor: '#999' }\n    },\n    axisTick: {\n      distance: -25,\n      length: 8,\n      lineStyle: { color: '#999', width: 1 }\n    },\n    splitLine: {\n      distance: -30,\n      length: 14,\n      lineStyle: { color: '#999', width: 2 }\n    },\n    axisLabel: {\n      color: '#aaa',\n      distance: -40,\n      fontSize: 14,\n      formatter: function(value) {\n        if (value === 0) return '0';\n        if (value === 10000) return '10k';\n        return '';\n      }\n    },\n    detail: {\n      valueAnimation: true,\n      formatter: function(value) {\n        return Math.round(value) + ' W';\n      },\n      color: '#fff',\n      fontSize: 28,\n      offsetCenter: [0, '70%']\n    },\n    data: [{ value: current }]\n  }]\n};"
       },
-      "pluginVersion": "2.0.1",
+      "pluginVersion": "6.4.1",
       "targets": [
         {
           "query": "from(bucket: \"energy\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> last()",
           "refId": "A"
+        },
+        {
+          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> min()",
+          "refId": "B"
+        },
+        {
+          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> max()",
+          "refId": "C"
         }
       ],
       "title": "Current Power Demand",
-      "type": "briangann-gauge-panel"
+      "type": "volkovlabs-echarts-panel"
     },
     {
       "datasource": "InfluxDB",
@@ -289,7 +242,7 @@
               {"color": "red", "value": 5000}
             ]
           },
-          "unit": "watt"
+          "unit": "suffix: W"
         }
       },
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
@@ -354,7 +307,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> integral(unit: 1h)",
+          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> integral(unit: 1h) |> group() |> sum()",
           "refId": "A"
         }
       ],
@@ -489,7 +442,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> last() |> map(fn: (r) => ({r with _value: (r._value / 1000.0) * 0.1172}))",
+          "query": "from(bucket: \"energy\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> last() |> map(fn: (r) => ({r with _value: (r._value / 1000.0) * 0.1172}))",
           "refId": "A"
         }
       ],
@@ -534,7 +487,7 @@
       "pluginVersion": "10.2.0",
       "targets": [
         {
-          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> group() |> integral(unit: 1h) |> map(fn: (r) => ({r with _value: (r._value / 1000.0) * 0.1172}))",
+          "query": "from(bucket: \"energy\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> integral(unit: 1h) |> group() |> sum() |> map(fn: (r) => ({r with _value: (r._value / 1000.0) * 0.1172}))",
           "refId": "A"
         }
       ],

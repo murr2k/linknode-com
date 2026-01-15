@@ -18,9 +18,10 @@ InfluxDB has been successfully deployed with the following configuration:
 
 ## Configuration
 
-- **Initial Bucket**: energy (30-day retention)
+- **Initial Bucket**: energy (5-year retention)
 - **Internal URL**: http://linknode-influxdb.internal:8086
 - **Volume**: 1GB persistent storage mounted at /var/lib/influxdb2
+- **Estimated data rate**: ~210 KB/day (~77 MB/year)
 
 ## Next Steps
 
@@ -44,19 +45,62 @@ InfluxDB has been successfully deployed with the following configuration:
 - `deploy.sh`: Deployment script
 - `verify-influxdb.sh`: Verification script (requires SSH access)
 
+## Admin Operations
+
+InfluxDB is not publicly accessible - admin operations must be performed via SSH from inside the container using the internal API.
+
+### Authentication
+
+First, retrieve the token from the container environment:
+
+```bash
+flyctl ssh console -a linknode-influxdb -C "printenv INFLUXDB_TOKEN"
+```
+
+Then use that token value in subsequent curl commands. The token is also stored as a Fly secret and can be viewed with `flyctl secrets list -a linknode-influxdb`.
+
+### List Buckets
+
+```bash
+TOKEN="<your-token-here>"
+flyctl ssh console -a linknode-influxdb -C "curl -s -H 'Authorization: Token $TOKEN' 'http://localhost:8086/api/v2/buckets?org=linknode'"
+```
+
+### Update Bucket Retention
+
+First get the bucket ID from the list command above, then:
+
+```bash
+# Example: Set retention to 5 years (157680000 seconds)
+TOKEN="<your-token-here>"
+BUCKET_ID="f7a54245a68d857f"
+flyctl ssh console -a linknode-influxdb -C "curl -s -X PATCH -H 'Authorization: Token $TOKEN' -H 'Content-Type: application/json' -d '{\"retentionRules\": [{\"type\": \"expire\", \"everySeconds\": 157680000}]}' 'http://localhost:8086/api/v2/buckets/$BUCKET_ID'"
+```
+
+Current bucket IDs:
+- `energy`: `f7a54245a68d857f`
+- `_monitoring`: `86302d3d2d685d53`
+- `_tasks`: `7ea2f569e9196c5e`
+
+### Check Storage Usage
+
+```bash
+flyctl ssh console -a linknode-influxdb -C "du -sh /var/lib/influxdb2/engine"
+```
+
 ## Troubleshooting
 
 If you need to access InfluxDB directly:
 ```bash
-fly ssh console -a linknode-influxdb
+flyctl ssh console -a linknode-influxdb
 ```
 
 To check logs:
 ```bash
-fly logs -a linknode-influxdb
+flyctl logs -a linknode-influxdb
 ```
 
 To restart the service:
 ```bash
-fly apps restart linknode-influxdb
+flyctl apps restart linknode-influxdb
 ```

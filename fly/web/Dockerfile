@@ -8,6 +8,13 @@ COPY index.html /usr/share/nginx/html/
 COPY robots.txt /usr/share/nginx/html/
 COPY sitemap.xml /usr/share/nginx/html/
 COPY build-info.json /usr/share/nginx/html/
+COPY manifest.json /usr/share/nginx/html/
+COPY favicon.ico /usr/share/nginx/html/
+COPY favicon.png /usr/share/nginx/html/
+COPY icon-192.png /usr/share/nginx/html/
+COPY icon-512.png /usr/share/nginx/html/
+COPY icon-maskable-192.png /usr/share/nginx/html/
+COPY icon-maskable-512.png /usr/share/nginx/html/
 
 # Expose port 80
 EXPOSE 80

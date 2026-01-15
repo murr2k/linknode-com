@@ -66,11 +66,20 @@ rate_limit_lock = Lock()
 RATE_LIMIT = 60  # requests per minute
 RATE_WINDOW = 60  # seconds
 
+# Device MAC filtering
+# The Eagle-200 has two Zigbee radios that report with different MACs.
+# ef68 (HAN radio) only sends empty message_cluster data - filter it out.
+# ef69 (Control radio) sends all useful meter data (power, energy, price).
+IGNORED_DEVICE_MACS = [
+    'd8d5b9000000ef68',  # HAN radio - only sends empty message_cluster
+]
+
 # Statistics
 stats = {
     'total_requests': 0,
     'successful_writes': 0,
     'failed_writes': 0,
+    'filtered_requests': 0,
     'last_data_received': None,
     'last_power_reading': None,
     'start_time': datetime.now(timezone.utc).isoformat()
@@ -331,7 +340,14 @@ def eagle_webhook():
         data = parse_eagle_xml(xml_data)
         if not data:
             return jsonify({'error': 'Failed to parse XML'}), 400
-        
+
+        # Filter out ignored device MACs (e.g., ef68 which only sends empty messages)
+        device_mac = data.get('device_mac', '')
+        if device_mac in IGNORED_DEVICE_MACS:
+            stats['filtered_requests'] += 1
+            logger.debug(f"Filtered message from ignored device: {device_mac}")
+            return jsonify({'status': 'filtered', 'reason': 'ignored_device_mac'}), 200
+
         # Create InfluxDB point
         point = Point("energy_monitor") \
             .tag("device_mac", data['device_mac']) \
