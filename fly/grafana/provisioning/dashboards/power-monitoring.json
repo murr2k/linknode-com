@@ -34,10 +34,13 @@
       "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
       "id": 1,
       "options": {
+        "minValue": 0,
+        "maxValue": 10000,
         "animateNeedleValueTransition": true,
         "animateNeedleValueTransitionSpeed": 500,
         "gaugeRadius": 0,
         "edgeWidth": 0.05,
+        "showTicks": true,
         "tickSpacingMajor": 1000,
         "tickSpacingMinor": 500,
         "tickLengthMajor": 0.15,
