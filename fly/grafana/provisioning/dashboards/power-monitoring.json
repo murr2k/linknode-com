@@ -160,7 +160,7 @@
               {"color": "orange", "value": 100000}
             ]
           },
-          "unit": "none"  
+          "unit": "kwatth"  
         },
         "overrides": []
       },
@@ -168,20 +168,15 @@
       "id": 3,
       "options": {
         "colorMode": "value",
-        "graphMode": "none",
+        "graphMode": "area",
         "justifyMode": "center",
         "orientation": "auto",
-        "text": {
-          "titleSize": 14,
-          "valueSize": 24,
-          "suffix": " kWh"
-        },
         "reduceOptions": {
-          "calcs": ["last"],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
-        "textMode": "value"
+        "textMode": "auto"
       },
       "pluginVersion": "10.2.0",
       "targets": [
@@ -190,7 +185,7 @@
           "refId": "A"
         }
       ],
-      "title": "Utility Meter Reading (kWh)",
+      "title": "Utility Meter Reading",
       "type": "stat"
     },
     {
