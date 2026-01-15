@@ -1,20 +1,176 @@
-# BC Hydro Residential Rate Plan Analysis
+# Home Energy Cost Analysis: Gas & Electric Heating Optimization
 
 > **Analysis Date:** January 15, 2026
 > **Data Sources:**
 > - [Eagle-200 Energy Monitor](https://rainforestautomation.com/rfa-z114-eagle-200-2/) (real-time, January 2026)
 > - BC Hydro Bill #111016322656 (Sep 26 - Nov 26, 2025)
-> - [BC Hydro Residential Rates Documentation](https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates.html)
+> - FortisBC Gas Bill #4421276 (Dec 2, 2025 - Jan 2, 2026)
+> - [BC Hydro Residential Rates](https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates.html)
+> - [FortisBC Natural Gas Rates](https://www.fortisbc.com/gas/gas-rates)
 >
-> **Account:** 1 2094 937 | **Meter:** 5101641 | **Location:** Surrey, BC
+> **Location:** 1344 129a St, Surrey, BC
+> **Electric Account:** 1 2094 937 | **Gas Account:** 4421276
 
 ## Executive Summary
 
-Your electricity usage shows **significant seasonal variation**:
-- **Fall (Sep-Nov):** 22.7 kWh/day - barely exceeds Tier 1 threshold
-- **Winter (January):** 63.0 kWh/day - heavily into Tier 2
+### Key Finding: Gas Heating is 2.5× Cheaper Than Electric
 
-**Recommendation:** **Stay on Tiered Rate** - Your seasonal variation means Tiered and Flat rates are nearly equal annually (~$5 difference). The best savings opportunity is adding **Time-of-Day pricing** if you can shift loads to overnight hours (~$65-115/year savings).
+| Heating Source | Cost per kWh of Heat | Relative Cost |
+|----------------|---------------------|---------------|
+| **Gas Furnace** (92% efficient) | **$0.054/kWh** | 1.0× (baseline) |
+| Electric Space Heater (Tier 1) | $0.117/kWh | 2.2× more expensive |
+| Electric Space Heater (Tier 2) | $0.141/kWh | 2.6× more expensive |
+
+### Recommendations
+
+1. **Turn UP the gas furnace thermostat** - Gas heat is significantly cheaper
+2. **Reduce/eliminate electric space heater use** - Your winter electricity spike (+40 kWh/day) suggests heavy space heater usage costing ~$95/month more than equivalent gas heat
+3. **Stay on BC Hydro Tiered Rate** - Seasonal variation makes it nearly equal to Flat Rate
+4. **Consider Time-of-Day pricing** - Potential ~$65-115/year savings if loads can shift overnight
+
+### Potential Monthly Savings: ~$95/month in Winter
+
+By shifting 40 kWh/day of electric space heater load to gas furnace:
+- Current electric heating cost: ~$162/month
+- Equivalent gas heating cost: ~$67/month
+- **Monthly savings: ~$95**
+
+---
+
+## Gas vs Electric Heating Analysis
+
+### Your Heating System
+
+| Component | Type | Notes |
+|-----------|------|-------|
+| **Primary Heat** | Gas-fired forced air furnace | FortisBC natural gas |
+| **Cooling** | Heat pump (in-line heat exchanger) | Outdoor unit, ducted |
+| **Supplemental** | Electric space heaters | Portable/baseboard |
+
+### FortisBC Gas Rates (Effective January 1, 2026)
+
+```
+Rate Component                              Per GJ
+─────────────────────────────────────────────────────
+Delivery                                    $8.469
+Storage & Transport                         $2.255
+Cost of Gas                                 $2.230
+                                           ────────
+Subtotal                                   $12.954
+
+Additional Charges:
+  Municipal Operating Fee (0.70%)           +$0.091
+  BC Clean Energy Levy (0.40%)              +$0.052
+  GST (5%)                                  +$0.655
+                                           ────────
+TOTAL EFFECTIVE RATE                       $13.75/GJ
+
+Basic Charge: $0.4216/day ($12.65/month)
+```
+
+*Note: Gas rates increased ~11.1% effective January 1, 2026*
+
+### Cost Per kWh of Delivered Heat
+
+```mermaid
+xychart-beta
+    title "Cost per kWh of Heat by Source"
+    x-axis ["Gas Furnace", "Electric Tier 1", "Electric Tier 2"]
+    y-axis "$/kWh" 0 --> 0.15
+    bar [0.054, 0.117, 0.141]
+```
+
+**Calculation:**
+
+| Energy Source | Rate | Efficiency | Cost per kWh Heat |
+|---------------|------|------------|-------------------|
+| Natural Gas | $13.75/GJ | 92% (furnace) | $13.75 ÷ 277.78 ÷ 0.92 = **$0.054** |
+| BC Hydro Tier 1 | $0.1172/kWh | 100% (resistive) | **$0.117** |
+| BC Hydro Tier 2 | $0.1408/kWh | 100% (resistive) | **$0.141** |
+
+**Gas furnace delivers heat at 46% the cost of Tier 1 electric, and 38% the cost of Tier 2.**
+
+### Heat Pump Considerations
+
+Your heat pump's heating efficiency depends on outdoor temperature:
+
+| Outdoor Temp | Heat Pump COP | Electric Cost/kWh Heat | vs Gas |
+|--------------|---------------|------------------------|--------|
+| 10°C (50°F) | ~3.0 | $0.039-$0.047 | Cheaper than gas |
+| 5°C (41°F) | ~2.5 | $0.047-$0.056 | Break-even |
+| 0°C (32°F) | ~2.0 | $0.059-$0.070 | Gas cheaper |
+| -5°C (23°F) | ~1.5 | $0.078-$0.094 | Gas much cheaper |
+
+**Recommendation:** Use heat pump for heating when temps are above 5°C; rely on gas furnace below 5°C.
+
+---
+
+## Winter Electricity Spike Analysis
+
+### Evidence of Electric Space Heater Usage
+
+```mermaid
+xychart-beta
+    title "Daily Electricity Usage: Seasonal Pattern"
+    x-axis ["Fall (Sep-Nov)", "Winter (Jan)"]
+    y-axis "kWh/day" 0 --> 70
+    bar [22.7, 63.0]
+```
+
+| Period | Daily kWh | Baseline | Heating Load | Monthly Cost |
+|--------|-----------|----------|--------------|--------------|
+| **Fall** (Sep-Nov) | 22.7 | 22.7 | ~0 | $89/month |
+| **Winter** (Jan) | 63.0 | 22.7 | **40.3** | $258/month |
+
+**The 40 kWh/day increase (1.68 kW continuous) strongly suggests significant electric space heater usage.**
+
+### What 40 kWh/day of Electric Heating Costs
+
+```
+Monthly Electric Heating Cost (40 kWh/day × 31 days):
+  1,240 kWh × $0.13/kWh (blended rate) = $161/month
+
+If Same Heat Came from Gas Furnace:
+  Heat needed: 1,240 kWh
+  Gas required: 1,240 ÷ 0.92 efficiency = 1,348 kWh = 4.85 GJ
+  Gas cost: 4.85 GJ × $13.75/GJ = $67/month
+
+MONTHLY SAVINGS BY USING GAS: $161 - $67 = $94/month
+```
+
+### Gas Usage Correlation
+
+Your FortisBC history confirms furnace usage tracks temperature:
+
+| Period | Avg Temp | Gas (GJ) | GJ/day | Notes |
+|--------|----------|----------|--------|-------|
+| Jan 2026 | 6°C | 10.2 | 0.32 | Current bill |
+| Feb 2025 | 2°C | 13.8 | 0.43 | Coldest month, highest gas |
+| Aug 2025 | 20°C | 2.4 | 0.08 | Summer baseline (hot water) |
+
+**Summer baseline:** ~2 GJ/month (hot water + cooking)
+**Winter heating:** ~8-12 GJ/month additional
+
+```mermaid
+flowchart LR
+    subgraph Current["Current Winter Heating (Inefficient)"]
+        G1["Gas Furnace<br/>~10 GJ/month<br/>~$137"]
+        E1["Electric Space Heaters<br/>~1,240 kWh/month<br/>~$161"]
+    end
+
+    subgraph Optimized["Optimized Heating (Recommended)"]
+        G2["Gas Furnace<br/>~15 GJ/month<br/>~$204"]
+        E2["Electric Heaters<br/>OFF or minimal"]
+    end
+
+    Current -->|"Save ~$94/month"| Optimized
+```
+
+---
+
+## BC Hydro Rate Plan Analysis
+
+*This section analyzes electricity rate plans independent of the gas/electric heating question.*
 
 ---
 
@@ -485,12 +641,28 @@ The `/api/stats` endpoint now includes billing period calculations that can be e
 8. **[EAGLE-200 Local API Manual](https://rainforestautomation.com/wp-content/uploads/2017/02/EAGLE-200-Local-API-Manual-v1.0.pdf)**
    Technical documentation for the Eagle-200 XML data format and dual Zigbee radio architecture.
 
+### FortisBC Natural Gas Documentation
+
+9. **[FortisBC Natural Gas Rates](https://www.fortisbc.com/gas/gas-rates)**
+   Current natural gas rate schedules for residential customers.
+
+10. **[FortisBC Account Online](https://accounts.fortisbc.com/)**
+    Online portal for viewing usage history and bill details.
+
+11. **[FortisBC Energy Saving Tips](https://www.fortisbc.com/energy-savings/energy-saving-tips)**
+    Recommendations for reducing natural gas consumption.
+
+12. **[FortisBC Rate Changes (Jan 2026)](https://www.fortisbc.com/gas/rates)**
+    Details on the 11.1% rate increase effective January 1, 2026.
+
 ### Data Sources for This Analysis
 
 | Source | Data Used |
 |--------|-----------|
 | Eagle-200 Monitor | Real-time power (January 2026): 63 kWh/day average |
 | BC Hydro Bill #111016322656 | Fall usage (Sep-Nov 2025): 22.7 kWh/day, $184.79 total |
+| FortisBC Bill #4421276 | Gas usage (Dec 2025-Jan 2026): 10.2 GJ, $139.14 total |
+| FortisBC Usage History | 24-month gas consumption vs temperature correlation |
 | InfluxDB (`energy` bucket) | Historical power_w, energy_kwh, price_per_kwh |
 
 ### Real-Time Monitoring API
@@ -521,4 +693,4 @@ Your installation provides live data at:
 ---
 
 *Document generated: January 15, 2026*
-*Analysis by: Murray Kopit using Eagle-200 monitor data and BC Hydro rate schedules*
+*Analysis by: Murray Kopit using Eagle-200 monitor data, BC Hydro rates, and FortisBC gas rates*
