@@ -5,6 +5,7 @@ primary_region = "ord"
   dockerfile = "Dockerfile"
 
 [env]
+  GF_INSTALL_PLUGINS = "briangann-gauge-panel"
   GF_SERVER_HTTP_ADDR = "0.0.0.0"
   GF_SECURITY_ALLOW_EMBEDDING = "true"
   GF_AUTH_ANONYMOUS_ENABLED = "true"
