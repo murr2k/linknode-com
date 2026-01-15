@@ -967,26 +967,14 @@
                             <!-- Background arc -->
                             <path class="gauge-bg" d="M 30 140 A 110 110 0 0 1 250 140" />
 
-                            <!-- Colored zones: Green (0-1000W), Yellow (1000-2500W), Red (2500-5000W) -->
-                            <!-- Green zone: 0-20% of arc -->
-                            <path class="gauge-zone gauge-zone-green"
-                                  d="M 30 140 A 110 110 0 0 1 58 68"
-                                  stroke-dasharray="100" stroke-dashoffset="0" />
-                            <!-- Yellow zone: 20-50% of arc -->
-                            <path class="gauge-zone gauge-zone-yellow"
-                                  d="M 58 68 A 110 110 0 0 1 168 32"
-                                  stroke-dasharray="150" stroke-dashoffset="0" />
-                            <!-- Red zone: 50-100% of arc -->
-                            <path class="gauge-zone gauge-zone-red"
-                                  d="M 168 32 A 110 110 0 0 1 250 140"
-                                  stroke-dasharray="175" stroke-dashoffset="0" />
+                            <!-- Dynamic colored zones (updated via JavaScript) -->
+                            <path class="gauge-zone gauge-zone-green" id="gauge-zone-green" d="" />
+                            <path class="gauge-zone gauge-zone-yellow" id="gauge-zone-yellow" d="" />
+                            <path class="gauge-zone gauge-zone-red" id="gauge-zone-red" d="" />
 
-                            <!-- Scale labels -->
-                            <text class="gauge-label" x="25" y="160">0</text>
-                            <text class="gauge-label" x="55" y="70">1k</text>
-                            <text class="gauge-label" x="140" y="28">2.5k</text>
-                            <text class="gauge-label" x="225" y="70">4k</text>
-                            <text class="gauge-label" x="255" y="160">5k</text>
+                            <!-- Scale labels: 0 and 10k only -->
+                            <text class="gauge-label" x="20" y="158">0</text>
+                            <text class="gauge-label" x="248" y="158">10k</text>
 
                             <!-- Needle -->
                             <polygon class="gauge-needle" id="gauge-needle" points="140,50 135,140 140,145 145,140" />
@@ -1262,16 +1250,56 @@
             });
         });
 
-        // Gauge helper function - converts power (0-5000W) to needle rotation angle (-90 to 90 degrees)
+        // Gauge constants
+        const GAUGE_MAX_POWER = 10000;
+        const GAUGE_CENTER_X = 140;
+        const GAUGE_CENTER_Y = 140;
+        const GAUGE_RADIUS = 110;
+
+        // Gauge helper function - converts power (0-10000W) to needle rotation angle (-90 to 90 degrees)
         function powerToAngle(power) {
-            const maxPower = 5000;
-            const clampedPower = Math.min(Math.max(power, 0), maxPower);
-            // Map 0-5000W to -90 to 90 degrees
-            return (clampedPower / maxPower) * 180 - 90;
+            const clampedPower = Math.min(Math.max(power, 0), GAUGE_MAX_POWER);
+            return (clampedPower / GAUGE_MAX_POWER) * 180 - 90;
+        }
+
+        // Convert angle (in degrees, where -90 is left, 90 is right) to SVG arc coordinates
+        function angleToPoint(angleDeg) {
+            const angleRad = (angleDeg - 90) * Math.PI / 180; // Adjust so -90deg is at left
+            return {
+                x: GAUGE_CENTER_X + GAUGE_RADIUS * Math.cos(angleRad),
+                y: GAUGE_CENTER_Y + GAUGE_RADIUS * Math.sin(angleRad)
+            };
+        }
+
+        // Create SVG arc path from startAngle to endAngle (in degrees, -90 to 90)
+        function createArcPath(startAngle, endAngle) {
+            const start = angleToPoint(startAngle);
+            const end = angleToPoint(endAngle);
+            const largeArc = (endAngle - startAngle) > 180 ? 1 : 0;
+            return `M ${start.x} ${start.y} A ${GAUGE_RADIUS} ${GAUGE_RADIUS} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+        }
+
+        // Update gauge zones based on min/max power values
+        function updateGaugeZones(minPower, maxPower) {
+            // Convert power values to angles
+            const minAngle = powerToAngle(minPower);
+            const maxAngle = powerToAngle(maxPower);
+
+            // Green zone: 0 to minPower
+            const greenPath = createArcPath(-90, minAngle);
+            document.getElementById('gauge-zone-green').setAttribute('d', greenPath);
+
+            // Yellow zone: minPower to maxPower
+            const yellowPath = createArcPath(minAngle, maxAngle);
+            document.getElementById('gauge-zone-yellow').setAttribute('d', yellowPath);
+
+            // Red zone: maxPower to 10k
+            const redPath = createArcPath(maxAngle, 90);
+            document.getElementById('gauge-zone-red').setAttribute('d', redPath);
         }
 
         // Update gauge display
-        function updateGauge(power, isStale) {
+        function updateGauge(power, isStale, minPower, maxPower) {
             const needle = document.getElementById('gauge-needle');
             const valueText = document.getElementById('gauge-value');
             const liveDot = document.getElementById('gauge-live-dot');
@@ -1286,18 +1314,23 @@
                 liveDot.classList.add('stale');
                 liveText.classList.add('stale');
                 liveText.textContent = 'Stale';
+                // Set default zones when stale
+                updateGaugeZones(1000, 3000);
             } else {
+                // Update zones based on actual min/max
+                updateGaugeZones(minPower || 500, maxPower || 3000);
+
                 // Active state
                 const angle = powerToAngle(power);
                 needle.style.transform = `rotate(${angle}deg)`;
 
-                // Color needle based on power level
-                if (power < 1000) {
-                    needle.style.fill = '#22c55e';
-                } else if (power < 2500) {
-                    needle.style.fill = '#eab308';
+                // Color needle based on where it falls in the zones
+                if (power < minPower) {
+                    needle.style.fill = '#22c55e'; // Green - below typical min
+                } else if (power < maxPower) {
+                    needle.style.fill = '#eab308'; // Yellow - in typical range
                 } else {
-                    needle.style.fill = '#ef4444';
+                    needle.style.fill = '#ef4444'; // Red - above typical max
                 }
 
                 valueText.textContent = Math.round(power);
@@ -1330,7 +1363,7 @@
 
                     if (isStale) {
                         // Data is stale - update gauge to stale state
-                        updateGauge(0, true);
+                        updateGauge(0, true, 0, 0);
 
                         // Show how old the data is
                         const ageMinutes = Math.floor(ageInSeconds / 60);
@@ -1347,9 +1380,11 @@
                         document.getElementById('power-avg').textContent = '--';
                         document.getElementById('power-cost').textContent = '--';
                     } else {
-                        // Data is fresh - update gauge
+                        // Data is fresh - update gauge with dynamic zones based on 24h min/max
                         const currentPower = data.current_power || 0;
-                        updateGauge(currentPower, false);
+                        const minPower = data.min_24h || 500;
+                        const maxPower = data.max_24h || 3000;
+                        updateGauge(currentPower, false, minPower, maxPower);
 
                         // Update 24h stats
                         document.getElementById('power-min').textContent = Math.round(data.min_24h || 0) + 'W';
@@ -1377,7 +1412,7 @@
                 }
             } catch (error) {
                 console.error('Error fetching power data:', error);
-                updateGauge(0, true);
+                updateGauge(0, true, 0, 0);
                 document.getElementById('gauge-live-text').textContent = 'Error';
             } finally {
                 indicator.classList.remove('updating');
