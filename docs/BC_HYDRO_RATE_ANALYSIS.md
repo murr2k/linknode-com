@@ -2,9 +2,11 @@
 
 > **Analysis Date:** January 15, 2026
 > **Data Sources:**
-> - Eagle-200 Energy Monitor (real-time, January 2026)
+> - [Eagle-200 Energy Monitor](https://rainforestautomation.com/rfa-z114-eagle-200-2/) (real-time, January 2026)
 > - BC Hydro Bill #111016322656 (Sep 26 - Nov 26, 2025)
-> **Account:** 1 2094 937 | **Meter:** 5101641
+> - [BC Hydro Residential Rates Documentation](https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates.html)
+>
+> **Account:** 1 2094 937 | **Meter:** 5101641 | **Location:** Surrey, BC
 
 ## Executive Summary
 
@@ -12,7 +14,7 @@ Your electricity usage shows **significant seasonal variation**:
 - **Fall (Sep-Nov):** 22.7 kWh/day - barely exceeds Tier 1 threshold
 - **Winter (January):** 63.0 kWh/day - heavily into Tier 2
 
-**Recommendation:** The **Flat Rate plan would save you $50-100/year**, primarily during winter months when you consume well above the threshold. However, the savings are less dramatic than initially estimated due to your moderate fall/spring usage.
+**Recommendation:** **Stay on Tiered Rate** - Your seasonal variation means Tiered and Flat rates are nearly equal annually (~$5 difference). The best savings opportunity is adding **Time-of-Day pricing** if you can shift loads to overnight hours (~$65-115/year savings).
 
 ---
 
@@ -451,4 +453,72 @@ The `/api/stats` endpoint now includes billing period calculations that can be e
 | Flat Rate | RS 1151 | Current |
 | Time-of-Day | Add-on to RS 1101/1151 | Current |
 
-*Rates sourced from [BC Hydro Electric Tariff](https://www.bchydro.com/about/planning_regulatory/tariff.html)*
+---
+
+## References
+
+### BC Hydro Rate Documentation
+
+1. **[Residential Rates Overview](https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates.html)**
+   Main page explaining all residential rate options available to BC Hydro customers.
+
+2. **[Tiered Conservation Rate (RS 1101)](https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates/tiered-conservation.html)**
+   Default residential rate with two-tier pricing structure. Tier 1 threshold is 22.1918 kWh/day (~675 kWh/month).
+
+3. **[Flat Rate (RS 1151)](https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates/equal-flat.html)**
+   Alternative rate for high-usage households. Single flat rate for all consumption.
+
+4. **[Time-of-Day Pricing](https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates/time-of-use.html)**
+   Optional add-on providing ±$0.05/kWh rate adjustments based on time periods.
+
+5. **[Electric Tariff Schedule](https://www.bchydro.com/about/planning_regulatory/tariff.html)**
+   Official tariff documentation with full rate schedules and terms.
+
+6. **[Rate Calculator](https://app.bchydro.com/accounts-billing/rates-energy-use/compare-your-rate.html)**
+   BC Hydro's online tool to compare rate plans based on your usage.
+
+### Hardware Documentation
+
+7. **[Rainforest EAGLE-200 Energy Monitor](https://rainforestautomation.com/rfa-z114-eagle-200-2/)**
+   Real-time energy monitoring device used for data collection.
+
+8. **[EAGLE-200 Local API Manual](https://rainforestautomation.com/wp-content/uploads/2017/02/EAGLE-200-Local-API-Manual-v1.0.pdf)**
+   Technical documentation for the Eagle-200 XML data format and dual Zigbee radio architecture.
+
+### Data Sources for This Analysis
+
+| Source | Data Used |
+|--------|-----------|
+| Eagle-200 Monitor | Real-time power (January 2026): 63 kWh/day average |
+| BC Hydro Bill #111016322656 | Fall usage (Sep-Nov 2025): 22.7 kWh/day, $184.79 total |
+| InfluxDB (`energy` bucket) | Historical power_w, energy_kwh, price_per_kwh |
+
+### Real-Time Monitoring API
+
+Your installation provides live data at:
+
+- **Dashboard**: [linknode.com](https://linknode.com) - Real-time power consumption display
+- **Grafana**: [linknode.com/grafana](https://linknode.com/grafana) - Detailed analytics
+- **API Endpoint**: `https://linknode.com/api/stats` - JSON response with:
+  ```json
+  {
+    "current_power_watts": 1039,
+    "billing_period": {
+      "start": "2025-12-26T00:00:00Z",
+      "days_elapsed": 20,
+      "energy_kwh": 1261.2,
+      "tiered_cost": {
+        "tier1_kwh": 443.84,
+        "tier2_kwh": 817.36,
+        "basic_charge": 4.66,
+        "energy_cost": 167.00,
+        "total": 171.66
+      }
+    }
+  }
+  ```
+
+---
+
+*Document generated: January 15, 2026*
+*Analysis by: Murray Kopit using Eagle-200 monitor data and BC Hydro rate schedules*
