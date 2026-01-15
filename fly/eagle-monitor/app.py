@@ -423,6 +423,7 @@ def get_stats():
         'max_24h': 0,
         'avg_24h': 0,
         'cost_24h': 0,
+        'price_per_kwh': 0,
         'last_update': stats.get('last_data_received'),
         'monitor_stats': stats
     }
@@ -457,11 +458,24 @@ def get_stats():
             avg_result = query_api.query(org=INFLUXDB_ORG, query=avg_query)
             if avg_result and avg_result[0].records:
                 result['avg_24h'] = avg_result[0].records[0].get_value()
-            
-            # Calculate cost using avg power * hours (rate matches Grafana dashboard)
-            if result['avg_24h'] > 0:
+
+            # Get current electricity rate from InfluxDB (reported by Eagle from utility)
+            price_query = f'''
+            from(bucket: "{INFLUXDB_BUCKET}")
+                |> range(start: -{hours}h)
+                |> filter(fn: (r) => r["_measurement"] == "energy_monitor")
+                |> filter(fn: (r) => r["_field"] == "price_per_kwh")
+                |> group()
+                |> last()
+            '''
+            price_result = query_api.query(org=INFLUXDB_ORG, query=price_query)
+            if price_result and price_result[0].records:
+                result['price_per_kwh'] = price_result[0].records[0].get_value()
+
+            # Calculate cost using avg power * hours * actual rate from utility
+            if result['avg_24h'] > 0 and result['price_per_kwh'] > 0:
                 kwh = (result['avg_24h'] / 1000) * hours  # Convert W to kW and multiply by hours
-                result['cost_24h'] = round(kwh * 0.1172, 2)  # $0.1172 per kWh
+                result['cost_24h'] = round(kwh * result['price_per_kwh'], 2)
                 
         except Exception as e:
             logger.error(f"Error querying InfluxDB: {e}")
