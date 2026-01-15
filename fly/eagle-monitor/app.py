@@ -440,28 +440,28 @@ def get_stats():
                 |> filter(fn: (r) => r["_field"] == "power_w")
             '''
             
-            # Get min
-            min_query = query + '|> min()'
+            # Get min (group() aggregates across all device_mac series)
+            min_query = query + '|> group() |> min()'
             min_result = query_api.query(org=INFLUXDB_ORG, query=min_query)
             if min_result and min_result[0].records:
                 result['min_24h'] = min_result[0].records[0].get_value()
-            
+
             # Get max
-            max_query = query + '|> max()'
+            max_query = query + '|> group() |> max()'
             max_result = query_api.query(org=INFLUXDB_ORG, query=max_query)
             if max_result and max_result[0].records:
                 result['max_24h'] = max_result[0].records[0].get_value()
-            
+
             # Get mean
-            avg_query = query + '|> mean()'
+            avg_query = query + '|> group() |> mean()'
             avg_result = query_api.query(org=INFLUXDB_ORG, query=avg_query)
             if avg_result and avg_result[0].records:
                 result['avg_24h'] = avg_result[0].records[0].get_value()
             
-            # Calculate cost (assuming $0.12 per kWh)
+            # Calculate cost using avg power * hours (rate matches Grafana dashboard)
             if result['avg_24h'] > 0:
                 kwh = (result['avg_24h'] / 1000) * hours  # Convert W to kW and multiply by hours
-                result['cost_24h'] = round(kwh * 0.12, 2)  # $0.12 per kWh
+                result['cost_24h'] = round(kwh * 0.1172, 2)  # $0.1172 per kWh
                 
         except Exception as e:
             logger.error(f"Error querying InfluxDB: {e}")
