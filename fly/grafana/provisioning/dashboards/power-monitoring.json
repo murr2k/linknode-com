@@ -25,35 +25,55 @@
       "description": "Current power consumption",
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
           "decimals": 0,
-          "mappings": [],
           "max": 10000,
           "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 3000},
-              {"color": "red", "value": 5000}
-            ]
-          },
           "unit": "watt"
         }
       },
       "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
       "id": 1,
       "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": true,
-        "showThresholdMarkers": true
+        "animateNeedleValueTransition": true,
+        "animateNeedleValueTransitionSpeed": 500,
+        "gaugeRadius": 0,
+        "edgeWidth": 0.05,
+        "tickSpacingMajor": 1000,
+        "tickSpacingMinor": 500,
+        "tickLengthMajor": 0.15,
+        "tickWidthMajor": 2,
+        "tickLengthMinor": 0.08,
+        "tickWidthMinor": 1,
+        "tickMapConfig": {"enabled": false, "tickMaps": []},
+        "tickFont": "Roboto,Helvetica Neue,Arial,sans-serif",
+        "tickFontSize": 18,
+        "needleWidth": 5,
+        "needleLengthNeg": 0.2,
+        "needleColor": "#ffffff",
+        "outerEdgeColor": "#0099cc",
+        "innerColor": "#131313",
+        "pivotRadius": 0.1,
+        "pivotColor": "#999999",
+        "unitsLabelColor": "#ffffff",
+        "unitsLabelFont": "Roboto,Helvetica Neue,Arial,sans-serif",
+        "unitsLabelFontSize": 22,
+        "showThresholdColorOnValue": true,
+        "showThresholdOnGauge": true,
+        "thresholds": [
+          {"color": "#73BF69", "value": 0},
+          {"color": "#FADE2A", "value": 3000},
+          {"color": "#F2495C", "value": 5000}
+        ],
+        "zeroTickAngle": 60,
+        "maxTickAngle": 300,
+        "zeroNeedleAngle": 40,
+        "maxNeedleAngle": 320,
+        "valueYOffset": -30,
+        "showMinValue": false,
+        "showMaxValue": false,
+        "operatorName": "last"
       },
-      "pluginVersion": "10.2.0",
+      "pluginVersion": "2.0.1",
       "targets": [
         {
           "query": "from(bucket: \"energy\") |> range(start: -5m) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"power_w\") |> last()",
@@ -61,7 +81,7 @@
         }
       ],
       "title": "Current Power Demand",
-      "type": "gauge"
+      "type": "briangann-gauge-panel"
     },
     {
       "datasource": "InfluxDB",
