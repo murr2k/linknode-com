@@ -502,53 +502,6 @@
       ],
       "title": "Estimated Cost",
       "type": "stat"
-    },
-    {
-      "datasource": "InfluxDB",
-      "description": "Zigbee network signal strength to meter",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "mappings": [
-            {"options": {"": {"color": "text", "index": 0, "text": "N/A"}}, "type": "value"}
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "red", "value": null},
-              {"color": "yellow", "value": 50},
-              {"color": "green", "value": 80}
-            ]
-          },
-          "unit": "percent"
-        }
-      },
-      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 12},
-      "id": 11,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.2.0",
-      "targets": [
-        {
-          "query": "from(bucket: \"energy\") |> range(start: -24h) |> filter(fn: (r) => r._measurement == \"energy_monitor\") |> filter(fn: (r) => r._field == \"link_strength\") |> last()",
-          "refId": "A"
-        }
-      ],
-      "title": "Link Strength",
-      "type": "stat"
     }
   ],
   "style": "dark",
