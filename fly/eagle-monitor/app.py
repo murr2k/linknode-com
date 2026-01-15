@@ -79,7 +79,7 @@ IGNORED_DEVICE_MACS = [
 TIER1_RATE = float(os.getenv('TIER1_RATE', '0.1172'))  # $/kWh - below threshold
 TIER2_RATE = float(os.getenv('TIER2_RATE', '0.1408'))  # $/kWh - above threshold
 DAILY_THRESHOLD_KWH = float(os.getenv('DAILY_THRESHOLD_KWH', '22.1918'))  # kWh/day for tier boundary
-BILLING_CYCLE_START_DAY = int(os.getenv('BILLING_CYCLE_START_DAY', '1'))  # Day of month billing resets
+BILLING_CYCLE_START_DAY = int(os.getenv('BILLING_CYCLE_START_DAY', '26'))  # Day of month billing resets (BC Hydro)
 BASIC_CHARGE_DAILY = float(os.getenv('BASIC_CHARGE_DAILY', '0.2330'))  # $/day fixed charge
 
 # Statistics
