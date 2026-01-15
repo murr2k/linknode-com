@@ -967,10 +967,8 @@
                             <!-- Background arc -->
                             <path class="gauge-bg" d="M 30 140 A 110 110 0 0 1 250 140" />
 
-                            <!-- Dynamic colored zones (updated via JavaScript) -->
-                            <path class="gauge-zone gauge-zone-green" id="gauge-zone-green" d="" />
+                            <!-- Yellow zone only: shows typical range (24h min to 24h max) -->
                             <path class="gauge-zone gauge-zone-yellow" id="gauge-zone-yellow" d="" />
-                            <path class="gauge-zone gauge-zone-red" id="gauge-zone-red" d="" />
 
                             <!-- Scale labels: 0 and 10k only -->
                             <text class="gauge-label" x="20" y="158">0</text>
@@ -1279,23 +1277,15 @@
             return `M ${start.x} ${start.y} A ${GAUGE_RADIUS} ${GAUGE_RADIUS} 0 ${largeArc} 1 ${end.x} ${end.y}`;
         }
 
-        // Update gauge zones based on min/max power values
+        // Update gauge zone based on min/max power values (yellow zone only)
         function updateGaugeZones(minPower, maxPower) {
             // Convert power values to angles
             const minAngle = powerToAngle(minPower);
             const maxAngle = powerToAngle(maxPower);
 
-            // Green zone: 0 to minPower
-            const greenPath = createArcPath(-90, minAngle);
-            document.getElementById('gauge-zone-green').setAttribute('d', greenPath);
-
-            // Yellow zone: minPower to maxPower
+            // Yellow zone: minPower to maxPower (typical range)
             const yellowPath = createArcPath(minAngle, maxAngle);
             document.getElementById('gauge-zone-yellow').setAttribute('d', yellowPath);
-
-            // Red zone: maxPower to 10k
-            const redPath = createArcPath(maxAngle, 90);
-            document.getElementById('gauge-zone-red').setAttribute('d', redPath);
         }
 
         // Update gauge display
