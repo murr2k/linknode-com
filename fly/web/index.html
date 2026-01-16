@@ -904,55 +904,6 @@
             border-bottom: none;
         }
 
-        .tech-category {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 1rem 0;
-        }
-
-        .tech-category h4 {
-            color: #667eea;
-            margin-bottom: 1rem;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .tech-category-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 0.5rem;
-        }
-
-        .tech-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem;
-            color: #ccc;
-            font-size: 0.9rem;
-        }
-
-        .tech-item strong {
-            color: #fff;
-        }
-
-        .tech-item::before {
-            content: '›';
-            color: #667eea;
-            font-weight: bold;
-        }
-
-        .stack-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-
         .intent-quote {
             text-align: center;
             font-style: italic;
@@ -961,6 +912,69 @@
             padding: 1rem;
             border-left: 3px solid #667eea;
             background: rgba(102, 126, 234, 0.05);
+        }
+
+        .tech-stack-list {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .tech-stack-list h3 {
+            color: #22c55e;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .metrics-list {
+            margin: 1.5rem 0;
+        }
+
+        .metrics-list-item {
+            color: #ccc;
+            padding: 0.4rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .metrics-list-item::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #22c55e;
+        }
+
+        .metrics-list-item strong {
+            color: #22c55e;
+        }
+
+        .tech-line {
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tech-line:last-child {
+            border-bottom: none;
+        }
+
+        .tech-line-header {
+            color: #fff;
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+
+        .tech-line-item {
+            color: #ccc;
+            padding: 0.4rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .tech-line-item::before {
+            content: '›';
+            position: absolute;
+            left: 0;
+            color: #22c55e;
         }
 
         /* Responsive */
@@ -974,8 +988,6 @@
             .live-metrics-grid { grid-template-columns: 1fr; }
             .api-status-grid { grid-template-columns: 1fr; }
             .zero-dep-grid { grid-template-columns: 1fr; }
-            .stack-grid { grid-template-columns: 1fr; }
-            .tech-category-grid { grid-template-columns: 1fr; }
             .tech-stack-section h2 { font-size: 1.75rem; }
         }
     </style>
@@ -1226,7 +1238,199 @@
                 </div>
             </div>
         </section>
-        
+
+        <!-- Technology Stack Section -->
+        <section class="tech-stack-section">
+            <h2>Technology Stack</h2>
+
+            <!-- Zero-Dependency Frontend Highlight -->
+            <div class="tech-highlight-box">
+                <h3>Zero-Dependency Frontend</h3>
+                <p style="color: #ccc; margin-bottom: 1rem;">There is no framework. The frontend is <strong style="color: #22c55e;">100% vanilla</strong>.</p>
+
+                <div class="zero-dep-grid">
+                    <div class="zero-dep-column">
+                        <h4>No Frameworks</h4>
+                        <ul>
+                            <li>No React, Vue, Angular, or Svelte</li>
+                            <li>No component library (Material UI, Chakra, Ant Design)</li>
+                            <li>No CSS framework (Tailwind, Bootstrap)</li>
+                            <li>No build step (Webpack, Vite, esbuild)</li>
+                            <li>No npm dependencies for the frontend</li>
+                        </ul>
+                    </div>
+                    <div class="zero-dep-column positive">
+                        <h4>Everything Hand-Coded</h4>
+                        <ul>
+                            <li>Pure CSS in a single &lt;style&gt; tag (~900 lines)</li>
+                            <li>Vanilla ES6+ JavaScript with fetch() API</li>
+                            <li>Hand-coded SVG gauge with trigonometric arc calculations</li>
+                            <li>CSS Grid + Flexbox for responsive layout</li>
+                            <li>CSS Keyframe animations (no animation libraries)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metrics-list">
+                    <div class="metrics-list-item">Frontend dependencies - <strong>0</strong></div>
+                    <div class="metrics-list-item">Build time - <strong>0ms</strong> (no build step)</div>
+                    <div class="metrics-list-item">Bundle size - <strong>~50KB</strong> (just HTML/CSS/JS)</div>
+                    <div class="metrics-list-item">Time to Interactive - <strong>&lt; 1 second</strong></div>
+                    <div class="metrics-list-item">Lighthouse Performance - <strong>95+</strong></div>
+                </div>
+
+                <p class="intent-quote">This demonstrates that modern, polished UIs don't require heavy frameworks. The animated gradient background, floating particles, glassmorphism cards, and real-time gauge are all pure CSS/JS.</p>
+
+                <!-- Comprehensive Technology Stack -->
+                <div class="tech-stack-list">
+                    <h3>Comprehensive Technology Stack</h3>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Languages &amp; Markup</div>
+                        <div class="tech-line-item">Python 3.11 - Backend services and data processing</div>
+                        <div class="tech-line-item">JavaScript (ES6+) - Vanilla JS, no frameworks - lightweight and fast</div>
+                        <div class="tech-line-item">HTML5 - Semantic markup with Schema.org structured data</div>
+                        <div class="tech-line-item">CSS3 - Modern styling with Grid, Flexbox, animations</div>
+                        <div class="tech-line-item">Flux - InfluxDB time-series query language</div>
+                        <div class="tech-line-item">XML - Eagle-200 smart meter data format</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Frontend Graphics &amp; Visualization</div>
+                        <div class="tech-line-item">Custom SVG Gauge - Hand-coded with trigonometric arc path calculations</div>
+                        <div class="tech-line-item">CSS3 Animations - Keyframe animations (gradient, float, pulse, fadeIn)</div>
+                        <div class="tech-line-item">CSS3 Transforms - translateY, scale, rotate with GPU acceleration</div>
+                        <div class="tech-line-item">CSS3 Filters - drop-shadow, blur, backdrop-filter for glass effects</div>
+                        <div class="tech-line-item">Linear Gradients - Background animations and text gradients</div>
+                        <div class="tech-line-item">Grafana 11.4.0 - Embedded dashboards via iframe</div>
+                        <div class="tech-line-item">Grafana Plugins - briangann-gauge-panel, volkovlabs-echarts-panel</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Backend Services</div>
+                        <div class="tech-line-item">Flask 3.0.0 - Lightweight Python web framework</div>
+                        <div class="tech-line-item">Flask-CORS - Cross-origin resource sharing</div>
+                        <div class="tech-line-item">Werkzeug 3.0.1 - WSGI toolkit</div>
+                        <div class="tech-line-item">influxdb-client - Time-series database integration</div>
+                        <div class="tech-line-item">Nginx Alpine - High-performance reverse proxy with rate limiting</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Databases &amp; Storage</div>
+                        <div class="tech-line-item">InfluxDB 2.7 - Purpose-built time-series database</div>
+                        <div class="tech-line-item">Flux Queries - Functional data scripting language</div>
+                        <div class="tech-line-item">5-Year Retention - 43,800 hours of historical data</div>
+                        <div class="tech-line-item">Persistent Volumes - Durable storage on Fly.io</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Infrastructure &amp; Deployment</div>
+                        <div class="tech-line-item">Fly.io - Global edge computing platform</div>
+                        <div class="tech-line-item">Docker - Containerized microservices (Alpine-based for minimal footprint)</div>
+                        <div class="tech-line-item">Private Mesh Network - Secure internal service communication (*.internal)</div>
+                        <div class="tech-line-item">Auto-scaling - Automatic instance management with health checks</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">CI/CD Pipeline</div>
+                        <div class="tech-line-item">GitHub Actions - Automated workflows</div>
+                        <div class="tech-line-item">Change Detection - Smart deployments via dorny/paths-filter</div>
+                        <div class="tech-line-item">Auto-Rollback - Version capture and recovery on failure</div>
+                        <div class="tech-line-item">Slack Integration - Native GitHub notifications</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Testing &amp; Quality</div>
+                        <div class="tech-line-item">Playwright - E2E browser automation</div>
+                        <div class="tech-line-item">axe-core - WCAG accessibility auditing</div>
+                        <div class="tech-line-item">TypeScript - Type-safe test scripts</div>
+                        <div class="tech-line-item">Visual Regression - Screenshot comparison testing</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Security Stack</div>
+                        <div class="tech-line-item">Semgrep - OWASP Top 10 + Flask/Python/JS scanning</div>
+                        <div class="tech-line-item">Trivy - Docker image vulnerability scanning</div>
+                        <div class="tech-line-item">Gitleaks - Secrets detection in code</div>
+                        <div class="tech-line-item">Rate Limiting - Nginx zones (30r/s general, 10r/s API, 5r/s sensitive)</div>
+                        <div class="tech-line-item">CSP Headers - Content Security Policy with specific directives</div>
+                        <div class="tech-line-item">HSTS - HTTP Strict Transport Security</div>
+                        <div class="tech-line-item">CORS Whitelist - Origin-specific cross-origin policies</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">IoT Integration</div>
+                        <div class="tech-line-item">Eagle-200 - Rainforest smart meter bridge</div>
+                        <div class="tech-line-item">Zigbee SEP - Smart Energy Profile protocol</div>
+                        <div class="tech-line-item">BC Hydro Rates - Tiered pricing calculations</div>
+                        <div class="tech-line-item">~9 Second Updates - Near real-time power monitoring</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Progressive Web App</div>
+                        <div class="tech-line-item">Web App Manifest - Installable on mobile/desktop</div>
+                        <div class="tech-line-item">Responsive Icons - 192px, 512px, maskable variants</div>
+                        <div class="tech-line-item">Theme Color - Native app feel</div>
+                    </div>
+                </div>
+
+                <!-- Project Economics -->
+                <div class="tech-stack-list">
+                    <h3>Project Economics</h3>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Monthly Infrastructure Cost - ~$15/month</div>
+                        <div class="tech-line-item">Fly.io Hosting - 5 VMs (shared CPU, 256-512MB RAM)</div>
+                        <div class="tech-line-item">Persistent Storage - 2GB for InfluxDB and Grafana data</div>
+                        <div class="tech-line-item">Domain - ~$1/month (amortized annual cost)</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Frontend Stack - $0</div>
+                        <div class="tech-line-item">No React, Vue, Angular - Avoided complexity debt and bundle bloat</div>
+                        <div class="tech-line-item">No CSS frameworks - No Tailwind/Bootstrap overhead</div>
+                        <div class="tech-line-item">No build tooling - Zero Webpack/Vite configuration</div>
+                        <div class="tech-line-item">No npm dependencies - Zero supply chain risk</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Database &amp; Visualization - $0</div>
+                        <div class="tech-line-item">InfluxDB - Self-hosted open source (vs $50-200/mo for cloud)</div>
+                        <div class="tech-line-item">Grafana - Self-hosted open source (vs $100-500/mo for Datadog)</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">DevOps &amp; CI/CD - $0</div>
+                        <div class="tech-line-item">GitHub Actions - Free tier for public repositories</div>
+                        <div class="tech-line-item">Docker - Open source containerization</div>
+                        <div class="tech-line-item">Automated deployments - No CircleCI/GitLab fees ($15-50/mo saved)</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Security Stack - $0</div>
+                        <div class="tech-line-item">Semgrep - Open source SAST (vs $30-100/mo for Snyk)</div>
+                        <div class="tech-line-item">Trivy - Open source container scanning</div>
+                        <div class="tech-line-item">Gitleaks - Open source secrets detection</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Infrastructure Services - $0</div>
+                        <div class="tech-line-item">SSL/TLS Certificates - Let's Encrypt via Fly.io</div>
+                        <div class="tech-line-item">CDN - Included with Fly.io global edge network</div>
+                        <div class="tech-line-item">Rate Limiting - Nginx built-in (no Cloudflare fees)</div>
+                        <div class="tech-line-item">Health Monitoring - Fly.io built-in checks</div>
+                    </div>
+
+                    <div class="tech-line">
+                        <div class="tech-line-header">Total Savings</div>
+                        <div class="tech-line-item">Typical SaaS stack for equivalent functionality - $300-1,000/month</div>
+                        <div class="tech-line-item">This project - ~$15/month</div>
+                        <div class="tech-line-item">Monthly savings - 95-98% cost reduction</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <div class="grid">
             <div class="card">
                 <span class="card-icon">🚀</span>
@@ -1330,185 +1534,6 @@
                 <div class="contact-buttons">
                     <a href="https://github.com/murr2k" class="btn-primary">View My Work</a>
                     <a href="mailto:murr2k@gmail.com" class="btn-secondary">Get In Touch</a>
-                </div>
-            </div>
-        </section>
-
-        <!-- Technology Stack Section -->
-        <section class="tech-stack-section">
-            <h2>Technology Stack</h2>
-
-            <!-- Zero-Dependency Frontend Highlight -->
-            <div class="tech-highlight-box">
-                <h3>Zero-Dependency Frontend</h3>
-                <p style="color: #ccc; margin-bottom: 1rem;">There is no framework. The frontend is <strong style="color: #22c55e;">100% vanilla</strong>.</p>
-
-                <div class="zero-dep-grid">
-                    <div class="zero-dep-column">
-                        <h4>No Frameworks</h4>
-                        <ul>
-                            <li>No React, Vue, Angular, or Svelte</li>
-                            <li>No component library (Material UI, Chakra, Ant Design)</li>
-                            <li>No CSS framework (Tailwind, Bootstrap)</li>
-                            <li>No build step (Webpack, Vite, esbuild)</li>
-                            <li>No npm dependencies for the frontend</li>
-                        </ul>
-                    </div>
-                    <div class="zero-dep-column positive">
-                        <h4>Everything Hand-Coded</h4>
-                        <ul>
-                            <li>Pure CSS in a single &lt;style&gt; tag (~900 lines)</li>
-                            <li>Vanilla ES6+ JavaScript with fetch() API</li>
-                            <li>Hand-coded SVG gauge with trigonometric arc calculations</li>
-                            <li>CSS Grid + Flexbox for responsive layout</li>
-                            <li>CSS Keyframe animations (no animation libraries)</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <table class="metrics-table">
-                    <thead>
-                        <tr>
-                            <th>Metric</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Frontend dependencies</td>
-                            <td>0</td>
-                        </tr>
-                        <tr>
-                            <td>Build time</td>
-                            <td>0ms (no build step)</td>
-                        </tr>
-                        <tr>
-                            <td>Bundle size</td>
-                            <td>~50KB (just HTML/CSS/JS)</td>
-                        </tr>
-                        <tr>
-                            <td>Time to Interactive</td>
-                            <td>&lt; 1 second</td>
-                        </tr>
-                        <tr>
-                            <td>Lighthouse Performance</td>
-                            <td>95+</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <p class="intent-quote">This is intentional - it demonstrates that modern, polished UIs don't require heavy frameworks. The animated gradient background, floating particles, glassmorphism cards, and real-time gauge are all pure CSS/JS.</p>
-            </div>
-
-            <!-- Full Technology Stack -->
-            <h3 style="text-align: center; color: #888; margin: 2rem 0 1rem; font-size: 1.1rem;">Comprehensive Technology Stack</h3>
-            <div class="stack-grid">
-                <div class="tech-category">
-                    <h4>Languages &amp; Markup</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Python 3.11</strong> - Backend services and data processing</span>
-                        <span class="tech-item"><strong>JavaScript (ES6+)</strong> - Vanilla JS, no frameworks - lightweight and fast</span>
-                        <span class="tech-item"><strong>HTML5</strong> - Semantic markup with Schema.org structured data</span>
-                        <span class="tech-item"><strong>CSS3</strong> - Modern styling with Grid, Flexbox, animations</span>
-                        <span class="tech-item"><strong>Flux</strong> - InfluxDB time-series query language</span>
-                        <span class="tech-item"><strong>XML</strong> - Eagle-200 smart meter data format</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>Frontend Graphics &amp; Visualization</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Custom SVG Gauge</strong> - Hand-coded with trigonometric arc path calculations</span>
-                        <span class="tech-item"><strong>CSS3 Animations</strong> - Keyframe animations (gradient, float, pulse, fadeIn)</span>
-                        <span class="tech-item"><strong>CSS3 Transforms</strong> - translateY, scale, rotate with GPU acceleration</span>
-                        <span class="tech-item"><strong>CSS3 Filters</strong> - drop-shadow, blur, backdrop-filter for glass effects</span>
-                        <span class="tech-item"><strong>Linear Gradients</strong> - Background animations and text gradients</span>
-                        <span class="tech-item"><strong>Grafana 11.4.0</strong> - Embedded dashboards via iframe</span>
-                        <span class="tech-item"><strong>Grafana Plugins</strong> - briangann-gauge-panel, volkovlabs-echarts-panel</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>Backend Services</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Flask 3.0.0</strong> - Lightweight Python web framework</span>
-                        <span class="tech-item"><strong>Flask-CORS</strong> - Cross-origin resource sharing</span>
-                        <span class="tech-item"><strong>Werkzeug 3.0.1</strong> - WSGI toolkit</span>
-                        <span class="tech-item"><strong>influxdb-client</strong> - Time-series database integration</span>
-                        <span class="tech-item"><strong>Nginx Alpine</strong> - High-performance reverse proxy with rate limiting</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>Databases &amp; Storage</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>InfluxDB 2.7</strong> - Purpose-built time-series database</span>
-                        <span class="tech-item"><strong>Flux Queries</strong> - Functional data scripting language</span>
-                        <span class="tech-item"><strong>5-Year Retention</strong> - 43,800 hours of historical data</span>
-                        <span class="tech-item"><strong>Persistent Volumes</strong> - Durable storage on Fly.io</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>Infrastructure &amp; Deployment</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Fly.io</strong> - Global edge computing platform</span>
-                        <span class="tech-item"><strong>Docker</strong> - Containerized microservices (Alpine-based for minimal footprint)</span>
-                        <span class="tech-item"><strong>Private Mesh Network</strong> - Secure internal service communication (*.internal)</span>
-                        <span class="tech-item"><strong>Auto-scaling</strong> - Automatic instance management with health checks</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>CI/CD Pipeline</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>GitHub Actions</strong> - Automated workflows</span>
-                        <span class="tech-item"><strong>Change Detection</strong> - Smart deployments via dorny/paths-filter</span>
-                        <span class="tech-item"><strong>Auto-Rollback</strong> - Version capture and recovery on failure</span>
-                        <span class="tech-item"><strong>Slack Integration</strong> - Native GitHub notifications</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>Testing &amp; Quality</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Playwright</strong> - E2E browser automation</span>
-                        <span class="tech-item"><strong>axe-core</strong> - WCAG accessibility auditing</span>
-                        <span class="tech-item"><strong>TypeScript</strong> - Type-safe test scripts</span>
-                        <span class="tech-item"><strong>Visual Regression</strong> - Screenshot comparison testing</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>Security Stack</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Semgrep</strong> - OWASP Top 10 + Flask/Python/JS scanning</span>
-                        <span class="tech-item"><strong>Trivy</strong> - Docker image vulnerability scanning</span>
-                        <span class="tech-item"><strong>Gitleaks</strong> - Secrets detection in code</span>
-                        <span class="tech-item"><strong>Rate Limiting</strong> - Nginx zones (30r/s general, 10r/s API, 5r/s sensitive)</span>
-                        <span class="tech-item"><strong>CSP Headers</strong> - Content Security Policy with specific directives</span>
-                        <span class="tech-item"><strong>HSTS</strong> - HTTP Strict Transport Security</span>
-                        <span class="tech-item"><strong>CORS Whitelist</strong> - Origin-specific cross-origin policies</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>IoT Integration</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Eagle-200</strong> - Rainforest smart meter bridge</span>
-                        <span class="tech-item"><strong>Zigbee SEP</strong> - Smart Energy Profile protocol</span>
-                        <span class="tech-item"><strong>BC Hydro Rates</strong> - Tiered pricing calculations</span>
-                        <span class="tech-item"><strong>~9 Second Updates</strong> - Near real-time power monitoring</span>
-                    </div>
-                </div>
-
-                <div class="tech-category">
-                    <h4>Progressive Web App</h4>
-                    <div class="tech-category-grid">
-                        <span class="tech-item"><strong>Web App Manifest</strong> - Installable on mobile/desktop</span>
-                        <span class="tech-item"><strong>Responsive Icons</strong> - 192px, 512px, maskable variants</span>
-                        <span class="tech-item"><strong>Theme Color</strong> - Native app feel</span>
-                    </div>
                 </div>
             </div>
         </section>
