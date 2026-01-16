@@ -1873,8 +1873,8 @@
             // Check Eagle Monitor (which also indicates InfluxDB status)
             checkServiceStatus('https://linknode-eagle-monitor.fly.dev/health', 'eagle');
 
-            // Check Grafana
-            checkServiceStatus('https://linknode-grafana.fly.dev/api/health', 'grafana');
+            // Check Grafana (uses no-cors due to Grafana's CORS policy)
+            checkGrafanaStatus();
 
             // InfluxDB status is derived from Eagle monitor
             checkInfluxDBStatus();
@@ -1898,6 +1898,30 @@
                 const statusDot = document.getElementById('influx-status');
                 const statusText = document.getElementById('influx-status-text');
                 statusDot.classList.remove('online');
+                statusText.textContent = 'Offline';
+            }
+        }
+
+        async function checkGrafanaStatus() {
+            const statusDot = document.getElementById('grafana-status');
+            const statusText = document.getElementById('grafana-status-text');
+
+            statusDot.classList.add('connecting');
+            statusText.textContent = 'Checking...';
+
+            try {
+                // Use no-cors mode since Grafana doesn't allow cross-origin API requests
+                // If the fetch succeeds (no network error), the server is reachable
+                await fetch('https://linknode-grafana.fly.dev/api/health', {
+                    mode: 'no-cors',
+                    signal: AbortSignal.timeout(5000)
+                });
+                // If we get here without throwing, server is reachable
+                statusDot.classList.remove('connecting');
+                statusDot.classList.add('online');
+                statusText.textContent = 'Online';
+            } catch (error) {
+                statusDot.classList.remove('connecting', 'online');
                 statusText.textContent = 'Offline';
             }
         }
