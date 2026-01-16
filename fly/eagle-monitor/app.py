@@ -95,6 +95,8 @@ stats = {
     'failed_writes': 0,
     'filtered_requests': 0,
     'last_data_received': None,
+    'previous_data_received': None,
+    'packet_interval_ms': None,
     'last_power_reading': None,
     'start_time': datetime.now(timezone.utc).isoformat()
 }
@@ -180,11 +182,12 @@ def require_auth(f):
 # Keep the old decorator for backward compatibility
 require_api_key = require_auth
 
-def broadcast_power_update(power_w, timestamp):
+def broadcast_power_update(power_w, timestamp, packet_interval_ms=None):
     """Broadcast power update to all connected SSE clients"""
     data = json.dumps({
         'power_w': power_w,
-        'timestamp': timestamp
+        'timestamp': timestamp,
+        'packet_interval_ms': packet_interval_ms
     })
     message = f"data: {data}\n\n"
 
@@ -393,8 +396,6 @@ def eagle_webhook():
         if 'power_w' in data:
             point.field("power_w", float(data['power_w']))
             stats['last_power_reading'] = data['power_w']
-            # Broadcast to SSE clients for real-time updates
-            broadcast_power_update(data['power_w'], data['timestamp'].isoformat())
         
         if 'energy_delivered_kwh' in data:
             point.field("energy_delivered_kwh", float(data['energy_delivered_kwh']))
@@ -416,7 +417,24 @@ def eagle_webhook():
             try:
                 write_api.write(bucket=INFLUXDB_BUCKET, record=point)
                 stats['successful_writes'] += 1
-                stats['last_data_received'] = datetime.now(timezone.utc).isoformat()
+
+                # Calculate packet interval
+                now = datetime.now(timezone.utc)
+                if stats['last_data_received']:
+                    previous = datetime.fromisoformat(stats['last_data_received'].replace('Z', '+00:00'))
+                    interval = (now - previous).total_seconds() * 1000  # milliseconds
+                    stats['packet_interval_ms'] = round(interval)
+                    stats['previous_data_received'] = stats['last_data_received']
+                stats['last_data_received'] = now.isoformat()
+
+                # Broadcast to SSE clients for real-time updates (after interval is calculated)
+                if 'power_w' in data:
+                    broadcast_power_update(
+                        data['power_w'],
+                        data['timestamp'].isoformat(),
+                        stats.get('packet_interval_ms')
+                    )
+
                 logger.info(f"Written data to InfluxDB: {data}")
             except Exception as e:
                 stats['failed_writes'] += 1
@@ -516,7 +534,11 @@ def health_check():
 def get_stats():
     """Get power statistics with min/max/avg calculations"""
     hours = int(request.args.get('hours', 24))
-    
+
+    # Count active SSE viewers
+    with sse_clients_lock:
+        active_viewers = len(sse_clients)
+
     result = {
         'current_power': stats.get('last_power_reading', 0),
         'min_24h': 0,
@@ -525,6 +547,8 @@ def get_stats():
         'cost_24h': 0,
         'price_per_kwh': 0,
         'last_update': stats.get('last_data_received'),
+        'active_viewers': active_viewers,
+        'packet_interval_ms': stats.get('packet_interval_ms'),
         'monitor_stats': stats,
         # Billing period info (tiered rates)
         'billing_period': {

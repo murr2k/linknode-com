@@ -241,7 +241,7 @@
         
         /* New styles for live data widgets */
         .live-metrics-section {
-            margin: 4rem 0;
+            margin: 4rem 0 2rem 0;
             padding: 2rem 0;
         }
         
@@ -815,7 +815,7 @@
 
         /* Technology Stack Section */
         .tech-stack-section {
-            margin: 4rem 0;
+            margin: 2rem 0 4rem 0;
             padding: 2rem 0;
         }
 
@@ -1217,6 +1217,18 @@
                             <div class="api-status">
                                 <span class="status-dot online" id="web-status"></span>
                                 <span id="web-status-text">Online</span>
+                            </div>
+                        </div>
+                        <div class="api-status-item">
+                            <span class="api-name">👁️ Active Viewers</span>
+                            <div class="api-status">
+                                <span id="active-viewers-count" style="font-weight: 600; color: var(--text-primary);">--</span>
+                            </div>
+                        </div>
+                        <div class="api-status-item">
+                            <span class="api-name">⏱️ Packet Interval</span>
+                            <div class="api-status">
+                                <span id="packet-interval" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
                         </div>
                     </div>
@@ -1797,6 +1809,30 @@
                         document.getElementById('power-avg').textContent = Math.round(data.avg_24h || 0) + 'W';
                         document.getElementById('power-cost').textContent = '$' + (data.cost_24h || 0).toFixed(2);
 
+                        // Update active viewers count
+                        if (data.active_viewers !== undefined) {
+                            document.getElementById('active-viewers-count').textContent = data.active_viewers;
+                        }
+
+                        // Update packet interval (time between Eagle-200 packets)
+                        const intervalEl = document.getElementById('packet-interval');
+                        if (data.packet_interval_ms !== null && data.packet_interval_ms !== undefined) {
+                            const intervalSec = data.packet_interval_ms / 1000;
+                            if (intervalSec < 15) {
+                                intervalEl.textContent = intervalSec.toFixed(1) + 's';
+                                intervalEl.style.color = '#22c55e'; // green - normal ~8-10s
+                            } else if (intervalSec < 30) {
+                                intervalEl.textContent = intervalSec.toFixed(1) + 's';
+                                intervalEl.style.color = '#eab308'; // yellow - slightly delayed
+                            } else {
+                                intervalEl.textContent = intervalSec.toFixed(0) + 's';
+                                intervalEl.style.color = '#ef4444'; // red - significant gap
+                            }
+                        } else {
+                            intervalEl.textContent = '--';
+                            intervalEl.style.color = 'var(--text-primary)';
+                        }
+
                         // Update live indicator based on data freshness
                         // Show "Live" if data is less than 60 seconds old (Eagle reports ~every 9s)
                         if (ageInSeconds < 60) {
@@ -1950,6 +1986,22 @@
                         liveDot.classList.remove('stale');
                         liveText.classList.remove('stale');
                         liveText.textContent = 'Live';
+
+                        // Update packet interval (also arrives via SSE)
+                        if (data.packet_interval_ms !== null && data.packet_interval_ms !== undefined) {
+                            const intervalEl = document.getElementById('packet-interval');
+                            const intervalSec = data.packet_interval_ms / 1000;
+                            if (intervalSec < 15) {
+                                intervalEl.textContent = intervalSec.toFixed(1) + 's';
+                                intervalEl.style.color = '#22c55e'; // green
+                            } else if (intervalSec < 30) {
+                                intervalEl.textContent = intervalSec.toFixed(1) + 's';
+                                intervalEl.style.color = '#eab308'; // yellow
+                            } else {
+                                intervalEl.textContent = intervalSec.toFixed(0) + 's';
+                                intervalEl.style.color = '#ef4444'; // red
+                            }
+                        }
                     }
                 } catch (e) {
                     console.error('Error parsing SSE data:', e);

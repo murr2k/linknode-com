@@ -1,6 +1,11 @@
 {
-  "version": "v1.0.0",
-  "buildDate": "2025-07-23",
-  "commit": "development",
-  "environment": "production"
+  "version": "v1.3.0-post-workflow-testing-65-g49324a5",
+  "buildDate": "2026-01-16",
+  "buildTime": "03:36:32",
+  "commit": "49324a5",
+  "commitFull": "49324a5e2dae781be1696c37217c9e6ef4ecd93c",
+  "branch": "main",
+  "buildNumber": "157",
+  "environment": "production",
+  "deployedBy": "Murray Kopit"
 }
