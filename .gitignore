@@ -108,3 +108,11 @@ e2e-traces/
 
 # Nested git repositories (managed separately)
 websites/
+
+# Windows Zone.Identifier files
+*:Zone.Identifier
+
+# Personal/private documents
+*.pdf
+fortis_bill_*
+Usage history*
