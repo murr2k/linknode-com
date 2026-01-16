@@ -98,7 +98,9 @@ stats = {
     'previous_data_received': None,
     'packet_interval_ms': None,
     'last_power_reading': None,
-    'start_time': datetime.now(timezone.utc).isoformat()
+    'start_time': datetime.now(timezone.utc).isoformat(),
+    'packets_today': 0,
+    'packets_today_date': datetime.now(timezone.utc).strftime('%Y-%m-%d')
 }
 
 # Initialize InfluxDB client
@@ -418,8 +420,15 @@ def eagle_webhook():
                 write_api.write(bucket=INFLUXDB_BUCKET, record=point)
                 stats['successful_writes'] += 1
 
-                # Calculate packet interval
+                # Track daily packets (reset at midnight UTC)
                 now = datetime.now(timezone.utc)
+                today = now.strftime('%Y-%m-%d')
+                if stats['packets_today_date'] != today:
+                    stats['packets_today'] = 0
+                    stats['packets_today_date'] = today
+                stats['packets_today'] += 1
+
+                # Calculate packet interval
                 if stats['last_data_received']:
                     previous = datetime.fromisoformat(stats['last_data_received'].replace('Z', '+00:00'))
                     interval = (now - previous).total_seconds() * 1000  # milliseconds
@@ -549,6 +558,7 @@ def get_stats():
         'last_update': stats.get('last_data_received'),
         'active_viewers': active_viewers,
         'packet_interval_ms': stats.get('packet_interval_ms'),
+        'packets_today': stats.get('packets_today', 0),
         'monitor_stats': stats,
         # Billing period info (tiered rates)
         'billing_period': {

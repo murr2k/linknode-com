@@ -1213,10 +1213,16 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name">Web Interface</span>
+                            <span class="api-name">Grafana</span>
                             <div class="api-status">
-                                <span class="status-dot online" id="web-status"></span>
-                                <span id="web-status-text">Online</span>
+                                <span class="status-dot" id="grafana-status"></span>
+                                <span id="grafana-status-text">Checking...</span>
+                            </div>
+                        </div>
+                        <div class="api-status-item">
+                            <span class="api-name">📦 Packets Today</span>
+                            <div class="api-status">
+                                <span id="packets-today" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
                         </div>
                         <div class="api-status-item">
@@ -1814,6 +1820,11 @@
                             document.getElementById('active-viewers-count').textContent = data.active_viewers;
                         }
 
+                        // Update packets today
+                        if (data.packets_today !== undefined) {
+                            document.getElementById('packets-today').textContent = data.packets_today.toLocaleString();
+                        }
+
                         // Update packet interval (time between Eagle-200 packets)
                         const intervalEl = document.getElementById('packet-interval');
                         if (data.packet_interval_ms !== null && data.packet_interval_ms !== undefined) {
@@ -1861,7 +1872,10 @@
         async function checkAPIStatuses() {
             // Check Eagle Monitor (which also indicates InfluxDB status)
             checkServiceStatus('https://linknode-eagle-monitor.fly.dev/health', 'eagle');
-            
+
+            // Check Grafana
+            checkServiceStatus('https://linknode-grafana.fly.dev/api/health', 'grafana');
+
             // InfluxDB status is derived from Eagle monitor
             checkInfluxDBStatus();
         }
