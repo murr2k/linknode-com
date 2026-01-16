@@ -1007,19 +1007,27 @@
         "@context": "https://schema.org",
         "@graph": [
             {
+                "@type": "Person",
+                "@id": "https://linknode.com/#author",
+                "name": "Murray Kopit",
+                "url": "https://github.com/murr2k",
+                "sameAs": [
+                    "https://github.com/murr2k"
+                ]
+            },
+            {
                 "@type": "Organization",
                 "@id": "https://linknode.com/#organization",
                 "name": "Linknode",
                 "url": "https://linknode.com",
                 "logo": {
                     "@type": "ImageObject",
-                    "url": "https://linknode.com/images/logo.png"
+                    "url": "https://linknode.com/icon-512.png",
+                    "width": 512,
+                    "height": 512
                 },
-                "contactPoint": {
-                    "@type": "ContactPoint",
-                    "email": "murr2k@gmail.com",
-                    "contactType": "Technical Support",
-                    "availableLanguage": "English"
+                "founder": {
+                    "@id": "https://linknode.com/#author"
                 },
                 "sameAs": [
                     "https://github.com/murr2k"
@@ -1033,42 +1041,21 @@
                 "description": "Real-time energy monitoring system with smart meter integration and cloud-based dashboards",
                 "publisher": {
                     "@id": "https://linknode.com/#organization"
-                },
-                "potentialAction": {
-                    "@type": "SearchAction",
-                    "target": {
-                        "@type": "EntryPoint",
-                        "urlTemplate": "https://linknode.com/?s={search_term_string}"
-                    },
-                    "query-input": "required name=search_term_string"
                 }
             },
             {
-                "@type": "Product",
-                "@id": "https://linknode.com/#product",
-                "name": "Linknode Energy Monitoring System",
-                "description": "Professional real-time power monitoring solution with Eagle-200 smart meter integration, live dashboards, and cloud-based energy management",
-                "brand": {
-                    "@id": "https://linknode.com/#organization"
-                },
-                "offers": {
-                    "@type": "Offer",
-                    "availability": "https://schema.org/InStock",
-                    "price": "0",
-                    "priceCurrency": "USD",
-                    "priceValidUntil": "2025-12-31"
-                },
-                "aggregateRating": {
-                    "@type": "AggregateRating",
-                    "ratingValue": "4.8",
-                    "reviewCount": "47"
-                }
-            },
-            {
-                "@type": "SoftwareApplication",
+                "@type": "WebApplication",
+                "@id": "https://linknode.com/#application",
                 "name": "Linknode Energy Monitor",
-                "applicationCategory": "BusinessApplication",
-                "operatingSystem": "Web Browser",
+                "description": "Professional real-time power monitoring solution with Eagle-200 smart meter integration, live dashboards, and cloud-based energy management",
+                "url": "https://linknode.com",
+                "applicationCategory": "UtilitiesApplication",
+                "operatingSystem": "Any (Web Browser)",
+                "browserRequirements": "Requires JavaScript",
+                "softwareVersion": "1.3",
+                "author": {
+                    "@id": "https://linknode.com/#author"
+                },
                 "offers": {
                     "@type": "Offer",
                     "price": "0",
@@ -1077,10 +1064,10 @@
                 "featureList": [
                     "Real-time power consumption monitoring",
                     "Eagle-200 smart meter integration",
-                    "Cloud-based data storage",
+                    "InfluxDB time-series storage",
                     "Interactive Grafana dashboards",
-                    "24/7 monitoring capability",
-                    "API access for developers"
+                    "Server-Sent Events for live updates",
+                    "BC Hydro tiered rate calculations"
                 ]
             }
         ]
