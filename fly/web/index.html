@@ -602,7 +602,15 @@
         #environment {
             color: #fbbf24;
         }
-        
+
+        #branch {
+            color: #a78bfa;
+        }
+
+        #build-number {
+            color: #34d399;
+        }
+
         .footer {
             text-align: center;
             padding: 2rem;
@@ -1544,19 +1552,27 @@
             <div class="status-grid">
                 <div class="status-item">
                     <span class="status-label">Version:</span>
-                    <span class="status-value" id="app-version">v1.0.0</span>
+                    <span class="status-value" id="app-version">Loading...</span>
                 </div>
                 <div class="status-item">
                     <span class="status-label">Build Date:</span>
-                    <span class="status-value" id="build-date">2025-07-23</span>
+                    <span class="status-value" id="build-date">Loading...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Branch:</span>
+                    <span class="status-value" id="branch">Loading...</span>
                 </div>
                 <div class="status-item">
                     <span class="status-label">Commit:</span>
-                    <span class="status-value" id="commit-sha">-</span>
+                    <span class="status-value" id="commit-sha">Loading...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Build #:</span>
+                    <span class="status-value" id="build-number">Loading...</span>
                 </div>
                 <div class="status-item">
                     <span class="status-label">Environment:</span>
-                    <span class="status-value" id="environment">Production</span>
+                    <span class="status-value" id="environment">Loading...</span>
                 </div>
             </div>
         </div>
@@ -1580,13 +1596,46 @@
                 const response = await fetch('/build-info.json?t=' + Date.now());
                 if (response.ok) {
                     const buildInfo = await response.json();
-                    document.getElementById('app-version').textContent = buildInfo.version || 'v1.0.0';
-                    document.getElementById('build-date').textContent = buildInfo.buildDate || '2025-07-23';
-                    document.getElementById('commit-sha').textContent = buildInfo.commit || '-';
+
+                    // Version
+                    document.getElementById('app-version').textContent = buildInfo.version || 'unknown';
+
+                    // Build date with optional time
+                    let dateDisplay = buildInfo.buildDate || 'unknown';
+                    if (buildInfo.buildTime) {
+                        dateDisplay += ' ' + buildInfo.buildTime;
+                    }
+                    document.getElementById('build-date').textContent = dateDisplay;
+
+                    // Branch
+                    const branchEl = document.getElementById('branch');
+                    branchEl.textContent = buildInfo.branch || 'unknown';
+
+                    // Commit - make it a clickable link to GitHub
+                    const commitEl = document.getElementById('commit-sha');
+                    const commitSha = buildInfo.commit || 'unknown';
+                    const commitFull = buildInfo.commitFull || commitSha;
+                    if (commitSha !== 'unknown' && commitSha !== '-') {
+                        commitEl.innerHTML = `<a href="https://github.com/murr2k/linknode-com/commit/${commitFull}" target="_blank" style="color: #f472b6; text-decoration: none;">${commitSha}</a>`;
+                    } else {
+                        commitEl.textContent = commitSha;
+                    }
+
+                    // Build number
+                    document.getElementById('build-number').textContent = buildInfo.buildNumber || '-';
+
+                    // Environment
                     document.getElementById('environment').textContent = buildInfo.environment || 'Production';
                 }
             } catch (error) {
                 console.log('Could not load build info:', error);
+                // Set fallback values on error
+                document.getElementById('app-version').textContent = 'error';
+                document.getElementById('build-date').textContent = 'error';
+                document.getElementById('branch').textContent = 'error';
+                document.getElementById('commit-sha').textContent = 'error';
+                document.getElementById('build-number').textContent = 'error';
+                document.getElementById('environment').textContent = 'error';
             }
         }
         
@@ -1842,21 +1891,108 @@
         }
 
         // Chart.js code removed - using embedded Grafana dashboard instead
-        
+
+        // Server-Sent Events for real-time power updates
+        let sseConnection = null;
+        let sseReconnectAttempts = 0;
+        const MAX_SSE_RECONNECT_ATTEMPTS = 5;
+
+        function connectSSE() {
+            if (sseConnection) {
+                sseConnection.close();
+            }
+
+            console.log('Connecting to real-time power stream...');
+            sseConnection = new EventSource('https://linknode-eagle-monitor.fly.dev/api/stream');
+
+            sseConnection.onopen = function() {
+                console.log('SSE connected - real-time updates active');
+                sseReconnectAttempts = 0;
+                // Update indicator to show real-time mode
+                const liveText = document.getElementById('gauge-live-text');
+                if (liveText && liveText.textContent === 'Connecting...') {
+                    liveText.textContent = 'Live';
+                }
+            };
+
+            sseConnection.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    // Skip connection confirmation messages
+                    if (data.connected) {
+                        console.log('SSE stream confirmed');
+                        return;
+                    }
+
+                    // Update gauge with real-time power reading
+                    if (data.power_w !== undefined) {
+                        const power = Math.round(data.power_w);
+                        console.log('Real-time power update:', power, 'W');
+
+                        // Get current min/max from the displayed stats for zone calculation
+                        const minText = document.getElementById('power-min').textContent;
+                        const maxText = document.getElementById('power-max').textContent;
+                        const minPower = parseInt(minText) || 500;
+                        const maxPower = parseInt(maxText) || 3000;
+
+                        // Update gauge immediately
+                        updateGauge(power, false, minPower, maxPower);
+
+                        // Flash the indicator to show update received
+                        const indicator = document.getElementById('power-update-indicator');
+                        indicator.classList.add('updating');
+                        setTimeout(() => indicator.classList.remove('updating'), 200);
+
+                        // Update live indicator
+                        const liveDot = document.getElementById('gauge-live-dot');
+                        const liveText = document.getElementById('gauge-live-text');
+                        liveDot.classList.remove('stale');
+                        liveText.classList.remove('stale');
+                        liveText.textContent = 'Live';
+                    }
+                } catch (e) {
+                    console.error('Error parsing SSE data:', e);
+                }
+            };
+
+            sseConnection.onerror = function(error) {
+                console.error('SSE connection error:', error);
+                sseConnection.close();
+
+                // Attempt reconnection with exponential backoff
+                if (sseReconnectAttempts < MAX_SSE_RECONNECT_ATTEMPTS) {
+                    sseReconnectAttempts++;
+                    const delay = Math.min(1000 * Math.pow(2, sseReconnectAttempts), 30000);
+                    console.log(`SSE reconnecting in ${delay}ms (attempt ${sseReconnectAttempts}/${MAX_SSE_RECONNECT_ATTEMPTS})...`);
+                    setTimeout(connectSSE, delay);
+                } else {
+                    console.log('SSE max reconnect attempts reached, falling back to polling');
+                    // Fall back to faster polling if SSE fails
+                    setInterval(fetchPowerData, 5000);
+                }
+            };
+        }
+
         // Initialize and start periodic updates
         console.log('Starting Linknode Energy Monitor...');
+
+        // Initial data fetch for 24h stats
         fetchPowerData().then(() => console.log('Initial power data fetch completed'));
         checkAPIStatuses().then(() => console.log('Initial status check completed'));
-        
-        // Update power data every 5 seconds.
-        setInterval(fetchPowerData, 5000);
-        
+
+        // Connect to SSE for real-time gauge updates
+        connectSSE();
+
+        // Fetch 24h stats less frequently (every 30 seconds) since SSE handles real-time gauge
+        setInterval(fetchPowerData, 30000);
+
         // Update API statuses every 30 seconds
         setInterval(() => {
             checkAPIStatuses();
             setTimeout(updateServiceCount, 2000); // Count after status checks complete
         }, 30000);
-        
+
         // Initial service count after a delay
         setTimeout(updateServiceCount, 2000);
     </script>

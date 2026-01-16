@@ -61,10 +61,16 @@ PUBLIC_API_ENDPOINTS = ['/health', '/']  # Endpoints that don't require auth
 # Rate limiting configuration
 from collections import defaultdict
 from threading import Lock
+import queue
+import json
 rate_limit_storage = defaultdict(list)
 rate_limit_lock = Lock()
 RATE_LIMIT = 60  # requests per minute
 RATE_WINDOW = 60  # seconds
+
+# Server-Sent Events (SSE) for real-time updates
+sse_clients = []
+sse_clients_lock = Lock()
 
 # Device MAC filtering
 # The Eagle-200 has two Zigbee radios that report with different MACs.
@@ -173,6 +179,26 @@ def require_auth(f):
 
 # Keep the old decorator for backward compatibility
 require_api_key = require_auth
+
+def broadcast_power_update(power_w, timestamp):
+    """Broadcast power update to all connected SSE clients"""
+    data = json.dumps({
+        'power_w': power_w,
+        'timestamp': timestamp
+    })
+    message = f"data: {data}\n\n"
+
+    with sse_clients_lock:
+        # Remove dead clients and send to live ones
+        dead_clients = []
+        for client_queue in sse_clients:
+            try:
+                client_queue.put_nowait(message)
+            except:
+                dead_clients.append(client_queue)
+
+        for dead in dead_clients:
+            sse_clients.remove(dead)
 
 def init_influxdb():
     """Initialize InfluxDB connection"""
@@ -367,6 +393,8 @@ def eagle_webhook():
         if 'power_w' in data:
             point.field("power_w", float(data['power_w']))
             stats['last_power_reading'] = data['power_w']
+            # Broadcast to SSE clients for real-time updates
+            broadcast_power_update(data['power_w'], data['timestamp'].isoformat())
         
         if 'energy_delivered_kwh' in data:
             point.field("energy_delivered_kwh", float(data['energy_delivered_kwh']))
@@ -599,10 +627,66 @@ def index():
         'endpoints': {
             '/eagle': 'POST - Receive Eagle-200 XML data',
             '/api/stats': 'GET - Monitor statistics',
+            '/api/stream': 'GET - Real-time power updates (SSE)',
             '/health': 'GET - Health check',
             '/api/security/stats': 'GET - Security monitoring statistics'
         }
     }), 200
+
+@app.route('/api/stream', methods=['GET'])
+def power_stream():
+    """Server-Sent Events endpoint for real-time power updates"""
+    from flask import Response
+
+    def generate():
+        # Create a queue for this client
+        client_queue = queue.Queue(maxsize=10)
+
+        with sse_clients_lock:
+            sse_clients.append(client_queue)
+
+        try:
+            # Send initial connection message
+            yield "data: {\"connected\": true}\n\n"
+
+            # Send current power reading if available
+            if stats.get('last_power_reading') is not None:
+                initial = json.dumps({
+                    'power_w': stats['last_power_reading'],
+                    'timestamp': stats.get('last_data_received')
+                })
+                yield f"data: {initial}\n\n"
+
+            # Stream updates as they arrive
+            while True:
+                try:
+                    # Wait for new data with timeout (keeps connection alive)
+                    message = client_queue.get(timeout=30)
+                    yield message
+                except queue.Empty:
+                    # Send keepalive comment to prevent connection timeout
+                    yield ": keepalive\n\n"
+
+        except GeneratorExit:
+            # Client disconnected
+            pass
+        finally:
+            with sse_clients_lock:
+                if client_queue in sse_clients:
+                    sse_clients.remove(client_queue)
+
+    response = Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'X-Accel-Buffering': 'no'  # Disable nginx buffering
+        }
+    )
+    return response
+
 
 @app.route('/api/security/stats', methods=['GET'])
 @require_api_key
