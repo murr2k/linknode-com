@@ -263,6 +263,10 @@ def check_data_health():
     except Exception as e:
         logger.error(f"Error in data health check: {e}")
 
+# Eagle/Zigbee Smart Energy timestamps count seconds from 2000-01-01 UTC,
+# not the Unix epoch (1970-01-01). This is the gap between the two.
+ZIGBEE_EPOCH_OFFSET = 946684800  # seconds from 1970-01-01 to 2000-01-01 UTC
+
 def parse_eagle_xml(xml_data):
     """Parse Eagle-200 XML data"""
     try:
@@ -272,18 +276,16 @@ def parse_eagle_xml(xml_data):
         device_mac = root.findtext('.//DeviceMacId', '').replace('0x', '')
         meter_mac = root.findtext('.//MeterMacId', '').replace('0x', '')
         timestamp = root.findtext('.//TimeStamp', '')
-        
-        # Parse timestamp (Eagle sends as hex seconds since epoch)
-        if timestamp.startswith('0x'):
-            timestamp_int = int(timestamp, 16)
-        else:
-            timestamp_int = int(timestamp)
-        
-        # Convert to datetime
-        dt = datetime.fromtimestamp(timestamp_int, tz=timezone.utc)
-        
-        # Check if timestamp is reasonable (not more than 1 year in the past or future)
         now = datetime.now(timezone.utc)
+
+        # Decode the Zigbee-epoch timestamp; missing/non-numeric values fall back to now.
+        try:
+            timestamp_int = int(timestamp, 16) if timestamp.startswith('0x') else int(timestamp)
+            dt = datetime.fromtimestamp(timestamp_int + ZIGBEE_EPOCH_OFFSET, tz=timezone.utc)
+        except (ValueError, TypeError, OSError, OverflowError):
+            dt = now
+
+        # Safety net for genuinely implausible timestamps (more than a year off).
         one_year = 365 * 24 * 60 * 60  # seconds
         if abs((now - dt).total_seconds()) > one_year:
             logger.warning(f"Unreasonable timestamp from Eagle: {dt}, using current time instead")
