@@ -17,6 +17,7 @@ import time
 from functools import wraps
 import hashlib
 import base64
+import re
 from security_monitor import security_monitor, require_api_key_with_monitoring
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -83,6 +84,13 @@ sse_clients_lock = Lock()
 IGNORED_DEVICE_MACS = [
     'd8d5b9000000ef68',  # HAN radio - only sends empty message_cluster
 ]
+
+# Message types that are recognized but intentionally not stored (static metadata,
+# no telemetry). Acknowledged without a write and logged at DEBUG, not as "unhandled".
+IGNORED_MESSAGE_TYPES = {'DeviceInfo'}
+
+# Field tags whose values are secrets (Zigbee keys/codes) and must never be logged.
+SENSITIVE_FIELD_TAGS = ('InstallCode', 'LinkKey')
 
 # BC Hydro Tiered Rate Configuration
 # https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates/tiered.html
@@ -268,6 +276,16 @@ def check_data_health():
 # not the Unix epoch (1970-01-01). This is the gap between the two.
 ZIGBEE_EPOCH_OFFSET = 946684800  # seconds from 1970-01-01 to 2000-01-01 UTC
 
+def _dump_message_redacted(elem):
+    """Serialize an XML message for logging, masking any secret-bearing fields."""
+    try:
+        raw = ET.tostring(elem, encoding='unicode').strip()
+    except Exception:
+        return '<unserializable>'
+    for tag in SENSITIVE_FIELD_TAGS:
+        raw = re.sub(rf'(<{tag}>)[^<]*(</{tag}>)', r'\1***REDACTED***\2', raw)
+    return raw
+
 def parse_eagle_xml(xml_data):
     """Parse Eagle-200 XML data"""
     try:
@@ -390,17 +408,18 @@ def parse_eagle_xml(xml_data):
             data['current_block'] = elem.findtext('CurrentBlock', '')
             data['current_price'] = elem.findtext('CurrentPrice', '')
         
-        # Unhandled message types: record the type and log the full payload so its
-        # contents can be inspected before deciding whether to store them.
+        # Unhandled message types: recognized metadata that carries no telemetry
+        # (e.g. DeviceInfo) is acknowledged quietly; anything else is logged with its
+        # payload (secrets redacted) so it can be inspected before deciding what to do.
         else:
             for child in root:
                 if child.tag != 'rainforest':
-                    data['message_type'] = 'unknown_' + child.tag.lower()
-                    try:
-                        payload = ET.tostring(child, encoding='unicode').strip()
-                    except Exception:
-                        payload = '<unserializable>'
-                    logger.warning(f"Unhandled message type {child.tag}: {payload}")
+                    if child.tag in IGNORED_MESSAGE_TYPES:
+                        data['message_type'] = child.tag.lower()
+                        logger.debug(f"Ignoring metadata message type: {child.tag}")
+                    else:
+                        data['message_type'] = 'unknown_' + child.tag.lower()
+                        logger.warning(f"Unhandled message type {child.tag}: {_dump_message_redacted(child)}")
                     break
         
         return data
