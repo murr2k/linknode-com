@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application
 COPY app.py .
 COPY security_monitor.py .
+COPY monitor_data_staleness.py .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
