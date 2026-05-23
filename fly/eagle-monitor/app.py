@@ -2,6 +2,7 @@
 """
 Eagle-200 XML Monitor for InfluxDB
 Receives XML POST data from Eagle-200 energy monitor and stores in InfluxDB
+Includes data staleness monitoring with Slack alerts
 """
 
 import os
@@ -17,6 +18,9 @@ from functools import wraps
 import hashlib
 import base64
 from security_monitor import security_monitor, require_api_key_with_monitoring
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from monitor_data_staleness import DataStalenessMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -102,6 +106,15 @@ stats = {
     'packets_today': 0,
     'packets_today_date': datetime.now(timezone.utc).strftime('%Y-%m-%d')
 }
+
+# Initialize data staleness monitor
+monitor = DataStalenessMonitor(
+    slack_webhook=os.getenv('SLACK_WEBHOOK_URL'),
+    stale_threshold_minutes=int(os.getenv('STALE_THRESHOLD_MINUTES', '5'))
+)
+
+# Background scheduler for monitoring
+scheduler = None
 
 # Initialize InfluxDB client
 influx_client = None
@@ -221,6 +234,34 @@ def init_influxdb():
     except Exception as e:
         logger.error(f"Failed to connect to InfluxDB: {e}")
         return False
+
+def start_data_monitor():
+    """Start the data staleness monitoring background task"""
+    global scheduler
+
+    if scheduler is None:
+        scheduler = BackgroundScheduler()
+
+        # Add job to check data freshness every 5 minutes
+        scheduler.add_job(
+            check_data_health,
+            IntervalTrigger(minutes=5),
+            id='data_staleness_check',
+            name='Check data staleness',
+            replace_existing=True
+        )
+
+        scheduler.start()
+        logger.info("Data staleness monitor started (checks every 5 minutes)")
+
+def check_data_health():
+    """Background job to check if data is still arriving"""
+    try:
+        current_status, transitioned = monitor.check_data_freshness(stats)
+        if transitioned:
+            logger.info(f"Data health status changed to: {current_status}")
+    except Exception as e:
+        logger.error(f"Error in data health check: {e}")
 
 def parse_eagle_xml(xml_data):
     """Parse Eagle-200 XML data"""
@@ -733,8 +774,8 @@ def get_security_stats():
     if not admin_key or provided_key != admin_key:
         return jsonify({'error': 'Admin access required'}), 403
     
-    stats = security_monitor.get_security_stats()
-    return jsonify(stats), 200
+    stats_result = security_monitor.get_security_stats()
+    return jsonify(stats_result), 200
 
 if __name__ == '__main__':
     # Wait for InfluxDB to be ready
@@ -748,7 +789,10 @@ if __name__ == '__main__':
     
     if not influx_client:
         logger.error("Failed to connect to InfluxDB after 30 retries")
-    
+
+    # Start the data staleness monitor
+    start_data_monitor()
+
     # Run Flask app
     port = int(os.getenv('PORT', '5000'))
     app.run(host='0.0.0.0', port=port, debug=False)
