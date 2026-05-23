@@ -173,8 +173,9 @@ def require_auth(f):
             api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
             
             if not API_KEY:
-                # If no API key is configured, log warning but allow access
-                logger.warning("API_KEY not configured - authentication disabled for API")
+                # If no API key is configured, allow access. Logged at DEBUG to avoid
+                # per-request noise from the dashboard/Grafana polling /api/stats.
+                logger.debug("API_KEY not configured - authentication disabled for API")
                 return f(*args, **kwargs)
             
             if not api_key:
@@ -387,13 +388,17 @@ def parse_eagle_xml(xml_data):
             data['current_block'] = elem.findtext('CurrentBlock', '')
             data['current_price'] = elem.findtext('CurrentPrice', '')
         
-        # Log unknown message types
+        # Unhandled message types: record the type and log the full payload so its
+        # contents can be inspected before deciding whether to store them.
         else:
-            # Find the first child element of rainforest to identify message type
             for child in root:
                 if child.tag != 'rainforest':
                     data['message_type'] = 'unknown_' + child.tag.lower()
-                    logger.warning(f"Unknown message type: {child.tag}")
+                    try:
+                        payload = ET.tostring(child, encoding='unicode').strip()
+                    except Exception:
+                        payload = '<unserializable>'
+                    logger.warning(f"Unhandled message type {child.tag}: {payload}")
                     break
         
         return data
@@ -454,7 +459,18 @@ def eagle_webhook():
         
         if 'message_text' in data:
             point.field("message_text", data['message_text'])
-        
+
+        # Messages with no storable fields (DeviceInfo, BillingPeriodList, TimeCluster,
+        # BlockPriceDetail, etc.) carry only metadata. A fieldless InfluxDB write always
+        # fails, so acknowledge them without attempting one.
+        storable_fields = ('power_w', 'energy_delivered_kwh', 'energy_received_kwh',
+                           'price_per_kwh', 'link_strength', 'message_text')
+        if not any(field in data for field in storable_fields):
+            stats['filtered_requests'] += 1
+            logger.debug(f"No storable fields for message_type={data.get('message_type')}; acknowledged without write")
+            return jsonify({'status': 'ignored', 'reason': 'no_storable_fields',
+                            'message_type': data.get('message_type')}), 200
+
         # Write to InfluxDB
         if write_api:
             try:
