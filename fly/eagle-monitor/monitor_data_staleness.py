@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 class DataStalenessMonitor:
     """Monitor data freshness and track state transitions"""
 
-    def __init__(self, state_file=None, slack_webhook=None, stale_threshold_minutes=5):
+    def __init__(self, state_file=None, slack_webhook=None, stale_threshold_minutes=5,
+                 pushover_token=None, pushover_user=None,
+                 pushover_retry=60, pushover_expire=3600):
         """
         Initialize the monitor.
 
@@ -26,10 +28,18 @@ class DataStalenessMonitor:
             state_file: Path to JSON file for persisting state (default: /tmp/eagle_monitor_state.json)
             slack_webhook: Slack webhook URL for alerts
             stale_threshold_minutes: Consider data stale if older than this many minutes
+            pushover_token: Pushover application API token (for emergency siren alerts)
+            pushover_user: Pushover user key
+            pushover_retry: Seconds between siren re-alerts while unacknowledged (Pushover min 30)
+            pushover_expire: Seconds before Pushover stops re-alerting (Pushover max 10800)
         """
         self.state_file = state_file or os.getenv('MONITOR_STATE_FILE', '/tmp/eagle_monitor_state.json')
         self.slack_webhook = slack_webhook or os.getenv('SLACK_WEBHOOK_URL')
         self.stale_threshold_minutes = stale_threshold_minutes
+        self.pushover_token = pushover_token or os.getenv('PUSHOVER_API_TOKEN')
+        self.pushover_user = pushover_user or os.getenv('PUSHOVER_USER_KEY')
+        self.pushover_retry = pushover_retry
+        self.pushover_expire = pushover_expire
         self.previous_status = self._load_state()
 
         logger.info(f"DataStalenessMonitor initialized with threshold: {stale_threshold_minutes} minutes")
@@ -77,6 +87,33 @@ class DataStalenessMonitor:
             logger.error(f"Failed to send Slack alert: {e}")
             return False
 
+    def _send_pushover_alert(self, message, title='Linknode Power Monitor Alert'):
+        """Send an emergency (siren) push via Pushover that repeats until acknowledged."""
+        if not (self.pushover_token and self.pushover_user):
+            logger.warning("Pushover not configured, skipping siren alert")
+            return False
+
+        try:
+            # priority=2 (emergency) re-alerts every `retry` seconds until the user
+            # acknowledges in the app, or `expire` seconds elapse.
+            payload = {
+                'token': self.pushover_token,
+                'user': self.pushover_user,
+                'title': title,
+                'message': message,
+                'priority': 2,
+                'retry': self.pushover_retry,
+                'expire': self.pushover_expire,
+                'sound': 'siren',
+            }
+            response = requests.post('https://api.pushover.net/1/messages.json', data=payload, timeout=10)
+            response.raise_for_status()
+            logger.info("Pushover siren alert sent successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send Pushover alert: {e}")
+            return False
+
     def check_data_freshness(self, stats_dict):
         """
         Check if data is fresh and handle state transitions.
@@ -99,6 +136,7 @@ class DataStalenessMonitor:
                 reason = self._get_failure_reason(stats_dict)
                 message = f"Data is not arriving from power meter!\n{reason}"
                 self._send_slack_alert(message, emoji='🚨')
+                self._send_pushover_alert(message)
             else:
                 # Going healthy
                 current_power = stats_dict.get('last_power_reading', 'N/A')

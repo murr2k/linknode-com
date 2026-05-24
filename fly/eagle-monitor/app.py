@@ -118,7 +118,9 @@ stats = {
 # Initialize data staleness monitor
 monitor = DataStalenessMonitor(
     slack_webhook=os.getenv('SLACK_WEBHOOK_URL'),
-    stale_threshold_minutes=int(os.getenv('STALE_THRESHOLD_MINUTES', '5'))
+    stale_threshold_minutes=int(os.getenv('STALE_THRESHOLD_MINUTES', '5')),
+    pushover_token=os.getenv('PUSHOVER_API_TOKEN'),
+    pushover_user=os.getenv('PUSHOVER_USER_KEY')
 )
 
 # Background scheduler for monitoring

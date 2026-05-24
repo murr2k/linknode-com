@@ -241,6 +241,68 @@ class TestDataStalenessMonitor(unittest.TestCase):
         self.assertIn('back online', payload['text'])
         self.assertIn('✅', payload['text'])
 
+    @patch('monitor_data_staleness.requests.post')
+    def test_pushover_siren_on_unhealthy_transition(self, mock_post):
+        """Test that an emergency Pushover siren is sent on unhealthy transition"""
+        monitor = DataStalenessMonitor(
+            state_file=self.state_file,
+            slack_webhook=None,  # isolate Pushover as the only POST
+            pushover_token='PUSHOVER_TEST_TOKEN',
+            pushover_user='PUSHOVER_TEST_USER',
+            stale_threshold_minutes=5
+        )
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_post.return_value = mock_response
+
+        old_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+        stats = {
+            'last_data_received': old_time.isoformat(),
+            'last_power_reading': 422.0
+        }
+
+        monitor.check_data_freshness(stats)
+
+        self.assertTrue(mock_post.called)
+        call_args = mock_post.call_args
+        # Pushover posts form-encoded data to its messages endpoint
+        self.assertEqual(call_args[0][0], 'https://api.pushover.net/1/messages.json')
+        payload = call_args[1]['data']
+        self.assertEqual(payload['priority'], 2)  # emergency: repeats until acked
+        self.assertEqual(payload['sound'], 'siren')
+        self.assertIn('Data is not arriving', payload['message'])
+
+    @patch('monitor_data_staleness.requests.post')
+    def test_pushover_not_sent_on_healthy_transition(self, mock_post):
+        """Test that the siren does NOT fire on recovery (healthy transition)"""
+        monitor = DataStalenessMonitor(
+            state_file=self.state_file,
+            slack_webhook=None,
+            pushover_token='PUSHOVER_TEST_TOKEN',
+            pushover_user='PUSHOVER_TEST_USER',
+            stale_threshold_minutes=5
+        )
+        monitor.previous_status = 'unhealthy'
+
+        now = datetime.now(timezone.utc)
+        stats = {
+            'last_data_received': now.isoformat(),
+            'last_power_reading': 422.0
+        }
+
+        monitor.check_data_freshness(stats)
+
+        # Recovery is Slack-only; with Slack disabled, no POST should occur
+        self.assertFalse(mock_post.called)
+
+    @patch('monitor_data_staleness.requests.post')
+    def test_pushover_skipped_when_unconfigured(self, mock_post):
+        """Test that missing Pushover credentials skip the siren gracefully"""
+        result = self.monitor._send_pushover_alert('test message')
+        self.assertFalse(result)
+        self.assertFalse(mock_post.called)
+
     def test_failure_reason_stale_data(self):
         """Test failure reason for stale data"""
         old_time = datetime.now(timezone.utc) - timedelta(minutes=10)
