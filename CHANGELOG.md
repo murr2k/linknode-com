@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Pushover emergency-priority alerting for power-meter outages (`fly/eagle-monitor`)
+  - Fires a siren push that repeats every 60s until acknowledged when data stops arriving
+  - Triggers only on the healthy→unhealthy transition (exactly one alert per outage); recovery stays Slack-only
+  - Credentials supplied via `PUSHOVER_API_TOKEN` / `PUSHOVER_USER_KEY` Fly secrets
+  - Regression tests assert exactly one alert per outage and per recovery event
+  - Advertised in the dashboard Technology Stack ("Monitoring & Alerting")
 - Data staleness detection for power monitoring dashboard
   - Displays dashes (--) instead of stale values when data is older than 2 minutes
   - Shows age indicator: "Live" (<30s), "Updated Xs ago" (30-60s), "Updated Xm ago" (1-2m), "No data for Xh Xm" (>2m)
@@ -44,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `INFLUXDB_TOKEN` to GitHub repository secrets
 
 ### Fixed
+- Restored GitHub Actions auto-deploy to Fly.io
+  - `FLY_API_TOKEN` had an expired third-party discharge token, so every push-triggered deploy was failing authentication
+  - Rotated to a fresh org deploy token; push-to-`main` now deploys changed services automatically again
 - Updated remaining hardcoded paths to use relative paths in scripts
   - `monitoring/test-api-endpoints.sh`: Fixed cloudflare-setup path reference
   - `monitoring/fix-eagle-404.sh`: Changed rackspace-connect.sh to linknode-connect.sh

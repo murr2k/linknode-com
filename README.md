@@ -24,6 +24,11 @@ A real-time energy monitoring dashboard that tracks power consumption using Eagl
   - Public Grafana dashboard (no login required)
   - Data staleness detection with age indicators
 
+- **Outage Alerting**
+  - Data staleness monitor detects when the power meter stops reporting
+  - Slack notifications on outage and recovery (fires once per state change, no spam)
+  - Pushover emergency-priority siren that repeats until acknowledged
+
 - **Modern Web Interface**
   - Dark theme with animated gradients
   - Embedded Grafana dashboard

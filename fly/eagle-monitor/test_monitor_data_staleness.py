@@ -303,6 +303,57 @@ class TestDataStalenessMonitor(unittest.TestCase):
         self.assertFalse(result)
         self.assertFalse(mock_post.called)
 
+    @patch('monitor_data_staleness.requests.post')
+    def test_single_alert_during_sustained_outage(self, mock_post):
+        """A sustained outage (multiple polls) must alert exactly once per channel"""
+        monitor = DataStalenessMonitor(
+            state_file=self.state_file,
+            slack_webhook='https://hooks.slack.com/services/TEST/WEBHOOK',
+            pushover_token='PUSHOVER_TEST_TOKEN',
+            pushover_user='PUSHOVER_TEST_USER',
+            stale_threshold_minutes=5
+        )
+        mock_post.return_value = MagicMock(raise_for_status=MagicMock())
+
+        old_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+        stats = {'last_data_received': old_time.isoformat(), 'last_power_reading': 422.0}
+
+        # The scheduler polls repeatedly while the meter stays down
+        for _ in range(3):
+            monitor.check_data_freshness(stats)
+
+        urls = [c.args[0] for c in mock_post.call_args_list]
+        slack_calls = [u for u in urls if 'pushover' not in u]
+        pushover_calls = [u for u in urls if 'pushover' in u]
+        self.assertEqual(len(slack_calls), 1, "outage must send exactly one Slack alert")
+        self.assertEqual(len(pushover_calls), 1, "outage must send exactly one Pushover siren")
+
+    @patch('monitor_data_staleness.requests.post')
+    def test_single_alert_during_sustained_recovery(self, mock_post):
+        """A sustained recovery (multiple polls) must alert exactly once, Slack only"""
+        monitor = DataStalenessMonitor(
+            state_file=self.state_file,
+            slack_webhook='https://hooks.slack.com/services/TEST/WEBHOOK',
+            pushover_token='PUSHOVER_TEST_TOKEN',
+            pushover_user='PUSHOVER_TEST_USER',
+            stale_threshold_minutes=5
+        )
+        monitor.previous_status = 'unhealthy'
+        mock_post.return_value = MagicMock(raise_for_status=MagicMock())
+
+        now = datetime.now(timezone.utc)
+        stats = {'last_data_received': now.isoformat(), 'last_power_reading': 422.0}
+
+        # The scheduler keeps polling after the meter comes back
+        for _ in range(3):
+            monitor.check_data_freshness(stats)
+
+        urls = [c.args[0] for c in mock_post.call_args_list]
+        slack_calls = [u for u in urls if 'pushover' not in u]
+        pushover_calls = [u for u in urls if 'pushover' in u]
+        self.assertEqual(len(slack_calls), 1, "recovery must send exactly one Slack alert")
+        self.assertEqual(len(pushover_calls), 0, "recovery must not trigger the Pushover siren")
+
     def test_failure_reason_stale_data(self):
         """Test failure reason for stale data"""
         old_time = datetime.now(timezone.utc) - timedelta(minutes=10)
