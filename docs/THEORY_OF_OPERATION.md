@@ -38,13 +38,6 @@ graph TB
         USER[User Browser] -->|HTTPS| WEB
         USER -.->|Direct Access| GF
     end
-
-    style SM fill:#f9f,stroke:#333
-    style E200 fill:#bbf,stroke:#333
-    style EM fill:#bfb,stroke:#333
-    style IDB fill:#fbb,stroke:#333
-    style GF fill:#fbf,stroke:#333
-    style WEB fill:#bff,stroke:#333
 ```
 
 ---
@@ -371,8 +364,6 @@ graph TB
 
     CF[Cloudflare<br/>DNS/CDN] --> WEB
     CF --> GF
-
-    style CF fill:#f96,stroke:#333
 ```
 
 **Resource Allocation:**

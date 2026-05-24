@@ -480,10 +480,6 @@ flowchart TD
     R3 --> Q2{Can shift load<br/>to overnight?}
     Q2 -->|"Yes (EV, water heater)"| R4["✅ Add Time-of-Day"]
     Q2 -->|"No"| R5["Stay on Flat only"]
-
-    style R3 fill:#90EE90
-    style R4 fill:#90EE90
-    style R1 fill:#87CEEB
 ```
 
 The **break-even point** between Tiered and Flat is approximately **900-950 kWh/month**:
@@ -525,8 +521,6 @@ flowchart TB
     end
 
     Analysis --> Recommended
-
-    style R1 fill:#90EE90
 ```
 
 ### Primary Recommendation: **Stay on Tiered Rate**
