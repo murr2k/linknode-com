@@ -1,4 +1,13 @@
 # Rackspace K8s Demo Project State
+
+> **⚠️ ARCHIVED / OBSOLETE — historical reference only.**
+> This document describes the retired **Rackspace Kubernetes** deployment, which
+> was decommissioned when the project migrated to **Fly.io**. The `demo-app`
+> namespace, NodePorts, and the IP `119.9.118.22` no longer exist. All
+> credentials it once contained were rotated and **revoked in January 2026** and
+> have been **redacted** below. Do not treat anything here as current config —
+> see `README.md` and `docs/THEORY_OF_OPERATION.md`.
+
 Last Updated: 2025-07-20
 
 ## Overview
@@ -10,7 +19,7 @@ This project implements a complete energy monitoring solution with real-time pow
 - **Main Demo Page**: http://119.9.118.22:30898
 - **Grafana Dashboard**: http://119.9.118.22:30300
 - **Eagle XML Endpoint**: http://119.9.118.22:30500
-- **Public Dashboard**: http://119.9.118.22:30300/public-dashboards/69ea815afaa245248a2f1a81491ca3f1
+- **Public Dashboard**: http://119.9.118.22:30300/public-dashboards/<redacted>
 
 ### Kubernetes Resources
 All resources are in the `demo-app` namespace:
@@ -76,15 +85,15 @@ All resources are in the `demo-app` namespace:
 ## Configuration Details
 
 ### InfluxDB
-- Token: `my-super-secret-auth-token`
+- Token: `<redacted — rotated & revoked Jan 2026>`
 - Organization: `rackspace`
 - Bucket: `power_metrics`
 - Retention: 30 days
 
 ### Grafana
-- Admin: admin/admin
+- Admin: `<redacted — rotated Jan 2026>`
 - Anonymous access: Enabled as Viewer
-- Public dashboard token: `69ea815afaa245248a2f1a81491ca3f1`
+- Public dashboard token: `<redacted>`
 
 ### Eagle-200 Configuration
 - Cloud Provider: Other

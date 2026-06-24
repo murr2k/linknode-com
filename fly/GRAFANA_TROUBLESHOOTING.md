@@ -45,9 +45,9 @@ content_security_policy = false
 **Fix**: Ensure all services use the same token:
 ```bash
 # Set the same token for all services
-fly secrets set INFLUXDB_TOKEN="my-super-secret-auth-token" -a linknode-influxdb
-fly secrets set INFLUXDB_TOKEN="my-super-secret-auth-token" -a linknode-eagle-monitor
-fly secrets set INFLUXDB_TOKEN="my-super-secret-auth-token" -a linknode-grafana
+fly secrets set INFLUXDB_TOKEN="<your-influxdb-token>" -a linknode-influxdb
+fly secrets set INFLUXDB_TOKEN="<your-influxdb-token>" -a linknode-eagle-monitor
+fly secrets set INFLUXDB_TOKEN="<your-influxdb-token>" -a linknode-grafana
 ```
 
 ### 4. Wrong Measurement and Field Names in Queries

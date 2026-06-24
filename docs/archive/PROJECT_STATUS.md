@@ -1,5 +1,12 @@
 # Rackspace Kubernetes Demo - Project Status
 
+> **⚠️ ARCHIVED / OBSOLETE — historical reference only.**
+> This document describes the retired **Rackspace Kubernetes** deployment
+> (NodePorts, Cloudflare quick-tunnels, the IP `119.9.118.22`), which was
+> decommissioned when the project migrated to **Fly.io**. None of the URLs,
+> services, or "Live URLs" below are current. See `README.md` and
+> `docs/archive/FLY_MIGRATION_COMPLETE.md` for the current architecture.
+
 ## Current Status: ✅ Fully Operational
 
 Last Updated: July 19, 2025
