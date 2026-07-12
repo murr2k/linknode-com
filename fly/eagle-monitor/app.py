@@ -456,7 +456,10 @@ def eagle_webhook():
             try:
                 _root = ET.fromstring(xml_data)
                 _mac = _root.findtext('.//DeviceMacId', '')
-                logger.info(f"RAWCAP mac={_mac} {_dump_message_redacted(_root)}")
+                # Collapse to one physical line: concurrent workers logging multi-line
+                # XML interleave in the stream and become unreadable otherwise.
+                _flat = ' '.join(_dump_message_redacted(_root).split())
+                logger.info(f"RAWCAP mac={_mac} {_flat}")
             except Exception as _e:
                 logger.info(f"RAWCAP parse-failed: {_e}")
 
