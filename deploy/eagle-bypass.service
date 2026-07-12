@@ -1,0 +1,36 @@
+[Unit]
+# Eagle-200 local-API bypass: poll the meter on the LAN and ship its telemetry to
+# our Fly /eagle endpoint as synthetic Rainforest XML whenever the real cloud path
+# has gone stale. See scripts/eagle_bypass.py for the full rationale.
+Description=Eagle-200 local-API bypass (failover uploader to Fly /eagle)
+After=network-online.target
+Wants=network-online.target
+# If it keeps dying (e.g. bad EAGLE_UPLOAD_PASSWORD), stop retrying after a burst
+# rather than hammering the endpoint forever.
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+# ADJUST these three to match the Pi: the user to run as, where you cloned the
+# repo, and the python3 path (`which python3`).
+User=pi
+WorkingDirectory=/opt/linknode-com
+ExecStart=/usr/bin/python3 /opt/linknode-com/scripts/eagle_bypass.py
+
+# Secrets (Cloud ID, Install Code, upload password) live here, NOT in the repo.
+# Install deploy/eagle-bypass.env.example to this path and chmod 600 it.
+EnvironmentFile=/etc/eagle-bypass.env
+
+Restart=always
+RestartSec=15
+SyslogIdentifier=eagle-bypass
+
+# Light hardening: the script only reads the repo and talks to the network.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

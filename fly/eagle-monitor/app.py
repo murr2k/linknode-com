@@ -92,6 +92,11 @@ IGNORED_MESSAGE_TYPES = {'DeviceInfo'}
 # Field tags whose values are secrets (Zigbee keys/codes) and must never be logged.
 SENSITIVE_FIELD_TAGS = ('InstallCode', 'LinkKey')
 
+# TEMPORARY diagnostic: when RAW_CAPTURE=1, log the raw (secret-redacted) payload of
+# DeviceInfo and MessageCluster messages so we can read the firmware version and check
+# whether the utility text channel is truly empty. Off by default; safe to leave in.
+RAW_CAPTURE = os.getenv('RAW_CAPTURE', '') == '1'
+
 # BC Hydro Tiered Rate Configuration
 # https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates/tiered.html
 TIER1_RATE = float(os.getenv('TIER1_RATE', '0.1172'))  # $/kWh - below threshold
@@ -443,7 +448,21 @@ def eagle_webhook():
         # Get XML data
         xml_data = request.data.decode('utf-8')
         logger.debug(f"Received XML: {xml_data[:200]}...")
-        
+
+        # TEMPORARY (RAW_CAPTURE=1): dump DeviceInfo/MessageCluster payloads verbatim,
+        # before the ignored-MAC filter below drops ef68, so we see the ef68 messages
+        # too. Secrets are redacted. Remove this block once the questions are answered.
+        if RAW_CAPTURE and ('<DeviceInfo' in xml_data or '<MessageCluster' in xml_data):
+            try:
+                _root = ET.fromstring(xml_data)
+                _mac = _root.findtext('.//DeviceMacId', '')
+                # Collapse to one physical line: concurrent workers logging multi-line
+                # XML interleave in the stream and become unreadable otherwise.
+                _flat = ' '.join(_dump_message_redacted(_root).split())
+                logger.info(f"RAWCAP mac={_mac} {_flat}")
+            except Exception as _e:
+                logger.info(f"RAWCAP parse-failed: {_e}")
+
         # Parse XML
         data = parse_eagle_xml(xml_data)
         if not data:
