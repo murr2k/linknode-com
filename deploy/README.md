@@ -7,25 +7,37 @@ cloud path is stale — a hot standby that fills gaps without duplicating data.
 It must run on a host that can reach the Eagle (`10.0.0.222`); Fly cannot. The
 always-on home is the Raspberry Pi, run under systemd.
 
+The script is a single, standard-library-only file, so there is no repo to clone
+and nothing to `pip install` on the Pi. The live deployment is exactly the
+single-file install below: the script at `/opt/eagle-bypass/eagle_bypass.py`,
+secrets at `/etc/eagle-bypass.env`, and the unit from this directory.
+
 ## Install on the Pi
 
 ```sh
-# 1. Get the code onto the Pi (adjust the path to taste; the unit assumes /opt).
-sudo git clone https://github.com/<you>/linknode-com /opt/linknode-com
-# (python3 stdlib only — no pip install needed.)
+# 1. Copy the two files onto the Pi from a machine that has this repo checked out.
+#    (git isn't required on the Pi.)
+scp scripts/eagle_bypass.py       pi@<pi-ip>:/tmp/
+scp deploy/eagle-bypass.service   pi@<pi-ip>:/tmp/
 
-# 2. Secrets: copy the template, fill it in, lock it down.
-sudo cp /opt/linknode-com/deploy/eagle-bypass.env.example /etc/eagle-bypass.env
-sudo nano /etc/eagle-bypass.env        # set EAGLE_INSTALL_CODE + EAGLE_UPLOAD_PASSWORD
-sudo chmod 600 /etc/eagle-bypass.env
+# --- the rest runs on the Pi (ssh pi@<pi-ip>) ---
 
-# 3. Install and start the service.
-sudo cp /opt/linknode-com/deploy/eagle-bypass.service /etc/systemd/system/
-#    Edit the User / WorkingDirectory / python3 path in the unit if they differ.
+# 2. Install the script (owned by root, world-readable, executable).
+sudo install -D -m 0755 /tmp/eagle_bypass.py /opt/eagle-bypass/eagle_bypass.py
+
+# 3. Secrets: create the env file root-only, fill it in.
+#    (start from deploy/eagle-bypass.env.example — copy it over too if you like)
+sudo install -m 0600 /dev/null /etc/eagle-bypass.env
+sudoedit /etc/eagle-bypass.env         # set EAGLE_IP, EAGLE_CLOUD_ID,
+                                       # EAGLE_INSTALL_CODE, EAGLE_UPLOAD_PASSWORD
+
+# 4. Install and start the service.
+sudo install -m 0644 /tmp/eagle-bypass.service /etc/systemd/system/
+#    Confirm User / python3 path in the unit match this host.
 sudo systemctl daemon-reload
 sudo systemctl enable --now eagle-bypass.service
 
-# 4. Watch it.
+# 5. Watch it.
 journalctl -u eagle-bypass.service -f
 ```
 
@@ -39,15 +51,14 @@ Run one cycle by hand first — this reads the meter and prints the XML without
 sending anything:
 
 ```sh
-cd /opt/linknode-com
 set -a; . /etc/eagle-bypass.env; set +a
-python3 scripts/eagle_bypass.py --dry-run --once -v
+python3 /opt/eagle-bypass/eagle_bypass.py --dry-run --once -v
 ```
 
 Then a single real send while the cloud is down (`-v` shows HTTP 200 per message):
 
 ```sh
-python3 scripts/eagle_bypass.py --once -v
+python3 /opt/eagle-bypass/eagle_bypass.py --once -v
 ```
 
 ## Notes
