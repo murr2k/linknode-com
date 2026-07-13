@@ -1783,11 +1783,15 @@
                 if (response.ok) {
                     const data = await response.json();
 
-                    // Check data staleness (2 minutes = 120 seconds)
-                    const lastUpdateTime = new Date(data.last_update);
+                    // Check data staleness (2 minutes = 120 seconds).
+                    // Guard the timestamp: new Date(null) is epoch 0 (1970), which
+                    // otherwise renders as a nonsense "~495526h ago" age when the
+                    // monitor has no last_update (fresh restart, or total outage).
                     const now = new Date();
-                    const ageInSeconds = Math.floor((now - lastUpdateTime) / 1000);
-                    const isStale = ageInSeconds > 120;
+                    const lastUpdateTime = data.last_update ? new Date(data.last_update) : null;
+                    const hasValidTime = lastUpdateTime && !isNaN(lastUpdateTime.getTime()) && lastUpdateTime.getTime() > 0;
+                    const ageInSeconds = hasValidTime ? Math.floor((now - lastUpdateTime) / 1000) : null;
+                    const isStale = !hasValidTime || ageInSeconds > 120;
 
                     const liveDot = document.getElementById('gauge-live-dot');
                     const liveText = document.getElementById('gauge-live-text');
@@ -1796,13 +1800,21 @@
                         // Data is stale - update gauge to stale state
                         updateGauge(0, true, 0, 0);
 
-                        // Show how old the data is
-                        const ageMinutes = Math.floor(ageInSeconds / 60);
-                        const ageHours = Math.floor(ageMinutes / 60);
-                        if (ageHours > 0) {
-                            liveText.textContent = `${ageHours}h ${ageMinutes % 60}m ago`;
+                        // Show how old the data is (or "No data" when we have no
+                        // valid timestamp at all, e.g. right after a monitor restart).
+                        if (!hasValidTime) {
+                            liveText.textContent = 'No data';
                         } else {
-                            liveText.textContent = `${ageMinutes}m ago`;
+                            const ageMinutes = Math.floor(ageInSeconds / 60);
+                            const ageHours = Math.floor(ageMinutes / 60);
+                            const ageDays = Math.floor(ageHours / 24);
+                            if (ageDays > 0) {
+                                liveText.textContent = `${ageDays}d ${ageHours % 24}h ago`;
+                            } else if (ageHours > 0) {
+                                liveText.textContent = `${ageHours}h ${ageMinutes % 60}m ago`;
+                            } else {
+                                liveText.textContent = `${ageMinutes}m ago`;
+                            }
                         }
 
                         // Also clear the 24h stats when data is stale
