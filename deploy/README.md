@@ -112,5 +112,11 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
   Rainforest's uploader, else you'll get near-duplicate points).
 - **The device flaps.** Its local data-CGI intermittently returns 503; the script
   logs `nothing to ship` and continues. That is expected, not a failure.
+- **Uptime heartbeat.** Every `--heartbeat-secs` (default 900s / 15 min), in *any*
+  mode including standby, the script POSTs a small `BypassStatus` message carrying
+  its own reliability numbers (data-uptime %, device-uptime %, outage counts). The
+  collector stashes these for the dashboard's Uptime tile and never writes them to
+  the time-series, so this is the one case where the bypass talks to `/eagle` while
+  the real cloud path is healthy. It carries no secrets.
 - **Secrets:** `/etc/eagle-bypass.env` holds the Install Code (which also exposes
   the Wi-Fi PSK via the local API) and the upload password. Keep it `600`.

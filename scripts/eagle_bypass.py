@@ -246,6 +246,28 @@ def msg_price(price, meter_mac):
     )
 
 
+def msg_bypass_status(snap):
+    """A side-channel heartbeat carrying the bypass's own reliability numbers, so the
+    dashboard can show real uptime instead of a hardcoded value. Not a Rainforest
+    telemetry type: the collector stashes it in its stats and never writes it to the
+    time-series or touches the data-freshness signal with it."""
+    def num(v):
+        return "" if v is None else repr(v) if isinstance(v, float) else str(v)
+    return (
+        "<rainforest><BypassStatus>"
+        f"<DeviceMacId>{DEVICE_MAC}</DeviceMacId>"
+        f"<TimeStamp>{_hexts()}</TimeStamp>"
+        f"<DataUptimePct>{num(snap.get('data_availability_pct'))}</DataUptimePct>"
+        f"<DeviceUptimePct>{num(snap.get('device_availability_pct'))}</DeviceUptimePct>"
+        f"<ObservedSeconds>{num(snap.get('observed_s'))}</ObservedSeconds>"
+        f"<OutageCount>{num(snap.get('outage_count'))}</OutageCount>"
+        f"<TotalOutageSeconds>{num(snap.get('total_outage_s'))}</TotalOutageSeconds>"
+        f"<WorstOutageSeconds>{num(snap.get('worst_outage_s'))}</WorstOutageSeconds>"
+        f"<ReadingsRescued>{num(snap.get('readings_rescued'))}</ReadingsRescued>"
+        "</BypassStatus></rainforest>"
+    )
+
+
 def post_eagle(xml, timeout=15):
     token = base64.b64encode(f"{UPLOAD_USER}:{UPLOAD_PASS}".encode()).decode()
     req = urllib.request.Request(
@@ -507,7 +529,15 @@ class Stats:
         d["device_availability_pct"] = (
             round(max(0.0, min(100.0, 100.0 * (obs - d["total_outage_s"]) / obs)), 2)
             if obs else None)
-        d["bypass_availability_pct"] = 100.0   # we shipped through every outage observed
+        # Data availability: the uptime a dashboard viewer actually experiences.
+        # Fresh data reached the site on any cycle we sat in standby (the real Eagle
+        # was fine) or successfully shipped a reading (we covered an outage). Probe
+        # cycles and failed ships are the only gaps. This is the number the bypass
+        # exists to keep high.
+        cyc = d.get("cycles", 0)
+        available_cycles = d.get("standby_cycles", 0) + d.get("readings_rescued", 0)
+        d["data_availability_pct"] = (
+            round(max(0.0, min(100.0, 100.0 * available_cycles / cyc)), 2) if cyc else None)
         if d.get("current_outage") and self._cur_start_mono is not None:
             d["current_outage_s"] = int(round(time.monotonic() - self._cur_start_mono))
         return d
@@ -647,11 +677,14 @@ def render_report(d):
     line(f"  watching   {watched} of wall time across {d.get('cycles', 0)} cycles")
     line("")
 
-    # Headline: how much of the time the *device* was actually up, and what the
-    # bypass did about the rest.
+    # Headline: the uptime a viewer actually experiences (data reaching the site),
+    # then the device's own uptime and what the bypass did about the gap.
+    data_avail = d.get("data_availability_pct")
+    if data_avail is not None:
+        line(f"  DATA UPTIME        {data_avail:5.2f}%   (fresh data reaching the site)")
     if avail is not None:
         down = _fmt_dur(d.get("total_outage_s", 0))
-        line(f"  DEVICE UPTIME      {avail:5.2f}%   (down {down} of the time we watched)")
+        line(f"  DEVICE UPTIME      {avail:5.2f}%   (Eagle-200 itself; down {down} of that time)")
     line(f"  BYPASS COVERAGE   100.00%   ({rescued} readings rescued during outages)")
     line("")
     line(f"  outages seen ....... {n}")
@@ -765,11 +798,26 @@ def ship(stats, dry_run=False, verbose=False):
     return ok > 0
 
 
+def ship_status(stats, dry_run=False, verbose=False):
+    """POST the reliability heartbeat so the dashboard can show live uptime. Best
+    effort: a failure here must never disturb the failover loop."""
+    xml = msg_bypass_status(stats._snapshot())
+    if dry_run:
+        log("DRY-RUN would ship bypass status heartbeat")
+        if verbose:
+            print(f"--- bypass_status ---\n{xml}\n", file=sys.stderr)
+        return
+    status, body = post_eagle(xml)
+    if verbose or status != 200:
+        log(f"  bypass_status: HTTP {status} {body}")
+
+
 def run_loop(args, stats):
     active = args.force            # force => always active
     probing = False               # currently in a one-cycle upload pause?
     last_probe = time.monotonic()
     stats.interval = args.interval   # so observed_s accrues real wall time per cycle
+    last_heartbeat = None            # force one on the first cycle so the site populates fast
 
     while True:
         age = fly_age_seconds()
@@ -812,6 +860,15 @@ def run_loop(args, stats):
                 ship(stats, dry_run=args.dry_run, verbose=args.verbose)
 
         stats.note_cycle(mode, age)
+
+        # Reliability heartbeat: independent of standby/active so the dashboard's
+        # uptime stays fresh even during long clean runs. Sent after note_cycle so
+        # this cycle is already counted in the numbers we report.
+        now_mono = time.monotonic()
+        if last_heartbeat is None or (now_mono - last_heartbeat) >= args.heartbeat_secs:
+            ship_status(stats, dry_run=args.dry_run, verbose=args.verbose)
+            last_heartbeat = now_mono
+
         stats.write_live()
         stats.maybe_flush()
 
@@ -827,6 +884,8 @@ def main():
                     help="consider the cloud path down after this many seconds of no data (default 90)")
     ap.add_argument("--probe-secs", type=int, default=300,
                     help="while active, pause uploads one cycle this often to test cloud recovery (default 300)")
+    ap.add_argument("--heartbeat-secs", type=int, default=900,
+                    help="ship a reliability/uptime heartbeat to the dashboard this often, any mode (default 900)")
     ap.add_argument("--force", action="store_true", help="ship every cycle regardless of cloud health (always-on)")
     ap.add_argument("--once", action="store_true", help="run a single cycle and exit")
     ap.add_argument("--dry-run", action="store_true", help="build and print XML; do not POST")
