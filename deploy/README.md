@@ -107,9 +107,15 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
 
 ## Notes
 
-- **Failover vs. always-on:** default is failover. Add `--force` to the
-  `ExecStart` line to ship every cycle regardless (only if you've disabled
-  Rainforest's uploader, else you'll get near-duplicate points).
+- **Always-on (current) vs. failover:** the Pi now runs `--force` (always-on),
+  because Rainforest removed the Eagle's own cloud uploader (at our request, to cut
+  device load), so the Pi is the sole source. If the device ever uploads on its own
+  again, drop `--force` and use `--stale-secs 90 --probe-secs 300` to return to
+  failover, else you'll get near-duplicate points.
+- **What "device health" means now:** with the cloud uploader gone, the meaningful
+  reliability signal is local-API read success (`read_failures` per cycle), i.e.
+  whether the Eagle answers the Pi. In `--force` mode the outage log (which keyed off
+  cloud staleness) no longer accrues.
 - **The device flaps.** Its local data-CGI intermittently returns 503; the script
   logs `nothing to ship` and continues. That is expected, not a failure.
 - **Uptime heartbeat.** Every `--heartbeat-secs` (default 900s / 15 min), in *any*
