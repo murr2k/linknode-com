@@ -238,7 +238,13 @@
             font-size: 0.875rem;
             margin-top: 0.5rem;
         }
-        
+
+        .metric-sublabel {
+            color: #666;
+            font-size: 0.75rem;
+            margin-top: 0.15rem;
+        }
+
         /* New styles for live data widgets */
         .live-metrics-section {
             margin: 4rem 0 2rem 0;
@@ -1107,8 +1113,9 @@
                 <div class="metric-label">Active Services</div>
             </div>
             <div class="metric">
-                <div class="metric-value">100%</div>
-                <div class="metric-label">Uptime</div>
+                <div class="metric-value" id="data-uptime">--</div>
+                <div class="metric-label">Data Uptime</div>
+                <div class="metric-sublabel" id="device-uptime">device --</div>
             </div>
             <div class="metric">
                 <div class="metric-value">24/7</div>
@@ -1782,6 +1789,22 @@
 
                 if (response.ok) {
                     const data = await response.json();
+
+                    // Uptime tile: real availability from the Pi bypass heartbeat.
+                    // Independent of meter-data freshness, so update it up front.
+                    // Data uptime = what a viewer experiences (bypass covers device
+                    // outages); the sublabel shows the Eagle-200's own health.
+                    if (data.bypass_status) {
+                        const b = data.bypass_status;
+                        const du = document.getElementById('data-uptime');
+                        const dev = document.getElementById('device-uptime');
+                        if (b.data_uptime_pct !== null && b.data_uptime_pct !== undefined) {
+                            du.textContent = b.data_uptime_pct.toFixed(1) + '%';
+                        }
+                        if (b.device_uptime_pct !== null && b.device_uptime_pct !== undefined) {
+                            dev.textContent = 'device ' + Math.round(b.device_uptime_pct) + '%';
+                        }
+                    }
 
                     // Check data staleness (2 minutes = 120 seconds).
                     // Guard the timestamp: new Date(null) is epoch 0 (1970), which

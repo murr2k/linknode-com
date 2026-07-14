@@ -70,12 +70,29 @@ cycle, so you can query current state without parsing the journal:
 ssh pi@<pi-ip> cat /run/eagle-bypass/stats.json | jq
 ```
 
+For a human-readable outage report instead of raw JSON (works against the running
+service's live file, or the newest flash copy if it is stopped):
+
+```sh
+ssh pi@<pi-ip> python3 /opt/eagle-bypass/eagle_bypass.py --report
+```
+
+It prints device uptime %, mean-time-between-outages, an outage-duration histogram,
+an hour-of-day sparkline of when the device tends to stall, and a table of the most
+recent outages with how many readings the bypass rescued during each.
+
 Counters include cycles, standby vs active, `activations` (how often the device
 stalled and the bypass stepped in), ships and per-type message success, `read_failures`
 by kind (timeout / 503 / empty), `longest_clean_run_s`, daily buckets, and
 `restarts` / `reboots` (the latter only counts real OS reboots, via the kernel boot
 id). `flash_saves` counts the hourly checkpoints and is a rough downtime-excluded
 running-hours estimate.
+
+Each closed outage is timestamped (from the Pi's NTP-synced clock) with its duration
+measured on the monotonic clock, so an NTP step mid-outage cannot distort it. The
+log keeps the most recent 100 outages; totals (`outage_count`, `total_outage_s`,
+histograms) are cumulative. An outage still open when the service stops is recorded
+as `incomplete` on the next start rather than being given an invented duration.
 
 Persistence is wear-conscious: the live file lives on tmpfs (`RuntimeDirectory`,
 zero SD writes), while **two** CRC-tagged copies are checkpointed to flash
@@ -95,5 +112,11 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
   Rainforest's uploader, else you'll get near-duplicate points).
 - **The device flaps.** Its local data-CGI intermittently returns 503; the script
   logs `nothing to ship` and continues. That is expected, not a failure.
+- **Uptime heartbeat.** Every `--heartbeat-secs` (default 900s / 15 min), in *any*
+  mode including standby, the script POSTs a small `BypassStatus` message carrying
+  its own reliability numbers (data-uptime %, device-uptime %, outage counts). The
+  collector stashes these for the dashboard's Uptime tile and never writes them to
+  the time-series, so this is the one case where the bypass talks to `/eagle` while
+  the real cloud path is healthy. It carries no secrets.
 - **Secrets:** `/etc/eagle-bypass.env` holds the Install Code (which also exposes
   the Wi-Fi PSK via the local API) and the upload password. Keep it `600`.

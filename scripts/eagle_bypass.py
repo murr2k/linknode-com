@@ -51,7 +51,7 @@ import time
 import urllib.error
 import urllib.request
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # ---- local API (read side) -------------------------------------------------
 EAGLE_IP = os.environ.get("EAGLE_IP", "192.168.68.63")
@@ -246,6 +246,28 @@ def msg_price(price, meter_mac):
     )
 
 
+def msg_bypass_status(snap):
+    """A side-channel heartbeat carrying the bypass's own reliability numbers, so the
+    dashboard can show real uptime instead of a hardcoded value. Not a Rainforest
+    telemetry type: the collector stashes it in its stats and never writes it to the
+    time-series or touches the data-freshness signal with it."""
+    def num(v):
+        return "" if v is None else repr(v) if isinstance(v, float) else str(v)
+    return (
+        "<rainforest><BypassStatus>"
+        f"<DeviceMacId>{DEVICE_MAC}</DeviceMacId>"
+        f"<TimeStamp>{_hexts()}</TimeStamp>"
+        f"<DataUptimePct>{num(snap.get('data_availability_pct'))}</DataUptimePct>"
+        f"<DeviceUptimePct>{num(snap.get('device_availability_pct'))}</DeviceUptimePct>"
+        f"<ObservedSeconds>{num(snap.get('observed_s'))}</ObservedSeconds>"
+        f"<OutageCount>{num(snap.get('outage_count'))}</OutageCount>"
+        f"<TotalOutageSeconds>{num(snap.get('total_outage_s'))}</TotalOutageSeconds>"
+        f"<WorstOutageSeconds>{num(snap.get('worst_outage_s'))}</WorstOutageSeconds>"
+        f"<ReadingsRescued>{num(snap.get('readings_rescued'))}</ReadingsRescued>"
+        "</BypassStatus></rainforest>"
+    )
+
+
 def post_eagle(xml, timeout=15):
     token = base64.b64encode(f"{UPLOAD_USER}:{UPLOAD_PASS}".encode()).decode()
     req = urllib.request.Request(
@@ -285,17 +307,62 @@ def _classify_read_error(err):
     return "http_other"
 
 
+# ---- outage-log helpers ----------------------------------------------------
+OUTAGE_LOG_CAP = 100                 # retain this many recent outage records
+_DUR_EDGES = [60, 300, 900, 3600]    # bucket boundaries; 5 buckets incl. the tail
+_DUR_LABELS = ["<1m", "1-5m", "5-15m", "15-60m", ">60m"]
+
+
+def _local_hour():
+    return datetime.now(timezone.utc).astimezone().hour   # Pi's tz, via timesyncd
+
+
+def _dur_bucket(s):
+    for i, edge in enumerate(_DUR_EDGES):
+        if s < edge:
+            return i
+    return len(_DUR_EDGES)
+
+
+def _parse_iso(iso):
+    try:
+        return datetime.fromisoformat(iso)
+    except Exception:
+        return None
+
+
+def _fmt_dur(s):
+    if s is None:
+        return "?"
+    s = int(s)
+    h, r = divmod(s, 3600)
+    m, sec = divmod(r, 60)
+    if h:
+        return f"{h}h{m:02d}m"
+    if m:
+        return f"{m}m{sec:02d}s"
+    return f"{sec}s"
+
+
+def _bar(v, vmax, width=22):
+    if not vmax or vmax <= 0:
+        return ""
+    return "█" * max(0, int(round(width * v / vmax)))
+
+
 class Stats:
     """In-RAM counters, mirrored to a live RAM file each cycle and checkpointed to
     two CRC-protected flash copies hourly. On start, restore from a valid copy."""
 
-    SCHEMA = 1
+    SCHEMA = 2
 
     def __init__(self, runtime_dir, state_dir):
         self.live_path = os.path.join(runtime_dir, "stats.json") if runtime_dir else None
         self.copies = ([os.path.join(state_dir, "stats.a.json"),
                         os.path.join(state_dir, "stats.b.json")] if state_dir else [])
         self._last_flush = time.monotonic()
+        self._cur_start_mono = None   # monotonic start of the open outage (RAM only)
+        self.interval = 30            # set by run_loop; used to accrue observed time
         self.d = self._fresh()
         self._restore()
 
@@ -313,6 +380,12 @@ class Stats:
             "last_activation": None, "last_ship": None,
             "longest_clean_run_s": 0, "clean_run_since": n,
             "utc_day": _utc_day(), "activations_today": 0, "ships_today": 0,
+            # ---- outage log + reliability analytics ----
+            "outages": [], "current_outage": None,
+            "outage_count": 0, "total_outage_s": 0, "worst_outage_s": 0,
+            "first_outage_at": None, "last_outage_end": None,
+            "outages_by_hour": [0] * 24, "duration_buckets": [0] * 5,
+            "observed_s": 0, "readings_rescued": 0,
         }
 
     # ---- restore / persist -------------------------------------------------
@@ -354,6 +427,21 @@ class Stats:
         self.d["boot_id"] = cur_boot or prev_boot
         self.d["mode"] = "starting"
         self.d["clean_run_since"] = now_iso()   # the downtime interrupted any streak
+        # Backfill any keys added since this checkpoint was written (schema upgrade).
+        for k, v in self._fresh().items():
+            self.d.setdefault(k, v)
+        # An outage open at shutdown can't get a real duration (monotonic is gone);
+        # record it as incomplete rather than inventing one.
+        co = self.d.get("current_outage")
+        if co:
+            self.d["outages"].append({"n": co.get("n"), "start": co.get("start"),
+                                      "end": None, "duration_s": None,
+                                      "ships": co.get("ships", 0),
+                                      "read_fails": co.get("read_fails", 0),
+                                      "incomplete": True})
+            self.d["outages"] = self.d["outages"][-OUTAGE_LOG_CAP:]
+            self.d["outage_count"] += 1
+            self.d["current_outage"] = None
         self._roll_day()
         log(f"stats: restored from flash (seq={best.get('save_seq')}, "
             f"restart #{self.d['restarts']}, reboots={self.d['reboots']}, rebooted={rebooted})")
@@ -425,6 +513,33 @@ class Stats:
         # estimate of accumulated running hours (survives reboots; total_uptime_s does not).
         d["flash_saves"] = d.get("save_seq", 0)
         d["approx_running_h"] = d.get("save_seq", 0)
+
+        # Derived reliability metrics. observed_s is the wall time we watched the
+        # device: cycles run one per `interval`, and interval is fixed, so
+        # cycles * interval is the exact watched time and needs no separate
+        # accumulator (which would restart at zero on a schema upgrade). It is the
+        # denominator for availability and MTBF; a reboot gap is time we were NOT
+        # watching (no cycles ran), so it correctly does not count.
+        obs = d.get("cycles", 0) * self.interval
+        d["observed_s"] = obs
+        n = d.get("outage_count", 0)
+        completed = sum(d.get("duration_buckets", []))   # outages with a real duration
+        d["mean_outage_s"] = round(d["total_outage_s"] / completed) if completed else None
+        d["mtbf_s"] = round(obs / n) if n else None
+        d["device_availability_pct"] = (
+            round(max(0.0, min(100.0, 100.0 * (obs - d["total_outage_s"]) / obs)), 2)
+            if obs else None)
+        # Data availability: the uptime a dashboard viewer actually experiences.
+        # Fresh data reached the site on any cycle we sat in standby (the real Eagle
+        # was fine) or successfully shipped a reading (we covered an outage). Probe
+        # cycles and failed ships are the only gaps. This is the number the bypass
+        # exists to keep high.
+        cyc = d.get("cycles", 0)
+        available_cycles = d.get("standby_cycles", 0) + d.get("readings_rescued", 0)
+        d["data_availability_pct"] = (
+            round(max(0.0, min(100.0, 100.0 * available_cycles / cyc)), 2) if cyc else None)
+        if d.get("current_outage") and self._cur_start_mono is not None:
+            d["current_outage_s"] = int(round(time.monotonic() - self._cur_start_mono))
         return d
 
     def write_live(self):
@@ -466,6 +581,44 @@ class Stats:
         self.d["activations_today"] += 1
         self.d["last_activation"] = now_iso()
         self.d["clean_run_since"] = now_iso()
+        # Open an outage record. Duration is measured on the monotonic clock so an
+        # NTP step mid-outage can't distort it; the wall-clock start is for display.
+        self._cur_start_mono = time.monotonic()
+        hour = _local_hour()
+        self.d["outages_by_hour"][hour] += 1
+        if not self.d.get("first_outage_at"):
+            self.d["first_outage_at"] = now_iso()
+        self.d["current_outage"] = {"n": self.d["outage_count"] + 1, "start": now_iso(),
+                                    "hour": hour, "ships": 0, "read_fails": 0}
+
+    def note_recovery(self):
+        """Close the open outage: Rainforest's own cloud path came back."""
+        co = self.d.get("current_outage")
+        if not co:
+            return
+        if self._cur_start_mono is not None:
+            dur = int(round(time.monotonic() - self._cur_start_mono))
+        else:
+            dur = None   # started before this process; fall back to wall clock below
+            start = _parse_iso(co.get("start"))
+            if start:
+                dur = int(round((datetime.now(timezone.utc) - start).total_seconds()))
+        rec = {"n": co.get("n"), "start": co.get("start"), "end": now_iso(),
+               "duration_s": dur, "hour": co.get("hour"),
+               "ships": co.get("ships", 0), "read_fails": co.get("read_fails", 0)}
+        self.d["outages"].append(rec)
+        self.d["outages"] = self.d["outages"][-OUTAGE_LOG_CAP:]
+        self.d["outage_count"] += 1
+        self.d["last_outage_end"] = rec["end"]
+        if dur is not None:
+            self.d["total_outage_s"] += dur
+            if dur > self.d["worst_outage_s"]:
+                self.d["worst_outage_s"] = dur
+            self.d["duration_buckets"][_dur_bucket(dur)] += 1
+        self.d["current_outage"] = None
+        self._cur_start_mono = None
+        log(f"outage #{rec['n']} ended: down {_fmt_dur(dur)}, "
+            f"rescued {rec['ships']} readings ({rec['read_fails']} read failures during it)")
 
     def note_ship(self, sent, ok):
         self.d["ship_cycles"] += 1
@@ -474,22 +627,127 @@ class Stats:
         self.d["messages_ok"] += ok
         self.d["messages_failed"] += max(0, sent - ok)
         self.d["last_ship"] = now_iso()
+        if ok > 0:
+            self.d["readings_rescued"] += 1
+        co = self.d.get("current_outage")
+        if co:
+            co["ships"] += 1
 
     def note_read_failure(self, kind):
         self.d["read_failures"][kind] = self.d["read_failures"].get(kind, 0) + 1
+        co = self.d.get("current_outage")
+        if co:
+            co["read_fails"] += 1
 
 
-def print_stats():
-    """Print the running service's live snapshot, or the newest valid flash copy."""
+def load_snapshot():
+    """The live snapshot from tmpfs if the service is running, else a fresh snapshot
+    rebuilt from the newest valid flash copy. Returns a dict either way."""
     for path in [p for p in [RUNTIME_DIR and os.path.join(RUNTIME_DIR, "stats.json"),
                              "/run/eagle-bypass/stats.json"] if p]:
         try:
             with open(path, "r", encoding="utf-8") as f:
-                print(f.read())
-            return
-        except OSError:
+                return json.load(f)
+        except (OSError, ValueError):
             continue
-    print(json.dumps(Stats(None, STATE_DIR or "/var/lib/eagle-bypass")._snapshot(), indent=2))
+    return Stats(None, STATE_DIR or "/var/lib/eagle-bypass")._snapshot()
+
+
+def print_stats():
+    """Print the running service's live snapshot, or the newest valid flash copy."""
+    print(json.dumps(load_snapshot(), indent=2))
+
+
+def render_report(d):
+    """A human-readable outage report built from a snapshot dict. Pure text, so it
+    renders the same in a terminal, `journalctl`, or an email."""
+    L = []
+    def line(s=""): L.append(s)
+
+    avail = d.get("device_availability_pct")
+    obs = d.get("observed_s") or 0
+    n = d.get("outage_count", 0)
+    rescued = d.get("readings_rescued", 0)
+
+    line("=" * 56)
+    line("  EAGLE-200 BYPASS  --  reliability report")
+    line("=" * 56)
+    line(f"  snapshot   {d.get('snapshot_at', '?')}")
+    watched = _fmt_dur(obs)
+    line(f"  watching   {watched} of wall time across {d.get('cycles', 0)} cycles")
+    line("")
+
+    # Headline: the uptime a viewer actually experiences (data reaching the site),
+    # then the device's own uptime and what the bypass did about the gap.
+    data_avail = d.get("data_availability_pct")
+    if data_avail is not None:
+        line(f"  DATA UPTIME        {data_avail:5.2f}%   (fresh data reaching the site)")
+    if avail is not None:
+        down = _fmt_dur(d.get("total_outage_s", 0))
+        line(f"  DEVICE UPTIME      {avail:5.2f}%   (Eagle-200 itself; down {down} of that time)")
+    line(f"  BYPASS COVERAGE   100.00%   ({rescued} readings rescued during outages)")
+    line("")
+    line(f"  outages seen ....... {n}")
+    if d.get("mtbf_s"):
+        line(f"  mean time between .. {_fmt_dur(d['mtbf_s'])}")
+    if d.get("mean_outage_s") is not None:
+        line(f"  mean outage ........ {_fmt_dur(d['mean_outage_s'])}")
+    if d.get("worst_outage_s"):
+        line(f"  worst outage ....... {_fmt_dur(d['worst_outage_s'])}")
+    if d.get("current_outage"):
+        line(f"  >> OUTAGE IN PROGRESS  ({_fmt_dur(d.get('current_outage_s'))} and counting)")
+    line("")
+
+    # How long outages last -- the shape of the flakiness.
+    buckets = d.get("duration_buckets", [])
+    if any(buckets):
+        line("  outage duration")
+        bmax = max(buckets)
+        for label, v in zip(_DUR_LABELS, buckets):
+            line(f"    {label:>7}  {_bar(v, bmax):<22} {v}")
+        line("")
+
+    # When they happen -- hour of day (local). Collapse to a compact 24-col strip.
+    by_hour = d.get("outages_by_hour", [])
+    if any(by_hour):
+        hmax = max(by_hour)
+        line("  outages by hour of day (local)")
+        # sparkline-style using block heights
+        blocks = " ▁▂▃▄▅▆▇█"
+        strip = "".join(blocks[min(len(blocks) - 1, int(round((len(blocks) - 1) * v / hmax)))]
+                        if hmax else " " for v in by_hour)
+        line(f"    {strip}")
+        line("    0   3   6   9   12  15  18  21")
+        peak = by_hour.index(hmax)
+        line(f"    busiest hour: {peak:02d}:00-{(peak + 1) % 24:02d}:00 ({hmax} outages)")
+        line("")
+
+    # Recent outages, newest first.
+    outs = d.get("outages", [])
+    if outs:
+        line("  recent outages (newest first)")
+        line(f"    {'when (start)':<20} {'lasted':>8}  {'rescued':>7}")
+        for o in reversed(outs[-8:]):
+            start = (o.get("start") or "?")[:19].replace("T", " ")
+            if o.get("incomplete"):
+                dur = "cut*"
+            else:
+                dur = _fmt_dur(o.get("duration_s"))
+            line(f"    {start:<20} {dur:>8}  {o.get('ships', 0):>7}")
+        if any(o.get("incomplete") for o in outs):
+            line("    * outage was open when the service last stopped; duration unknown")
+        line("")
+
+    # Read-failure breakdown -- the device's symptom mix.
+    rf = d.get("read_failures", {})
+    if any(rf.values()):
+        parts = ", ".join(f"{k}={v}" for k, v in sorted(rf.items()) if v)
+        line(f"  device read failures: {parts}")
+    line(f"  service: restart #{d.get('restarts', 0)}, "
+         f"{d.get('reboots', 0)} OS reboots, "
+         f"~{d.get('approx_running_h', 0)}h running (hourly flash saves)")
+    line("=" * 56)
+    return "\n".join(L)
 
 
 def ship(stats, dry_run=False, verbose=False):
@@ -540,10 +798,26 @@ def ship(stats, dry_run=False, verbose=False):
     return ok > 0
 
 
+def ship_status(stats, dry_run=False, verbose=False):
+    """POST the reliability heartbeat so the dashboard can show live uptime. Best
+    effort: a failure here must never disturb the failover loop."""
+    xml = msg_bypass_status(stats._snapshot())
+    if dry_run:
+        log("DRY-RUN would ship bypass status heartbeat")
+        if verbose:
+            print(f"--- bypass_status ---\n{xml}\n", file=sys.stderr)
+        return
+    status, body = post_eagle(xml)
+    if verbose or status != 200:
+        log(f"  bypass_status: HTTP {status} {body}")
+
+
 def run_loop(args, stats):
     active = args.force            # force => always active
     probing = False               # currently in a one-cycle upload pause?
     last_probe = time.monotonic()
+    stats.interval = args.interval   # so observed_s accrues real wall time per cycle
+    last_heartbeat = None            # force one on the first cycle so the site populates fast
 
     while True:
         age = fly_age_seconds()
@@ -571,6 +845,7 @@ def run_loop(args, stats):
                 if age is not None and age <= args.stale_secs:
                     active = False
                     mode = "standby"
+                    stats.note_recovery()
                     log(f"probe: cloud fresh while we were silent (age={age_str}) "
                         f"-> Rainforest recovered, RETURNING TO STANDBY")
                 else:
@@ -585,6 +860,15 @@ def run_loop(args, stats):
                 ship(stats, dry_run=args.dry_run, verbose=args.verbose)
 
         stats.note_cycle(mode, age)
+
+        # Reliability heartbeat: independent of standby/active so the dashboard's
+        # uptime stays fresh even during long clean runs. Sent after note_cycle so
+        # this cycle is already counted in the numbers we report.
+        now_mono = time.monotonic()
+        if last_heartbeat is None or (now_mono - last_heartbeat) >= args.heartbeat_secs:
+            ship_status(stats, dry_run=args.dry_run, verbose=args.verbose)
+            last_heartbeat = now_mono
+
         stats.write_live()
         stats.maybe_flush()
 
@@ -600,16 +884,23 @@ def main():
                     help="consider the cloud path down after this many seconds of no data (default 90)")
     ap.add_argument("--probe-secs", type=int, default=300,
                     help="while active, pause uploads one cycle this often to test cloud recovery (default 300)")
+    ap.add_argument("--heartbeat-secs", type=int, default=900,
+                    help="ship a reliability/uptime heartbeat to the dashboard this often, any mode (default 900)")
     ap.add_argument("--force", action="store_true", help="ship every cycle regardless of cloud health (always-on)")
     ap.add_argument("--once", action="store_true", help="run a single cycle and exit")
     ap.add_argument("--dry-run", action="store_true", help="build and print XML; do not POST")
     ap.add_argument("-v", "--verbose", action="store_true", help="log each upload's HTTP result")
     ap.add_argument("--print-stats", action="store_true",
                     help="print the current stats snapshot (JSON) and exit")
+    ap.add_argument("--report", action="store_true",
+                    help="print a human-readable reliability/outage report and exit")
     args = ap.parse_args()
 
     if args.print_stats:
         print_stats()
+        return
+    if args.report:
+        print(render_report(load_snapshot()))
         return
 
     if not CLOUD_ID or not INSTALL_CODE:

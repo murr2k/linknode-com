@@ -117,7 +117,10 @@ stats = {
     'last_power_reading': None,
     'start_time': datetime.now(timezone.utc).isoformat(),
     'packets_today': 0,
-    'packets_today_date': datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    'packets_today_date': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+    # Reliability heartbeat from the Pi bypass (uptime the dashboard displays).
+    # Populated out-of-band by BypassStatus messages; None until the first arrives.
+    'bypass_status': None,
 }
 
 # Initialize data staleness monitor
@@ -372,6 +375,33 @@ def parse_eagle_xml(xml_data):
                 if div_val != 0:
                     data['energy_received_kwh'] = (received_val * mult_val) / div_val
         
+        # 2b. BypassStatus - reliability heartbeat from our Pi failover uploader.
+        # Not a Rainforest telemetry type: it carries the bypass's own uptime numbers
+        # so the dashboard can show real availability. Stashed in stats, never written
+        # to the time-series (see eagle_webhook), so it can't distort energy data.
+        elif root.find('.//BypassStatus') is not None:
+            elem = root.find('.//BypassStatus')
+            data['message_type'] = 'bypass_status'
+
+            def _num(tag, cast):
+                raw = elem.findtext(tag, '')
+                if raw is None or raw == '':
+                    return None
+                try:
+                    return cast(raw)
+                except (ValueError, TypeError):
+                    return None
+
+            data['bypass'] = {
+                'data_uptime_pct': _num('DataUptimePct', float),
+                'device_uptime_pct': _num('DeviceUptimePct', float),
+                'observed_seconds': _num('ObservedSeconds', int),
+                'outage_count': _num('OutageCount', int),
+                'total_outage_seconds': _num('TotalOutageSeconds', int),
+                'worst_outage_seconds': _num('WorstOutageSeconds', int),
+                'readings_rescued': _num('ReadingsRescued', int),
+            }
+
         # 3. TimeCluster - Time synchronization
         elif root.find('.//TimeCluster') is not None:
             elem = root.find('.//TimeCluster')
@@ -474,6 +504,19 @@ def eagle_webhook():
             stats['filtered_requests'] += 1
             logger.debug(f"Filtered message from ignored device: {device_mac}")
             return jsonify({'status': 'filtered', 'reason': 'ignored_device_mac'}), 200
+
+        # Reliability heartbeat from the Pi bypass: record the uptime numbers for the
+        # dashboard and acknowledge. Deliberately returns BEFORE the InfluxDB write and
+        # the last_data_received update below -- it must not be mistaken for fresh meter
+        # data, or it would mask the staleness/Pushover alerting during a real outage.
+        if data.get('message_type') == 'bypass_status':
+            b = data.get('bypass', {})
+            b['updated_at'] = datetime.now(timezone.utc).isoformat()
+            stats['bypass_status'] = b
+            logger.info(f"Bypass heartbeat: data_uptime={b.get('data_uptime_pct')}% "
+                        f"device_uptime={b.get('device_uptime_pct')}% "
+                        f"outages={b.get('outage_count')}")
+            return jsonify({'status': 'ok', 'type': 'bypass_status'}), 200
 
         # Create InfluxDB point
         point = Point("energy_monitor") \
@@ -658,6 +701,8 @@ def get_stats():
         'active_viewers': active_viewers,
         'packet_interval_ms': stats.get('packet_interval_ms'),
         'packets_today': stats.get('packets_today', 0),
+        # Live uptime from the Pi bypass heartbeat (None until the first arrives).
+        'bypass_status': stats.get('bypass_status'),
         'monitor_stats': stats,
         # Billing period info (tiered rates)
         'billing_period': {
