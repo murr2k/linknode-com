@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Eagle-200 local-API bypass: a hot-standby failover uploader that keeps the data
+  pipeline alive through the meter's hardware faults (`scripts/eagle_bypass.py`, `deploy/`)
+  - Polls the Eagle's LAN REST API and forwards synthetic Rainforest XML to the Fly
+    `/eagle` endpoint only while the real cloud path is stale, filling gaps without
+    duplicating data
+  - Runs as a systemd service on a Raspberry Pi on the home network (the one host that
+    can reach the meter; Fly cannot). See `deploy/README.md`
+  - Single standard-library-only file, so there is nothing to clone or `pip install`
+    on the Pi
+- Persistent reliability statistics for the bypass
+  - Counters kept in RAM, mirrored to a tmpfs live file each cycle for querying
+    (`/run/eagle-bypass/stats.json`, zero SD wear), and checkpointed hourly to two
+    CRC-tagged flash copies that survive reboots (restores from whichever copy is valid)
+  - Distinguishes real OS reboots from service restarts via the kernel boot id
+- Outage log with reliability analytics for the bypass
+  - Timestamps each device outage and records its duration, measured on the monotonic
+    clock so an NTP step mid-outage cannot distort it
+  - `--report` prints device uptime %, mean-time-between-outages, an outage-duration
+    histogram, an hour-of-day sparkline of when the device stalls, and a table of
+    recent outages with the readings the bypass rescued during each
+- Live uptime on the dashboard, replacing the previously hardcoded "100%"
+  - The bypass posts a small `BypassStatus` heartbeat every 15 minutes; the collector
+    surfaces it under `/api/stats.bypass_status` and the site renders it
+  - Shows **Data Uptime** (the availability a visitor actually experiences, kept high
+    by the bypass) with a **device health** sublabel (the Eagle-200's own uptime)
+  - The heartbeat is recorded out-of-band and never touches the data-freshness signal,
+    so it cannot mask the staleness / Pushover alerting during a genuine total outage
 - Pushover emergency-priority alerting for power-meter outages (`fly/eagle-monitor`)
   - Fires a siren push that repeats every 60s until acknowledged when data stops arriving
   - Triggers only on the healthy→unhealthy transition (exactly one alert per outage); recovery stays Slack-only
