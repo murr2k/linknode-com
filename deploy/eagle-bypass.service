@@ -12,15 +12,19 @@ StartLimitBurst=10
 
 [Service]
 Type=simple
-# ADJUST these three to match the Pi: the user to run as, where you cloned the
-# repo, and the python3 path (`which python3`).
+# ADJUST to match your host: the user to run as, and the python3 path
+# (`which python3`). Paths below match the single-file install in README.md
+# (the script copied to /opt/eagle-bypass/), which is how the live Pi is set up.
 User=pi
-WorkingDirectory=/opt/linknode-com
-ExecStart=/usr/bin/python3 /opt/linknode-com/scripts/eagle_bypass.py
+WorkingDirectory=/opt/eagle-bypass
 
 # Secrets (Cloud ID, Install Code, upload password) live here, NOT in the repo.
 # Install deploy/eagle-bypass.env.example to this path and chmod 600 it.
 EnvironmentFile=/etc/eagle-bypass.env
+
+# Failover mode with the tuning the Pi runs: poll every 30s, treat the cloud as
+# down after 90s of silence, and pause one cycle every 5 min to test recovery.
+ExecStart=/usr/bin/python3 /opt/eagle-bypass/eagle_bypass.py --interval 30 --stale-secs 90 --probe-secs 300 -v
 
 Restart=always
 RestartSec=15

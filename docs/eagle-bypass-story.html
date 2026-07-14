@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading the meter ourselves — an Eagle-200 local-API bypass</title>
+
+<style>
+  /* ---------------------------------------------------------------------------
+     Inlined from docs/assets/linknode-docs.css (source of truth) so this page is
+     self-contained, then re-skinned with an indigo accent that distinguishes it
+     from the field guide (teal) and the evidence page (blue).
+     ------------------------------------------------------------------------- */
+  :root {
+    --page:        #eef1f4;
+    --surface:     #ffffff;
+    --surface-2:   #f6f7f9;
+    --ink:         #0d1117;
+    --ink-2:       #47515e;
+    --muted:       #79838f;
+    --hairline:    rgba(13, 17, 23, 0.11);
+    --rule:        rgba(13, 17, 23, 0.07);
+
+    --accent:      #5b53d6;
+    --accent-ink:  #423bb0;
+    --wash:        rgba(91, 83, 214, 0.08);
+
+    --good:        #1f8a4c;
+    --warn:        #b8621b;
+    --danger:      #c0392f;
+
+    --shadow: 0 1px 2px rgba(13,17,23,.05), 0 10px 30px -16px rgba(13,17,23,.22);
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --measure: 66ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0b0e13; --surface: #161b22; --surface-2: #1c222b;
+      --ink: #e9edf2; --ink-2: #9aa6b3; --muted: #6d7885;
+      --hairline: rgba(255,255,255,0.13); --rule: rgba(255,255,255,0.07);
+      --accent: #8b83f0; --accent-ink: #a7a1f7; --wash: rgba(139,131,240,0.12);
+      --good: #46c073; --warn: #d98a3d; --danger: #e0685c;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -16px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0b0e13; --surface: #161b22; --surface-2: #1c222b;
+    --ink: #e9edf2; --ink-2: #9aa6b3; --muted: #6d7885;
+    --hairline: rgba(255,255,255,0.13); --rule: rgba(255,255,255,0.07);
+    --accent: #8b83f0; --accent-ink: #a7a1f7; --wash: rgba(139,131,240,0.12);
+    --good: #46c073; --warn: #d98a3d; --danger: #e0685c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -16px rgba(0,0,0,.7);
+  }
+  :root[data-theme="light"] {
+    --page: #eef1f4; --surface: #ffffff; --surface-2: #f6f7f9;
+    --ink: #0d1117; --ink-2: #47515e; --muted: #79838f;
+    --hairline: rgba(13,17,23,0.11); --rule: rgba(13,17,23,0.07);
+    --accent: #5b53d6; --accent-ink: #423bb0; --wash: rgba(91,83,214,0.08);
+    --good: #1f8a4c; --warn: #b8621b; --danger: #c0392f;
+    --shadow: 0 1px 2px rgba(13,17,23,.05), 0 10px 30px -16px rgba(13,17,23,.22);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font-family: var(--sans); font-size: 16px; line-height: 1.62;
+         -webkit-font-smoothing: antialiased; }
+  img, svg { max-width: 100%; height: auto; }
+
+  h1 { font-size: clamp(1.85rem, 4.4vw, 2.8rem); line-height: 1.1; letter-spacing: -.022em;
+       font-weight: 690; margin: 0; text-wrap: balance; }
+  h2 { font-size: 1.4rem; letter-spacing: -.012em; font-weight: 670; margin: 0;
+       padding-bottom: .65rem; border-bottom: 1px solid var(--hairline); text-wrap: balance; }
+  h3 { font-size: .98rem; font-weight: 660; margin: 1rem 0 0; }
+  p  { margin: 0; max-width: var(--measure); text-wrap: pretty; }
+  strong { font-weight: 640; }
+
+  a { color: var(--accent-ink); text-decoration-color: var(--hairline); text-underline-offset: 2px; }
+  a:focus-visible, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  code { font-family: var(--mono); font-size: .86em; background: var(--rule);
+         padding: .1em .38em; border-radius: 3px; word-break: break-word; }
+  pre  { margin: 0; background: var(--surface); border: 1px solid var(--hairline);
+         border-radius: 6px; padding: 1.1rem 1.25rem; overflow-x: auto;
+         font-family: var(--mono); font-size: .82rem; line-height: 1.7; color: var(--ink-2);
+         box-shadow: var(--shadow); }
+
+  .kicker { font-family: var(--mono); font-size: .7rem; letter-spacing: .16em;
+            text-transform: uppercase; color: var(--accent-ink); font-weight: 600; }
+  .lede   { font-size: 1.12rem; color: var(--ink-2); max-width: 48rem; text-wrap: pretty; }
+
+  .card { background: var(--surface); border: 1px solid var(--hairline);
+          border-radius: 6px; box-shadow: var(--shadow); padding: 1.5rem;
+          display: flex; flex-direction: column; gap: .8rem; }
+  .card h3 { margin: 0; }
+
+  .callout { background: var(--wash); border: 1px solid var(--hairline);
+             border-left: 3px solid var(--accent); border-radius: 6px;
+             padding: 1rem 1.2rem; font-size: .96rem; color: var(--ink-2);
+             display: flex; flex-direction: column; gap: .5rem; }
+  .callout.warn   { border-left-color: var(--warn); }
+  .callout.danger { border-left-color: var(--danger); }
+  .callout.good   { border-left-color: var(--good); }
+  .callout b, .callout strong { color: var(--ink); }
+  .callout .tag { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em;
+                  text-transform: uppercase; font-weight: 700; color: var(--accent-ink); }
+  .callout.warn   .tag { color: var(--warn); }
+  .callout.danger .tag { color: var(--danger); }
+  .callout.good   .tag { color: var(--good); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+           gap: 1px; background: var(--hairline);
+           border: 1px solid var(--hairline); border-radius: 6px; overflow: hidden; }
+  .tile  { background: var(--surface); padding: 1.15rem 1.25rem 1.25rem;
+           display: flex; flex-direction: column; gap: .3rem; }
+  .tile .k { font-family: var(--mono); font-size: .65rem; letter-spacing: .1em;
+             text-transform: uppercase; color: var(--muted); }
+  .tile .v { font-size: 1.85rem; font-weight: 650; letter-spacing: -.02em; line-height: 1.1;
+             font-variant-numeric: tabular-nums; }
+  .tile .n { font-size: .82rem; color: var(--ink-2); line-height: 1.35; }
+  .tile.bad .v { color: var(--danger); }
+  .tile.good .v { color: var(--good); }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--hairline);
+               border-radius: 6px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  thead th { background: var(--surface-2); }
+  th { text-align: left; font-family: var(--mono); font-size: .68rem; letter-spacing: .07em;
+       text-transform: uppercase; color: var(--muted); font-weight: 600;
+       padding: .6rem .9rem; border-bottom: 1px solid var(--hairline); }
+  td { padding: .55rem .9rem; border-bottom: 1px solid var(--rule); vertical-align: top;
+       background: var(--surface); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, .tabular { font-variant-numeric: tabular-nums; }
+
+  .proof { background: var(--surface); border: 1px solid var(--hairline);
+           border-radius: 6px; box-shadow: var(--shadow); overflow: hidden; }
+  .proof-head { padding: 1rem 1.35rem; border-bottom: 1px solid var(--hairline);
+                font-family: var(--mono); font-size: .72rem; letter-spacing: .08em;
+                text-transform: uppercase; color: var(--muted); }
+  .proof pre { border: 0; border-radius: 0; box-shadow: none; }
+  pre .ok  { color: var(--good); font-weight: 600; }
+  pre .err { color: var(--danger); font-weight: 600; }
+  pre .cmt { color: var(--muted); }
+  pre .hl  { color: var(--accent-ink); font-weight: 600; }
+
+  /* ---- page layout ---- */
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem;
+          display: flex; flex-direction: column; gap: 2.75rem; }
+  header { display: flex; flex-direction: column; gap: 1rem; }
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1rem; }
+  .rule { height: 1px; background: var(--hairline); border: 0; margin: 0; }
+  .foot { color: var(--muted); font-size: .82rem; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">Field report · Rainforest EAGLE-200 · linknode.com</div>
+    <h1>The meter was fine. The cloud wasn&rsquo;t. So we read the meter ourselves.</h1>
+    <p class="lede">Our home energy dashboard kept going dark. The fault wasn&rsquo;t the network and
+      wasn&rsquo;t the meter &mdash; it was the path in between. This is how we diagnosed it and
+      built a small, self-effacing workaround that fills the gaps and gets out of the way the moment
+      the normal path recovers. Written for two readers: the Rainforest firmware engineer who knows
+      this device better than we do, and the fellow owner who just wants their graph back.</p>
+  </header>
+
+  <section>
+    <h2>The pipeline</h2>
+    <p>An EAGLE-200 reads a residential smart meter over Zigbee and uploads to Rainforest&rsquo;s
+      cloud, which forwards each reading to a webhook of our choosing. Ours lands at a small Flask
+      collector on Fly.io, which writes to InfluxDB and renders a live gauge in Grafana.</p>
+    <div class="proof">
+      <div class="proof-head">the normal data path</div>
+<pre>smart meter ──Zigbee──▶ EAGLE-200 gateway ──HTTPS──▶ Rainforest cloud
+                                                          │
+                                                          ▼  HTTPS POST (XML)
+   Grafana ◀── InfluxDB ◀── linknode-eagle-monitor.fly.dev/eagle</pre>
+    </div>
+    <p>When it works, a reading arrives roughly every 8&ndash;10 seconds. When it doesn&rsquo;t,
+      every downstream stage is starved &mdash; and there is nothing any of them can do about it,
+      because the reading never left the gateway.</p>
+  </section>
+
+  <section>
+    <h2>The failure</h2>
+    <p>The stalls began as an occasional annoyance and, after an abrupt step-change on
+      <strong>24 June 2026</strong>, became the normal state of affairs. The signature is specific
+      and, once you&rsquo;ve seen it, unmistakable: the gateway&rsquo;s web server answers instantly
+      while the process that actually serves meter data is wedged.</p>
+
+    <div class="tiles">
+      <div class="tile"><span class="k">Uptime, 208 d</span><span class="v">87.3%</span><span class="n">the whole measured window</span></div>
+      <div class="tile bad"><span class="k">Uptime since Jun 24</span><span class="v">18%</span><span class="n">after the regression</span></div>
+      <div class="tile bad"><span class="k">Cumulative downtime</span><span class="v">635 h</span><span class="n">data simply absent</span></div>
+      <div class="tile"><span class="k">Typical stall</span><span class="v">15&ndash;25 m</span><span class="n">between self-recoveries</span></div>
+    </div>
+
+    <p>We eliminated the network methodically &mdash; moved the gateway to wired Ethernet, watched
+      the traffic on the wire, confirmed the box was reachable throughout. The tell is that the
+      device returns <code>503</code> from its <em>own</em> local HTTP server: the front end
+      (lighttpd) is healthy and fast, but the CGI backend that reads the Zigbee data has died.</p>
+
+    <div class="proof">
+      <div class="proof-head">the device, talking to itself &mdash; captured on the LAN</div>
+<pre><span class="cmt"># same box, same second: web server up, data backend down</span>
+POST /cgi-bin/post_manager  (wifi_status)     <span class="ok">200 OK</span>   4 ms
+POST /cgi-bin/post_manager  (device_list)     <span class="err">503 Service Unavailable</span>  after ~10 s
+TCP  10.0.0.222:80  connect                   <span class="ok">OPEN</span>    5 ms  <span class="cmt"># network is fine</span></pre>
+    </div>
+
+    <p>This is a device-internal fault. No amount of ret/rebooting the router, re-pairing Zigbee, or
+      poking the cloud changes it; only power-cycling the gateway clears the wedge, and after 24 June
+      it returns within the half-hour. The cloud portal, correctly, just reports the device as
+      offline &mdash; it has nothing to forward.</p>
+  </section>
+
+  <section>
+    <h2>The realization</h2>
+    <p>Here is the part that turns a complaint into a project. The gateway exposes a
+      <strong>local REST API</strong> on the LAN &mdash; the same one the cloud path is built on. And
+      when the data CGI is having a good minute, that local API returns fully-formed, current meter
+      readings, even while the cloud upload is stone dead.</p>
+    <div class="callout good">
+      <span class="tag">The opening</span>
+      <p>The data never left the building. If we can read the meter locally and hand our own
+        collector exactly what the cloud would have handed it, the dashboard never has to know the
+        cloud was down.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What we built</h2>
+    <p>A single, dependency-free Python script that polls the local API, translates each reading into
+      the precise wire format our collector already parses, and POSTs it to the same
+      <code>/eagle</code> endpoint &mdash; indistinguishable, from the collector&rsquo;s side, from a
+      genuine Rainforest forward.</p>
+
+    <h3>The wire format, reconstructed</h3>
+    <p>The collector expects <em>raw Zigbee</em> values &mdash; a hex integer plus a multiplier and
+      divisor &mdash; and does the decimal arithmetic itself. So rather than send a finished number,
+      we run that arithmetic backwards: take the decimal the local API gives us and re-encode the raw
+      form, so the collector&rsquo;s own math lands exactly on the original reading. One message type
+      per POST, because the parser handles the first match and ignores the rest.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Local API reading</th><th>Collector field</th><th>What we send</th></tr></thead>
+        <tbody>
+          <tr><td>InstantaneousDemand<br><span class="foot">0.814 kW</span></td><td class="num">power_w</td><td class="num">Demand <code>0x0000032e</code>, Mult <code>0x1</code>, Div <code>0x3e8</code></td></tr>
+          <tr><td>CurrentSummationDelivered<br><span class="foot">93639.569 kWh</span></td><td class="num">energy_delivered_kwh</td><td class="num">SummationDelivered <code>0x00000594d391</code>, Div <code>0x3e8</code></td></tr>
+          <tr><td>Price<br><span class="foot">$0.1172 / kWh</span></td><td class="num">price_per_kwh</td><td class="num">Price <code>0x00000494</code>, TrailingDigits <code>0x04</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Two details are load-bearing, and both are the kind of thing you only learn by getting them
+      wrong first:</p>
+
+    <div class="cols">
+      <div class="callout">
+        <span class="tag">Gotcha · time</span>
+        <p><strong>The timestamp is Zigbee-epoch.</strong> Seconds are counted from 2000-01-01, not
+          the Unix epoch &mdash; an offset of <code>946684800</code>. Send a Unix timestamp and the
+          collector&rsquo;s sanity check quietly rewrites your reading&rsquo;s time by 30 years.</p>
+      </div>
+      <div class="callout">
+        <span class="tag">Gotcha · identity</span>
+        <p><strong>There are two radios.</strong> Tag the data with the control radio
+          (<code>&hellip;ef69</code>). The other MAC (<code>&hellip;ef68</code>) only ever emitted
+          empty frames, so the collector filters it outright &mdash; label your messages with it and
+          they vanish on arrival.</p>
+      </div>
+    </div>
+
+    <h3>Failover, not replacement</h3>
+    <p>The workaround&rsquo;s guiding principle is to do nothing when it isn&rsquo;t needed. It watches
+      the collector&rsquo;s own freshness clock and ships only when the cloud path has gone quiet
+      past a threshold, so healthy Rainforest traffic is never duplicated. Because our own uploads
+      reset that same clock, it periodically falls silent for one cycle to check whether the cloud
+      has genuinely recovered &mdash; if the clock stays fresh while we hold our breath, Rainforest is
+      back, and we stand down.</p>
+    <p>It is also built for a flaky counterpart. The device&rsquo;s data CGI flaps between clean
+      reads, timeouts, <code>503</code>s, and the occasional well-formed-but-empty response. The
+      poller treats every one of those as &ldquo;nothing to ship this cycle,&rdquo; logs it, and
+      tries again &mdash; it never forwards a garbage reading and never crashes on a bad one.</p>
+
+    <div class="proof">
+      <div class="proof-head">a live failover cycle &mdash; three messages, all accepted</div>
+<pre>cloud stale (age=1912s &gt; 90s) <span class="hl">-&gt; ACTIVATING bypass</span>
+  demand      HTTP <span class="ok">200</span>  {"status":"ok"}
+  summation   HTTP <span class="ok">200</span>  {"status":"ok"}
+  price       HTTP <span class="ok">200</span>  {"status":"ok"}
+shipped 3/3 messages  [demand=0.814kW summation=93639.569kWh price=0.1172]</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two notes, two readers</h2>
+    <div class="cols">
+      <div class="card">
+        <h3>For Rainforest engineering</h3>
+        <p>This is a peer report, not a complaint. The fault is contained to the data-collection CGI:
+          in a single window, <code>wifi_status</code> and <code>system_query</code> return
+          <code>200</code> while <code>device_list</code> and <code>device_query</code> return
+          <code>503</code> from the same lighttpd instance &mdash; a backend hang, not a
+          connectivity or Zigbee-pairing issue.</p>
+        <p><strong>Repro:</strong> leave a post-24-June gateway running; watch <code>device_list</code>
+          over the local API; it wedges within ~15&ndash;25 min and recovers only on a power cycle.
+          The cloud outage is downstream of this &mdash; the box has nothing to upload.</p>
+        <p>The bright spot is your own local API: it was a stable enough surface to build a reliable
+          fallback on. Hardening the data daemon (or letting it self-restart on a stuck read) would
+          fix the root cause for every EAGLE-200 owner at once.</p>
+      </div>
+      <div class="card">
+        <h3>For fellow EAGLE-200 owners</h3>
+        <p>If your cloud data keeps dropping but the device is reachable, you are probably seeing this
+          same wedge &mdash; and you can route around it. The gateway&rsquo;s local API
+          (<code>POST /cgi-bin/post_manager</code>, HTTP Basic auth) serves live readings straight off
+          your LAN, no cloud required. Poll it, reshape the reading, and send it wherever you like.</p>
+        <p>It runs happily on hardware you already have lying around &mdash; ours lives on a
+          Raspberry Pi. The whole thing is one standard-library Python file.</p>
+        <div class="callout danger">
+          <span class="tag">Security</span>
+          <p>Your <strong>Install Code is a credential</strong>: it authenticates the local API, and
+            that API will hand back your <strong>Wi-Fi passphrase in plaintext</strong>. Never paste
+            raw captures into a forum or ticket, and store the Install Code like the password it
+            effectively is.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where it runs now</h2>
+    <p>The bypass lives on a Raspberry Pi 3 as a systemd service &mdash; enabled, restart-on-failure,
+      and proven across a reboot. It sits in standby while Rainforest is delivering, activates within
+      about 90 seconds when the cloud stalls, backfills from the meter reading by reading, and steps
+      aside the moment the normal path returns. The underlying device fault is unchanged; what changed
+      is that a half-hour outage is now a gap the graph never shows.</p>
+    <hr class="rule">
+    <p class="foot">Part of the linknode.com energy-monitoring project. Device identifiers, install
+      codes, and credentials have been redacted or are illustrative. Companion documents: the
+      <em>EAGLE-200 Field Guide</em> and the escalation evidence page.</p>
+  </section>
+
+</div>
+</body>
+</html>
