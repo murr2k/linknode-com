@@ -24,6 +24,15 @@ FAILOVER, NOT REPLACEMENT (default)
     --once         run a single cycle and exit (for cron/systemd timer)
     --dry-run      build and print the XML; do not POST
 
+POLLING CADENCE (--interval, default 30s)
+    The Eagle natively reports InstantaneousDemand every ~8-10s. We deliberately poll
+    slower, at 30s, for two reasons: the device is failing under CPU/storage load, so
+    we avoid roughly 4x the query pressure its native rate would add; and the dashboard
+    treats data as stale only after 2 minutes, so 30s is ample resolution. The failover
+    margins assumed it too (stale-secs 90 = 3 cycles, probe-secs 300 = 10 cycles). Kept
+    at 30s even now that the Pi is the primary uploader (decided 2026-07-14): the goal
+    is to nurse the aging hardware, not to stress it.
+
 CREDENTIALS (from the environment; never logged)
     Local API (read from the Eagle):
         EAGLE_IP            default 192.168.68.63

@@ -115,7 +115,15 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
 - **What "device health" means now:** with the cloud uploader gone, the meaningful
   reliability signal is local-API read success (`read_failures` per cycle), i.e.
   whether the Eagle answers the Pi. In `--force` mode the outage log (which keyed off
-  cloud staleness) no longer accrues.
+  cloud staleness) no longer accrues. The other half of the picture is
+  `messages_failed` / `messages_sent`: how often the Fly endpoint rejects or fails to
+  receive a transmission.
+- **Report rate (`--interval`, 30s).** The Eagle natively reports every ~8-10s; we
+  poll at 30s on purpose, to avoid roughly 4x the query load on the failing device and
+  because the dashboard only flags data as stale after 2 minutes. Kept at 30s even now
+  that the Pi is the primary uploader (decided 2026-07-14): nurse the hardware, do not
+  stress it. Faster resolution is one `--interval` change away if the tradeoff ever
+  shifts.
 - **The device flaps.** Its local data-CGI intermittently returns 503; the script
   logs `nothing to ship` and continues. That is expected, not a failure.
 - **Uptime heartbeat.** Every `--heartbeat-secs` (default 900s / 15 min), in *any*
