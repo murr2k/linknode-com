@@ -2,7 +2,7 @@
 
 `scripts/eagle_bypass.py` reads the Eagle's meter over the LAN and forwards it to
 our Fly `/eagle` endpoint as synthetic Rainforest XML, but only while the real
-cloud path is stale — a hot standby that fills gaps without duplicating data.
+cloud path is stale: a hot standby that fills gaps without duplicating data.
 
 It must run on a host that can reach the Eagle (`10.0.0.222`); Fly cannot. The
 always-on home is the Raspberry Pi, run under systemd.
@@ -26,7 +26,7 @@ scp deploy/eagle-bypass.service   pi@<pi-ip>:/tmp/
 sudo install -D -m 0755 /tmp/eagle_bypass.py /opt/eagle-bypass/eagle_bypass.py
 
 # 3. Secrets: create the env file root-only, fill it in.
-#    (start from deploy/eagle-bypass.env.example — copy it over too if you like)
+#    (start from deploy/eagle-bypass.env.example, copy it over too if you like)
 sudo install -m 0600 /dev/null /etc/eagle-bypass.env
 sudoedit /etc/eagle-bypass.env         # set EAGLE_IP, EAGLE_CLOUD_ID,
                                        # EAGLE_INSTALL_CODE, EAGLE_UPLOAD_PASSWORD
@@ -47,7 +47,7 @@ pauses one cycle to check whether Rainforest recovered.
 
 ## Verify before trusting it
 
-Run one cycle by hand first — this reads the meter and prints the XML without
+Run one cycle by hand first. This reads the meter and prints the XML without
 sending anything:
 
 ```sh
@@ -107,9 +107,23 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
 
 ## Notes
 
-- **Failover vs. always-on:** default is failover. Add `--force` to the
-  `ExecStart` line to ship every cycle regardless (only if you've disabled
-  Rainforest's uploader, else you'll get near-duplicate points).
+- **Always-on (current) vs. failover:** the Pi now runs `--force` (always-on),
+  because Rainforest removed the Eagle's own cloud uploader (at our request, to cut
+  device load), so the Pi is the sole source. If the device ever uploads on its own
+  again, drop `--force` and use `--stale-secs 90 --probe-secs 300` to return to
+  failover, else you'll get near-duplicate points.
+- **What "device health" means now:** with the cloud uploader gone, the meaningful
+  reliability signal is local-API read success (`read_failures` per cycle), i.e.
+  whether the Eagle answers the Pi. In `--force` mode the outage log (which keyed off
+  cloud staleness) no longer accrues. The other half of the picture is
+  `messages_failed` / `messages_sent`: how often the Fly endpoint rejects or fails to
+  receive a transmission.
+- **Report rate (`--interval`, 30s).** The Eagle natively reports every ~8-10s; we
+  poll at 30s on purpose, to avoid roughly 4x the query load on the failing device and
+  because the dashboard only flags data as stale after 2 minutes. Kept at 30s even now
+  that the Pi is the primary uploader (decided 2026-07-14): nurse the hardware, do not
+  stress it. Faster resolution is one `--interval` change away if the tradeoff ever
+  shifts.
 - **The device flaps.** Its local data-CGI intermittently returns 503; the script
   logs `nothing to ship` and continues. That is expected, not a failure.
 - **Uptime heartbeat.** Every `--heartbeat-secs` (default 900s / 15 min), in *any*
