@@ -30,6 +30,14 @@ Restart=always
 RestartSec=15
 SyslogIdentifier=eagle-bypass
 
+# Stats. Live counters mirror to RAM every cycle (/run/eagle-bypass, tmpfs, zero
+# SD wear) for querying; hourly CRC-protected checkpoints go to flash
+# (/var/lib/eagle-bypass, survives reboots). systemd creates both dirs owned by
+# User=, exposes them as $RUNTIME_DIRECTORY / $STATE_DIRECTORY, and both remain
+# writable under ProtectSystem=strict below.
+RuntimeDirectory=eagle-bypass
+StateDirectory=eagle-bypass
+
 # Light hardening: the script only reads the repo and talks to the network.
 NoNewPrivileges=true
 ProtectSystem=strict

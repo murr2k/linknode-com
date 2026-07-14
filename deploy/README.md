@@ -61,6 +61,33 @@ Then a single real send while the cloud is down (`-v` shows HTTP 200 per message
 python3 /opt/eagle-bypass/eagle_bypass.py --once -v
 ```
 
+## Stats
+
+The service keeps counters in RAM and mirrors them to a RAM-backed live file every
+cycle, so you can query current state without parsing the journal:
+
+```sh
+ssh pi@<pi-ip> cat /run/eagle-bypass/stats.json | jq
+```
+
+Counters include cycles, standby vs active, `activations` (how often the device
+stalled and the bypass stepped in), ships and per-type message success, `read_failures`
+by kind (timeout / 503 / empty), `longest_clean_run_s`, daily buckets, and
+`restarts` / `reboots` (the latter only counts real OS reboots, via the kernel boot
+id). `flash_saves` counts the hourly checkpoints and is a rough downtime-excluded
+running-hours estimate.
+
+Persistence is wear-conscious: the live file lives on tmpfs (`RuntimeDirectory`,
+zero SD writes), while **two** CRC-tagged copies are checkpointed to flash
+(`StateDirectory`) once an hour and on graceful stop. On start the service restores
+from whichever copy has a valid CRC, so a corrupt write during a power loss can't
+lose the counters. Nothing here holds secrets. To read the counters when the service
+is stopped:
+
+```sh
+sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
+```
+
 ## Notes
 
 - **Failover vs. always-on:** default is failover. Add `--force` to the
