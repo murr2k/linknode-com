@@ -147,6 +147,15 @@ def find_meter_mac(xml):
     return macs[-1] if macs else None
 
 
+def _meter_link(xml):
+    """The Zigbee link to the meter, from device_list: (ConnectionStatus, LastContact).
+    This is the Eagle<->meter side, which stays healthy even as the cloud path rots;
+    it's our best on-device signal for how much life the pairing has left."""
+    st = re.search(r"<ConnectionStatus>([^<]*)</ConnectionStatus>", xml or "")
+    lc = re.search(r"<LastContact>([^<]*)</LastContact>", xml or "")
+    return (st.group(1).strip() if st else None, lc.group(1).strip() if lc else None)
+
+
 def scrape(xml, name):
     m = re.search(rf"<Name>zigbee:{name}</Name>\s*<Value>([^<]*)</Value>", xml or "", re.I)
     return m.group(1).strip() if m else None
@@ -177,12 +186,13 @@ def read_meter():
     the local API yields them; any field may be absent."""
     xml, err = local_api(DEVICE_LIST)
     if err:
-        return {}, None, f"device_list: {err}"
+        return {}, None, f"device_list: {err}", None
+    link = _meter_link(xml)
     meter_mac = find_meter_mac(xml) or METER_MAC_FALLBACK
 
     xml, err = local_api(DEVICE_QUERY.format(mac=meter_mac))
     if err:
-        return {}, meter_mac, f"device_query: {err}"
+        return {}, meter_mac, f"device_query: {err}", link
 
     readings = {}
     demand = scrape(xml, "InstantaneousDemand")          # kW
@@ -203,7 +213,7 @@ def read_meter():
             readings["price"] = float(price)
     except ValueError:
         pass
-    return readings, meter_mac, None
+    return readings, meter_mac, None, link
 
 
 # ---- build the synthetic Rainforest messages -------------------------------
@@ -363,7 +373,7 @@ class Stats:
     """In-RAM counters, mirrored to a live RAM file each cycle and checkpointed to
     two CRC-protected flash copies hourly. On start, restore from a valid copy."""
 
-    SCHEMA = 2
+    SCHEMA = 3
 
     def __init__(self, runtime_dir, state_dir):
         self.live_path = os.path.join(runtime_dir, "stats.json") if runtime_dir else None
@@ -395,6 +405,9 @@ class Stats:
             "first_outage_at": None, "last_outage_end": None,
             "outages_by_hour": [0] * 24, "duration_buckets": [0] * 5,
             "observed_s": 0, "readings_rescued": 0,
+            # ---- meter (Zigbee) link health, from device_list ----
+            "meter_status": None, "meter_last_contact": None,
+            "meter_link_checks": 0, "meter_not_connected": 0,
         }
 
     # ---- restore / persist -------------------------------------------------
@@ -549,6 +562,11 @@ class Stats:
             round(max(0.0, min(100.0, 100.0 * available_cycles / cyc)), 2) if cyc else None)
         if d.get("current_outage") and self._cur_start_mono is not None:
             d["current_outage_s"] = int(round(time.monotonic() - self._cur_start_mono))
+        # Meter (Zigbee) link: how often device_list reported the meter Connected.
+        checks = d.get("meter_link_checks", 0)
+        d["meter_link_pct"] = (
+            round(100.0 * (checks - d.get("meter_not_connected", 0)) / checks, 2)
+            if checks else None)
         return d
 
     def write_live(self):
@@ -647,6 +665,15 @@ class Stats:
         co = self.d.get("current_outage")
         if co:
             co["read_fails"] += 1
+
+    def note_meter_link(self, status, last_contact):
+        """Record the Eagle<->meter Zigbee link state seen in device_list."""
+        self.d["meter_link_checks"] += 1
+        self.d["meter_status"] = status
+        if last_contact:
+            self.d["meter_last_contact"] = last_contact
+        if status and status != "Connected":
+            self.d["meter_not_connected"] += 1
 
 
 def load_snapshot():
@@ -752,6 +779,12 @@ def render_report(d):
     if any(rf.values()):
         parts = ", ".join(f"{k}={v}" for k, v in sorted(rf.items()) if v)
         line(f"  device read failures: {parts}")
+    # Meter (Zigbee) link -- the Eagle<->meter side, our best "life left" signal.
+    if d.get("meter_link_checks"):
+        mp = d.get("meter_link_pct")
+        line(f"  meter link: {d.get('meter_status')} "
+             f"({mp if mp is not None else '?'}% Connected over {d['meter_link_checks']} checks, "
+             f"{d.get('meter_not_connected', 0)} not-connected)")
     line(f"  service: restart #{d.get('restarts', 0)}, "
          f"{d.get('reboots', 0)} OS reboots, "
          f"~{d.get('approx_running_h', 0)}h running (hourly flash saves)")
@@ -762,7 +795,9 @@ def render_report(d):
 def ship(stats, dry_run=False, verbose=False):
     """Read the meter and push whatever telemetry it has. Returns True if we sent
     (or would have) at least one message."""
-    readings, meter_mac, err = read_meter()
+    readings, meter_mac, err, link = read_meter()
+    if link:
+        stats.note_meter_link(*link)
     if err:
         stats.note_read_failure(_classify_read_error(err))
         log(f"local read failed ({err}); nothing to ship")

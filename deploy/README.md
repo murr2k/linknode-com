@@ -118,6 +118,11 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
   cloud staleness) no longer accrues. The other half of the picture is
   `messages_failed` / `messages_sent`: how often the Fly endpoint rejects or fails to
   receive a transmission.
+- **Meter (Zigbee) link health.** Each cycle also records the meter's
+  `ConnectionStatus` and `LastContact` from `device_list` (`meter_status`,
+  `meter_link_pct`, `meter_not_connected`). This is the Eagle-to-meter side, which
+  stays healthy even as the cloud/IPC subsystems rot, so it is our best on-device
+  signal for how much life the pairing has left. `--report` shows it.
 - **Report rate (`--interval`, 30s).** The Eagle natively reports every ~8-10s; we
   poll at 30s on purpose, to avoid roughly 4x the query load on the failing device and
   because the dashboard only flags data as stale after 2 minutes. Kept at 30s even now
