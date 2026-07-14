@@ -29,6 +29,15 @@ A real-time energy monitoring dashboard that tracks power consumption using Eagl
   - Slack notifications on outage and recovery (fires once per state change, no spam)
   - Pushover emergency-priority siren that repeats until acknowledged
 
+- **Failover & Resilience** (the Eagle-200 meter is failing; see [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md))
+  - Local-API bypass: a Raspberry Pi on the home network polls the meter's LAN API and
+    ships synthetic Rainforest XML to the ingest endpoint whenever the meter's own
+    cloud uploader stalls (hot standby, no duplicate data). See [deploy/README.md](deploy/README.md)
+  - Persistent, CRC-checkpointed reliability stats survive reboots; `--report` prints a
+    human-readable outage and uptime report
+  - Live uptime on the dashboard: real **Data Uptime** and **device health** figures
+    driven by a heartbeat from the bypass, replacing a previously hardcoded 100%
+
 - **Modern Web Interface**
   - Dark theme with animated gradients
   - Embedded Grafana dashboard
@@ -164,6 +173,7 @@ cd fly/influxdb && flyctl deploy
 | Document | Description |
 |----------|-------------|
 | [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md) | System architecture and data flow |
+| [deploy/README.md](deploy/README.md) | Eagle-200 failover bypass: install and operate on the Pi |
 | [docs/HEALTH_CHECKS.md](docs/HEALTH_CHECKS.md) | Service health endpoints |
 | [docs/REGRESSION_TESTING.md](docs/REGRESSION_TESTING.md) | Baseline management guide |
 | [docs/e2e/](docs/e2e/) | E2E testing guides |
@@ -176,6 +186,7 @@ cd fly/influxdb && flyctl deploy
 flowchart LR
     subgraph Home Network
         Eagle[Eagle-200<br/>Smart Meter]
+        Pi[Raspberry Pi<br/>failover bypass]
     end
 
     subgraph Fly.io
@@ -190,15 +201,29 @@ flowchart LR
     end
 
     Eagle -->|XML/HTTP| Monitor
+    Eagle -.->|LAN API| Pi
+    Pi -.->|synthetic XML<br/>during outages| Monitor
     Monitor -->|Write| DB
     DB -->|Query| Grafana
     Browser -->|HTTPS| Web
     Web -->|Embed| Grafana
 ```
 
+The dashed path is the failover bypass: when the Eagle's own cloud uploader stalls,
+the Pi reads the meter over the LAN and fills the gap. See [deploy/README.md](deploy/README.md).
+
 See [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md) for detailed architecture diagrams.
 
 ## Recent Changes
+
+### 2026-07-14: Live uptime on the dashboard
+- Real **Data Uptime** and **device health** figures from a bypass heartbeat, replacing a hardcoded 100%
+- Outage log with reliability analytics for the bypass (`--report`: uptime %, MTBF, duration histogram, hour-of-day pattern)
+
+### 2026-07-12: Eagle-200 failover bypass
+- A Raspberry Pi polls the meter's LAN API and ships synthetic XML to fill gaps when the meter's cloud uploader stalls
+- Added because the Eagle-200 hardware is failing (storage wear causing repeated data outages)
+- Persistent, CRC-checkpointed statistics that survive reboots
 
 ### 2026-01-14: Security & Cleanup
 - Fixed critical Grafana vulnerability (anonymous Admin → Viewer)
