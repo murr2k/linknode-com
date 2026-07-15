@@ -107,15 +107,16 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
 
 ## Notes
 
-- **Always-on (current) vs. failover:** the Pi now runs `--force` (always-on),
-  because Rainforest removed the Eagle's own cloud uploader (at our request, to cut
-  device load), so the Pi is the sole source. If the device ever uploads on its own
-  again, drop `--force` and use `--stale-secs 90 --probe-secs 300` to return to
-  failover, else you'll get near-duplicate points.
+- **Always-on (default) vs. failover:** always-on is now the script's **default**
+  (no flag needed), because Rainforest removed the Eagle's own cloud uploader (at our
+  request, to cut device load), so the Pi is the sole source. If the device ever
+  uploads on its own again, add `--failover` (optionally with `--stale-secs 90
+  --probe-secs 300`) to return to failover, else you'll get near-duplicate points.
+  (`--force` is still accepted as a redundant no-op for backward compatibility.)
 - **What "device health" means now:** with the cloud uploader gone, the meaningful
   reliability signal is local-API read success (`read_failures` per cycle), i.e.
-  whether the Eagle answers the Pi. In `--force` mode the outage log (which keyed off
-  cloud staleness) no longer accrues. The other half of the picture is
+  whether the Eagle answers the Pi. In always-on (force) mode the outage log (which keyed
+  off cloud staleness) no longer accrues. The other half of the picture is
   `messages_failed` / `messages_sent`: how often the Fly endpoint rejects or fails to
   receive a transmission.
 - **Report rate (`--interval`, 30s).** The Eagle natively reports every ~8-10s; we

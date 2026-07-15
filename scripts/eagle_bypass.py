@@ -20,7 +20,11 @@ FAILOVER, NOT REPLACEMENT (default)
     one cycle and watch: if the clock stays fresh while we're silent, Rainforest is
     back and we return to standby; if it goes stale again, we resume shipping.
 
-    --force        ship every cycle regardless (always-on / replace mode)
+    Force (always-on) is the DEFAULT: the Pi is the sole uploader, so it ships every
+    cycle. The failover behaviour above is opt-in via --failover, for the day the Eagle
+    uploads on its own again (else you'd get near-duplicate points).
+
+    --failover     ship only while the real cloud path is stale (the old default)
     --once         run a single cycle and exit (for cron/systemd timer)
     --dry-run      build and print the XML; do not POST
 
@@ -43,8 +47,8 @@ CREDENTIALS (from the environment; never logged)
         EAGLE_UPLOAD_USER      default 'eagle'  (matches EAGLE_USERNAME on Fly)
         EAGLE_UPLOAD_PASSWORD  the EAGLE_PASSWORD secret set on the Fly app
 
-Usage:  python eagle_bypass.py [--interval 30] [--stale-secs 90] [--probe-secs 300]
-                               [--force] [--once] [--dry-run] [-v]
+Usage:  python eagle_bypass.py [--interval 30] [--failover [--stale-secs 90]
+                               [--probe-secs 300]] [--once] [--dry-run] [-v]
 """
 
 import argparse
@@ -895,7 +899,12 @@ def main():
                     help="while active, pause uploads one cycle this often to test cloud recovery (default 300)")
     ap.add_argument("--heartbeat-secs", type=int, default=900,
                     help="ship a reliability/uptime heartbeat to the dashboard this often, any mode (default 900)")
-    ap.add_argument("--force", action="store_true", help="ship every cycle regardless of cloud health (always-on)")
+    ap.add_argument("--failover", action="store_true",
+                    help="failover mode: ship only while the real cloud path is stale. "
+                         "Default is force / always-on (the Pi is the sole uploader).")
+    # Force (always-on) is the default now; --force is accepted for backward compatibility
+    # (the old systemd unit passed it explicitly) but is redundant. --failover opts out.
+    ap.add_argument("--force", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--once", action="store_true", help="run a single cycle and exit")
     ap.add_argument("--dry-run", action="store_true", help="build and print XML; do not POST")
     ap.add_argument("-v", "--verbose", action="store_true", help="log each upload's HTTP result")
@@ -904,6 +913,11 @@ def main():
     ap.add_argument("--report", action="store_true",
                     help="print a human-readable reliability/outage report and exit")
     args = ap.parse_args()
+
+    # Force (always-on) is the default; --failover is the explicit opt-out. The rest of
+    # the code keys off args.force, so derive it here. An explicit --force is a harmless
+    # no-op (default is already force); --failover always wins.
+    args.force = not args.failover
 
     if args.print_stats:
         print_stats()
