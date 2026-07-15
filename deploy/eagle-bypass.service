@@ -25,9 +25,10 @@ EnvironmentFile=/etc/eagle-bypass.env
 # Always-on mode (the tuning the Pi runs): poll every 30s and ship every cycle.
 # Rainforest removed the Eagle's own cloud uploader (at our request, to cut device
 # load), so there is no real cloud path left to fail over from and the Pi is the
-# sole source. For the failover alternative (when the device still uploads on its
-# own), drop --force and use --stale-secs 90 --probe-secs 300 instead.
-ExecStart=/usr/bin/python3 /opt/eagle-bypass/eagle_bypass.py --interval 30 --force -v
+# sole source. Always-on (force) is now the script's DEFAULT, so no flag is needed.
+# For the failover alternative (when the device uploads on its own again), add
+# --failover (optionally with --stale-secs 90 --probe-secs 300).
+ExecStart=/usr/bin/python3 /opt/eagle-bypass/eagle_bypass.py --interval 30 -v
 
 Restart=always
 RestartSec=15
