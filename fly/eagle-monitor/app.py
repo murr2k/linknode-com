@@ -702,9 +702,9 @@ def get_stats():
         'active_viewers': active_viewers,
         'packet_interval_ms': stats.get('packet_interval_ms'),
         'packets_today': stats.get('packets_today', 0),
-        # Rolling 24h completeness: readings received vs expected at the report rate.
-        # Populated from InfluxDB below; None if the DB is unreachable.
-        'samples_24h': None,
+        # Rolling 24h completeness: fresh meter reads received vs expected at the report
+        # rate. Populated from InfluxDB below; None if the DB is unreachable.
+        'reads_24h': None,
         # Live uptime from the Pi bypass heartbeat (None until the first arrives).
         'bypass_status': stats.get('bypass_status'),
         'monitor_stats': stats,
@@ -748,11 +748,14 @@ def get_stats():
             if avg_result and avg_result[0].records:
                 result['avg_24h'] = avg_result[0].records[0].get_value()
 
-            # Rolling-window completeness: how many meter readings actually arrived vs
-            # how many should have at the report rate. "received" = stored power_w
-            # (InstantaneousDemand) points in the window; "expected" = window / interval.
-            # Interval source, in priority: the Pi's own heartbeat, then SAMPLE_INTERVAL_SEC
-            # env, then 30s. This auto-adjusts if the Pi's report rate changes.
+            # Rolling-window completeness: how many FRESH meter reads arrived vs how many
+            # should have at the report rate. "received" = distinct stored power_w
+            # (InstantaneousDemand) points in the window; because the Pi timestamps each
+            # reading with the meter's LastContact time, a cycle where the Eagle did not
+            # respond (nothing shipped) or returned stale data (same LastContact -> same
+            # point, overwritten) does not add a point, so it does not count. "expected" =
+            # window / interval; interval comes from the Pi heartbeat, else SAMPLE_INTERVAL_SEC
+            # env, else 30s, so it auto-adjusts if the report rate changes.
             count_query = query + '|> group() |> count()'
             count_result = query_api.query(org=INFLUXDB_ORG, query=count_query)
             received = 0
@@ -762,7 +765,7 @@ def get_stats():
             interval_s = bypass.get('interval_s') or int(os.getenv('SAMPLE_INTERVAL_SEC', '30'))
             interval_s = interval_s if interval_s and interval_s > 0 else 30
             expected = round(hours * 3600 / interval_s)
-            result['samples_24h'] = {
+            result['reads_24h'] = {
                 'received': min(received, expected),   # clamp jitter so it never exceeds 100%
                 'expected': expected,
                 'interval_s': interval_s,

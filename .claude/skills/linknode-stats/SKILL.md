@@ -107,14 +107,14 @@ curl -s https://linknode-eagle-monitor.fly.dev/health | python -m json.tool
 | Timestamp of last real meter data | **`last_update`** (root) | also at `monitor_stats.last_data_received`; there is **no** root `last_data_received` |
 | Last bypass heartbeat time | **`bypass_status.updated_at`** | **not** `received_at` (that key does not exist) |
 | Live uptime tile values | `bypass_status.data_uptime_pct` / `.device_uptime_pct` | shipped by the Pi heartbeat every 15 min |
-| Dashboard "Samples Today" (received/expected, rolling 24h) | `samples_24h.received` / `.expected` | the completeness gauge the dashboard shows; `.interval_s` and `.window_hours` included. `null` if the DB is unreachable |
-| Data points stored today (legacy counter) | `packets_today` (root) | successful InfluxDB writes since midnight UTC; still emitted but the dashboard now uses `samples_24h` |
+| Dashboard "Meter Reads (24h)" (received/expected, rolling 24h) | `reads_24h.received` / `.expected` | **fresh** reads passed on, the completeness gauge the dashboard shows; `.interval_s` and `.window_hours` included. `null` if the DB is unreachable |
+| Data points stored today (legacy counter) | `packets_today` (root) | successful InfluxDB writes since midnight UTC; still emitted but the dashboard now uses `reads_24h` |
 | Current power (W) | `current_power` (root) | last power reading |
 | Gap between last two points (ms) | `packet_interval_ms` (root) | |
 
 Root keys: `active_viewers, avg_24h, billing_period, bypass_status, cost_24h, current_power,
 last_update, max_24h, min_24h, monitor_stats, packet_interval_ms, packets_today, price_per_kwh,
-samples_24h`.
+reads_24h`.
 
 `monitor_stats` (the ingest service's internal counters) keys: `bypass_status, failed_writes,
 filtered_requests, last_data_received, last_power_reading, packet_interval_ms, packets_today,
@@ -123,7 +123,7 @@ packets_today_date, previous_data_received, start_time, successful_writes, total
 `bypass_status` keys (the Pi heartbeat, seconds spelled out): `data_uptime_pct, device_uptime_pct,
 observed_seconds, outage_count, readings_rescued, total_outage_seconds, updated_at,
 worst_outage_seconds, interval_s`. (The `*_seconds` names are the heartbeat XML's renames of the Pi's
-internal `*_s` fields. `interval_s` is the Pi's report cadence, used to size `samples_24h.expected`.)
+internal `*_s` fields. `interval_s` is the Pi's report cadence, used to size `reads_24h.expected`.)
 
 `/health`: `{influxdb_connected, status, uptime_seconds}`.
 
@@ -144,12 +144,15 @@ internal `*_s` fields. `interval_s` is the Pi's report cadence, used to size `sa
   but only data-bearing messages become InfluxDB writes; metadata-only messages (DeviceInfo,
   BillingPeriodList, etc.) are acknowledged without a write. So `packets_today` counts stored points,
   not raw messages.
-- **`samples_24h` is the completeness gauge the dashboard shows ("Samples Today").** `received` counts
-  stored `power_w` (InstantaneousDemand) points over a **rolling 24h** window (one per Pi cycle);
-  `expected` is `window / interval_s` (2880 at the 30s rate). `interval_s` comes from the Pi's
-  heartbeat, falling back to the `SAMPLE_INTERVAL_SEC` env then 30, so it auto-adjusts if the report
-  rate changes. `received` is clamped to `expected`, so e.g. `2878/2880` means two readings were missed
-  in the last 24h. Unlike `packets_today`, it is a sliding window, not a midnight-UTC reset.
+- **`reads_24h` is the completeness gauge the dashboard shows ("Meter Reads (24h)").** `received`
+  counts **fresh** `power_w` (InstantaneousDemand) points over a **rolling 24h** window; `expected` is
+  `window / interval_s` (2880 at the 30s rate, from the Pi heartbeat, else `SAMPLE_INTERVAL_SEC` env,
+  else 30). "Fresh" is enforced at the source: the Pi timestamps each reading with the meter's
+  **LastContact** time, so a cycle where the Eagle did not respond (nothing shipped) or returned stale
+  data (same LastContact -> the point overwrites rather than adds) does not increment the count.
+  `received` is clamped to `expected`, so `2878/2880` means two of the last 24h's scheduled 30s reads
+  were missed or stale. Sliding window, not a midnight-UTC reset. Contrast `packets_today`, which counts
+  every successful write (including stale re-sends) since midnight UTC.
 - **The heartbeat is deliberately out-of-band.** The collector stashes `bypass_status` but does
   **not** touch `last_update` / `last_data_received`, so a heartbeat cannot masquerade as fresh meter
   data and suppress a real staleness alert. Judge freshness by `last_update`, judge the Pi's

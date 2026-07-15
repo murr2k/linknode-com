@@ -228,13 +228,31 @@ def _hexts():
     return f"0x{int(time.time()) - ZIGBEE_EPOCH_OFFSET:x}"
 
 
-def msg_demand(kw, meter_mac):
+def _reading_ts(link):
+    """Reading timestamp (Zigbee-epoch hex) from the meter's LastContact, i.e. when the
+    Eagle actually last heard from the meter, NOT wall-clock now. This is what makes a
+    reading count as *fresh*: if the Eagle's daemon hangs it keeps returning the same
+    LastContact, so successive ships collapse onto the same time-series point instead of
+    looking like new readings. LastContact is raw Unix; the collector re-adds the epoch
+    offset, so subtract it here (same convention as _hexts). Falls back to now if the
+    Eagle gave us no usable LastContact."""
+    lc = link[1] if link else None
+    if lc:
+        try:
+            unix = int(lc, 16) if str(lc).startswith("0x") else int(lc)
+            return f"0x{unix - ZIGBEE_EPOCH_OFFSET:x}"
+        except (ValueError, TypeError):
+            pass
+    return _hexts()
+
+
+def msg_demand(kw, meter_mac, ts=None):
     raw = max(0, round(kw * 1000))  # watts; mult=1 div=1000 -> collector power_w = raw
     return (
         "<rainforest><InstantaneousDemand>"
         f"<DeviceMacId>{DEVICE_MAC}</DeviceMacId>"
         f"<MeterMacId>{meter_mac}</MeterMacId>"
-        f"<TimeStamp>{_hexts()}</TimeStamp>"
+        f"<TimeStamp>{ts or _hexts()}</TimeStamp>"
         f"<Demand>0x{raw:08x}</Demand>"
         "<Multiplier>0x00000001</Multiplier>"
         "<Divisor>0x000003e8</Divisor>"
@@ -242,13 +260,13 @@ def msg_demand(kw, meter_mac):
     )
 
 
-def msg_summation(kwh, meter_mac):
+def msg_summation(kwh, meter_mac, ts=None):
     raw = max(0, round(kwh * 1000))  # Wh; mult=1 div=1000 -> collector kWh = raw/1000
     return (
         "<rainforest><CurrentSummationDelivered>"
         f"<DeviceMacId>{DEVICE_MAC}</DeviceMacId>"
         f"<MeterMacId>{meter_mac}</MeterMacId>"
-        f"<TimeStamp>{_hexts()}</TimeStamp>"
+        f"<TimeStamp>{ts or _hexts()}</TimeStamp>"
         f"<SummationDelivered>0x{raw:012x}</SummationDelivered>"
         "<Multiplier>0x00000001</Multiplier>"
         "<Divisor>0x000003e8</Divisor>"
@@ -810,11 +828,14 @@ def ship(stats, dry_run=False, verbose=False):
         return False
     meter_mac = meter_mac or METER_MAC_FALLBACK
 
+    # Stamp readings with the meter's real last-contact time, so a frozen Eagle
+    # (LastContact not advancing) does not masquerade as a stream of fresh readings.
+    ts = _reading_ts(link)
     outbox = []
     if "demand_kw" in readings:
-        outbox.append(("demand", msg_demand(readings["demand_kw"], meter_mac)))
+        outbox.append(("demand", msg_demand(readings["demand_kw"], meter_mac, ts)))
     if "summation_kwh" in readings:
-        outbox.append(("summation", msg_summation(readings["summation_kwh"], meter_mac)))
+        outbox.append(("summation", msg_summation(readings["summation_kwh"], meter_mac, ts)))
     if "price" in readings:
         outbox.append(("price", msg_price(readings["price"], meter_mac)))
 
