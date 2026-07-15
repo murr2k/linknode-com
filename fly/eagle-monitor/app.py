@@ -400,6 +400,7 @@ def parse_eagle_xml(xml_data):
                 'total_outage_seconds': _num('TotalOutageSeconds', int),
                 'worst_outage_seconds': _num('WorstOutageSeconds', int),
                 'readings_rescued': _num('ReadingsRescued', int),
+                'interval_s': _num('IntervalSeconds', int),
             }
 
         # 3. TimeCluster - Time synchronization
@@ -701,6 +702,9 @@ def get_stats():
         'active_viewers': active_viewers,
         'packet_interval_ms': stats.get('packet_interval_ms'),
         'packets_today': stats.get('packets_today', 0),
+        # Rolling 24h completeness: readings received vs expected at the report rate.
+        # Populated from InfluxDB below; None if the DB is unreachable.
+        'samples_24h': None,
         # Live uptime from the Pi bypass heartbeat (None until the first arrives).
         'bypass_status': stats.get('bypass_status'),
         'monitor_stats': stats,
@@ -743,6 +747,27 @@ def get_stats():
             avg_result = query_api.query(org=INFLUXDB_ORG, query=avg_query)
             if avg_result and avg_result[0].records:
                 result['avg_24h'] = avg_result[0].records[0].get_value()
+
+            # Rolling-window completeness: how many meter readings actually arrived vs
+            # how many should have at the report rate. "received" = stored power_w
+            # (InstantaneousDemand) points in the window; "expected" = window / interval.
+            # Interval source, in priority: the Pi's own heartbeat, then SAMPLE_INTERVAL_SEC
+            # env, then 30s. This auto-adjusts if the Pi's report rate changes.
+            count_query = query + '|> group() |> count()'
+            count_result = query_api.query(org=INFLUXDB_ORG, query=count_query)
+            received = 0
+            if count_result and count_result[0].records:
+                received = int(count_result[0].records[0].get_value() or 0)
+            bypass = stats.get('bypass_status') or {}
+            interval_s = bypass.get('interval_s') or int(os.getenv('SAMPLE_INTERVAL_SEC', '30'))
+            interval_s = interval_s if interval_s and interval_s > 0 else 30
+            expected = round(hours * 3600 / interval_s)
+            result['samples_24h'] = {
+                'received': min(received, expected),   # clamp jitter so it never exceeds 100%
+                'expected': expected,
+                'interval_s': interval_s,
+                'window_hours': hours,
+            }
 
             # Get current electricity rate from InfluxDB (reported by Eagle from utility)
             price_query = f'''

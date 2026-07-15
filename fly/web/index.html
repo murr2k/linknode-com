@@ -1214,9 +1214,9 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name">📦 Packets Today</span>
+                            <span class="api-name" title="Meter samples received from the Pi in the last 24 hours vs. the number expected at the current report rate">📊 Samples Today</span>
                             <div class="api-status">
-                                <span id="packets-today" style="font-weight: 600; color: var(--text-primary);">--</span>
+                                <span id="samples-today" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
                         </div>
                         <div class="api-status-item">
@@ -1226,7 +1226,7 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name">⏱️ Packet Interval</span>
+                            <span class="api-name">⏱️ Sample Interval</span>
                             <div class="api-status">
                                 <span id="packet-interval" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
@@ -1863,9 +1863,17 @@
                             document.getElementById('active-viewers-count').textContent = data.active_viewers;
                         }
 
-                        // Update packets today
-                        if (data.packets_today !== undefined) {
-                            document.getElementById('packets-today').textContent = data.packets_today.toLocaleString();
+                        // Update samples today: readings received vs expected over the last 24h
+                        const samplesEl = document.getElementById('samples-today');
+                        if (samplesEl) {
+                            const s = data.samples_24h;
+                            if (s && s.expected) {
+                                samplesEl.textContent =
+                                    `${s.received.toLocaleString()}/${s.expected.toLocaleString()}`;
+                            } else if (data.packets_today !== undefined) {
+                                // Fallback until the backend reports samples_24h (e.g. DB unreachable)
+                                samplesEl.textContent = data.packets_today.toLocaleString();
+                            }
                         }
 
                         // Update packet interval (time between Eagle-200 packets)

@@ -287,6 +287,7 @@ def msg_bypass_status(snap):
         f"<TotalOutageSeconds>{num(snap.get('total_outage_s'))}</TotalOutageSeconds>"
         f"<WorstOutageSeconds>{num(snap.get('worst_outage_s'))}</WorstOutageSeconds>"
         f"<ReadingsRescued>{num(snap.get('readings_rescued'))}</ReadingsRescued>"
+        f"<IntervalSeconds>{num(snap.get('interval_s'))}</IntervalSeconds>"
         "</BypassStatus></rainforest>"
     )
 
@@ -548,6 +549,7 @@ class Stats:
         # watching (no cycles ran), so it correctly does not count.
         obs = d.get("cycles", 0) * self.interval
         d["observed_s"] = obs
+        d["interval_s"] = self.interval   # report our cadence so the site can size "expected"
         n = d.get("outage_count", 0)
         completed = sum(d.get("duration_buckets", []))   # outages with a real duration
         d["mean_outage_s"] = round(d["total_outage_s"] / completed) if completed else None
