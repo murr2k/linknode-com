@@ -401,6 +401,7 @@ def parse_eagle_xml(xml_data):
                 'worst_outage_seconds': _num('WorstOutageSeconds', int),
                 'readings_rescued': _num('ReadingsRescued', int),
                 'interval_s': _num('IntervalSeconds', int),
+                'cycle_period_s': _num('CyclePeriodSeconds', float),
             }
 
         # 3. TimeCluster - Time synchronization
@@ -754,21 +755,24 @@ def get_stats():
             # reading with the meter's LastContact time, a cycle where the Eagle did not
             # respond (nothing shipped) or returned stale data (same LastContact -> same
             # point, overwritten) does not add a point, so it does not count. "expected" =
-            # window / interval; interval comes from the Pi heartbeat, else SAMPLE_INTERVAL_SEC
-            # env, else 30s, so it auto-adjusts if the report rate changes.
+            # window / period, where period is the Pi's MEASURED true cycle time (sleep +
+            # per-cycle work, ~35s at a nominal 30s interval), else the nominal interval,
+            # else SAMPLE_INTERVAL_SEC env, else 30. Using the measured period avoids a
+            # phantom shortfall from counting against an unachievable nominal rate.
             count_query = query + '|> group() |> count()'
             count_result = query_api.query(org=INFLUXDB_ORG, query=count_query)
             received = 0
             if count_result and count_result[0].records:
                 received = int(count_result[0].records[0].get_value() or 0)
             bypass = stats.get('bypass_status') or {}
-            interval_s = bypass.get('interval_s') or int(os.getenv('SAMPLE_INTERVAL_SEC', '30'))
-            interval_s = interval_s if interval_s and interval_s > 0 else 30
-            expected = round(hours * 3600 / interval_s)
+            period_s = (bypass.get('cycle_period_s') or bypass.get('interval_s')
+                        or float(os.getenv('SAMPLE_INTERVAL_SEC', '30')))
+            period_s = period_s if period_s and period_s > 0 else 30.0
+            expected = round(hours * 3600 / period_s)
             result['reads_24h'] = {
                 'received': min(received, expected),   # clamp jitter so it never exceeds 100%
                 'expected': expected,
-                'interval_s': interval_s,
+                'period_s': round(period_s, 1),
                 'window_hours': hours,
             }
 

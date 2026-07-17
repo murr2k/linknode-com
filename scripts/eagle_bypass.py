@@ -306,6 +306,7 @@ def msg_bypass_status(snap):
         f"<WorstOutageSeconds>{num(snap.get('worst_outage_s'))}</WorstOutageSeconds>"
         f"<ReadingsRescued>{num(snap.get('readings_rescued'))}</ReadingsRescued>"
         f"<IntervalSeconds>{num(snap.get('interval_s'))}</IntervalSeconds>"
+        f"<CyclePeriodSeconds>{num(snap.get('cycle_period_s'))}</CyclePeriodSeconds>"
         "</BypassStatus></rainforest>"
     )
 
@@ -396,7 +397,7 @@ class Stats:
     """In-RAM counters, mirrored to a live RAM file each cycle and checkpointed to
     two CRC-protected flash copies hourly. On start, restore from a valid copy."""
 
-    SCHEMA = 3
+    SCHEMA = 4
 
     def __init__(self, runtime_dir, state_dir):
         self.live_path = os.path.join(runtime_dir, "stats.json") if runtime_dir else None
@@ -428,6 +429,8 @@ class Stats:
             "first_outage_at": None, "last_outage_end": None,
             "outages_by_hour": [0] * 24, "duration_buckets": [0] * 5,
             "observed_s": 0, "readings_rescued": 0,
+            # Measured true cycle period (EMA); None until a couple of cycles run.
+            "cycle_period_s": None,
             # ---- meter (Zigbee) link health, from device_list ----
             "meter_status": None, "meter_last_contact": None,
             "meter_link_checks": 0, "meter_not_connected": 0,
@@ -690,6 +693,12 @@ class Stats:
         if co:
             co["read_fails"] += 1
 
+    def note_period(self, dt):
+        """Smooth (EMA) the measured true cycle period, so the site can size expected
+        reads from the real cadence (~interval + work) rather than the nominal interval."""
+        prev = self.d.get("cycle_period_s")
+        self.d["cycle_period_s"] = round(dt if prev is None else 0.1 * dt + 0.9 * prev, 2)
+
     def note_meter_link(self, status, last_contact):
         """Record the Eagle<->meter Zigbee link state seen in device_list."""
         self.d["meter_link_checks"] += 1
@@ -889,8 +898,20 @@ def run_loop(args, stats):
     last_probe = time.monotonic()
     stats.interval = args.interval   # so observed_s accrues real wall time per cycle
     last_heartbeat = None            # force one on the first cycle so the site populates fast
+    last_tick = None                 # for measuring the true cycle period (sleep + work)
 
     while True:
+        # Measure the real cycle period top-to-top: it is --interval of sleep PLUS the
+        # per-cycle work (two Eagle API calls + the uploads), so it runs a few seconds
+        # longer than --interval. The dashboard uses this, not the nominal interval, to
+        # size how many reads to expect. Reject absurd gaps (suspend / long hang).
+        tick = time.monotonic()
+        if last_tick is not None:
+            dt = tick - last_tick
+            if dt <= args.interval * 4:
+                stats.note_period(dt)
+        last_tick = tick
+
         age = fly_age_seconds()
         age_str = "unknown" if age is None else f"{round(age)}s"
         mode = "active"           # refined below for the standby/probing cases

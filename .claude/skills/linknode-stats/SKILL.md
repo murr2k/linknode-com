@@ -107,7 +107,7 @@ curl -s https://linknode-eagle-monitor.fly.dev/health | python -m json.tool
 | Timestamp of last real meter data | **`last_update`** (root) | also at `monitor_stats.last_data_received`; there is **no** root `last_data_received` |
 | Last bypass heartbeat time | **`bypass_status.updated_at`** | **not** `received_at` (that key does not exist) |
 | Live uptime tile values | `bypass_status.data_uptime_pct` / `.device_uptime_pct` | shipped by the Pi heartbeat every 15 min |
-| Dashboard "Meter Reads (24h)" (received/expected, rolling 24h) | `reads_24h.received` / `.expected` | **fresh** reads passed on, the completeness gauge the dashboard shows; `.interval_s` and `.window_hours` included. `null` if the DB is unreachable |
+| Dashboard "Meter Reads (24h)" (received/expected, rolling 24h) | `reads_24h.received` / `.expected` | **fresh** reads passed on, the completeness gauge the dashboard shows; `.period_s` (the measured cycle time used to size `expected`) and `.window_hours` included. `null` if the DB is unreachable |
 | Data points stored today (legacy counter) | `packets_today` (root) | successful InfluxDB writes since midnight UTC; still emitted but the dashboard now uses `reads_24h` |
 | Current power (W) | `current_power` (root) | last power reading |
 | Gap between last two points (ms) | `packet_interval_ms` (root) | |
@@ -122,8 +122,10 @@ packets_today_date, previous_data_received, start_time, successful_writes, total
 
 `bypass_status` keys (the Pi heartbeat, seconds spelled out): `data_uptime_pct, device_uptime_pct,
 observed_seconds, outage_count, readings_rescued, total_outage_seconds, updated_at,
-worst_outage_seconds, interval_s`. (The `*_seconds` names are the heartbeat XML's renames of the Pi's
-internal `*_s` fields. `interval_s` is the Pi's report cadence, used to size `reads_24h.expected`.)
+worst_outage_seconds, interval_s, cycle_period_s`. (The `*_seconds` names are the heartbeat XML's
+renames of the Pi's internal `*_s` fields. `interval_s` is the nominal `--interval` (30). `cycle_period_s`
+is the Pi's **measured** true cycle time, EMA of sleep + per-cycle work, ~35s, and is what actually
+sizes `reads_24h.expected`.)
 
 `/health`: `{influxdb_connected, status, uptime_seconds}`.
 
@@ -146,13 +148,19 @@ internal `*_s` fields. `interval_s` is the Pi's report cadence, used to size `re
   not raw messages.
 - **`reads_24h` is the completeness gauge the dashboard shows ("Meter Reads (24h)").** `received`
   counts **fresh** `power_w` (InstantaneousDemand) points over a **rolling 24h** window; `expected` is
-  `window / interval_s` (2880 at the 30s rate, from the Pi heartbeat, else `SAMPLE_INTERVAL_SEC` env,
-  else 30). "Fresh" is enforced at the source: the Pi timestamps each reading with the meter's
-  **LastContact** time, so a cycle where the Eagle did not respond (nothing shipped) or returned stale
-  data (same LastContact -> the point overwrites rather than adds) does not increment the count.
-  `received` is clamped to `expected`, so `2878/2880` means two of the last 24h's scheduled 30s reads
-  were missed or stale. Sliding window, not a midnight-UTC reset. Contrast `packets_today`, which counts
-  every successful write (including stale re-sends) since midnight UTC.
+  `window / period_s`. **`period_s` is the Pi's MEASURED cycle time (~35s), not the nominal `--interval`
+  (30s).** The real cadence is slower than the interval because each cycle also does work (two Eagle API
+  calls + three POSTs) before the `--interval` sleep, so the true max is ~2469/24h, not 2880. Sizing
+  `expected` off the nominal 30s produced a phantom ~15% shortfall (a flat ~85% at every window size was
+  the tell); the measured period fixes it. "Fresh" is enforced at the source: the Pi timestamps each
+  reading with the meter's **LastContact** time, so a cycle where the Eagle did not respond (nothing
+  shipped) or returned stale data (same LastContact -> the point overwrites rather than adds) does not
+  increment the count. `received` is clamped to `expected`. Sliding window, not a midnight-UTC reset.
+  Contrast `packets_today`, which counts every successful write (including stale re-sends) since midnight UTC.
+- **"Meter Reads" vs the "Data Uptime" tile.** They measure different things and can diverge. Data
+  Uptime = the Pi's `data_availability_pct` = it shipped something each cycle (in force mode ~100%
+  unless the Eagle stops responding), and it does NOT drop for stale-but-answered reads. Meter Reads
+  drops for both no-response and stale. When healthy both sit near 100%.
 - **The heartbeat is deliberately out-of-band.** The collector stashes `bypass_status` but does
   **not** touch `last_update` / `last_data_received`, so a heartbeat cannot masquerade as fresh meter
   data and suppress a real staleness alert. Judge freshness by `last_update`, judge the Pi's
