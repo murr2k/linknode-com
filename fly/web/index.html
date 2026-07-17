@@ -1226,7 +1226,7 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name">⏱️ Sample Interval</span>
+                            <span class="api-name" title="The Pi's measured read cycle: the ~30s wait plus the per-cycle work (~35s total). Green = normal cadence; yellow/red = cycles running long (e.g. the Eagle slow to answer).">⏱️ Sample Interval</span>
                             <div class="api-status">
                                 <span id="packet-interval" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
@@ -1880,19 +1880,22 @@
                             }
                         }
 
-                        // Update packet interval (time between Eagle-200 packets)
+                        // Sample interval = the Pi's measured read cycle (~35s: the ~30s
+                        // wait plus per-cycle work), reported via the heartbeat. Colour
+                        // reflects whether the cadence is normal or the Pi is running long
+                        // (e.g. the Eagle getting slow to answer), not the old per-message gap.
                         const intervalEl = document.getElementById('packet-interval');
-                        if (data.packet_interval_ms !== null && data.packet_interval_ms !== undefined) {
-                            const intervalSec = data.packet_interval_ms / 1000;
-                            if (intervalSec < 15) {
-                                intervalEl.textContent = intervalSec.toFixed(1) + 's';
-                                intervalEl.style.color = '#22c55e'; // green - normal ~8-10s
-                            } else if (intervalSec < 30) {
-                                intervalEl.textContent = intervalSec.toFixed(1) + 's';
-                                intervalEl.style.color = '#eab308'; // yellow - slightly delayed
+                        const bs = data.bypass_status || {};
+                        const periodS = bs.cycle_period_s;
+                        if (periodS !== null && periodS !== undefined) {
+                            const nominal = bs.interval_s || 30;
+                            intervalEl.textContent = periodS.toFixed(0) + 's';
+                            if (periodS <= nominal * 1.5) {
+                                intervalEl.style.color = '#22c55e';   // green - normal cadence
+                            } else if (periodS <= nominal * 2) {
+                                intervalEl.style.color = '#eab308';   // yellow - cycles running slow
                             } else {
-                                intervalEl.textContent = intervalSec.toFixed(0) + 's';
-                                intervalEl.style.color = '#ef4444'; // red - significant gap
+                                intervalEl.style.color = '#ef4444';   // red - cycles badly delayed
                             }
                         } else {
                             intervalEl.textContent = '--';
