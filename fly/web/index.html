@@ -1214,9 +1214,9 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name">📦 Packets Today</span>
+                            <span class="api-name" title="Fresh meter readings the Pi passed on from the Eagle in the last 24 hours vs. the number expected at the report rate. A 30s cycle where the Eagle did not respond, or returned stale (unchanged) data, does not count.">📊 Meter Reads (24h)</span>
                             <div class="api-status">
-                                <span id="packets-today" style="font-weight: 600; color: var(--text-primary);">--</span>
+                                <span id="meter-reads" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
                         </div>
                         <div class="api-status-item">
@@ -1226,7 +1226,7 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name">⏱️ Packet Interval</span>
+                            <span class="api-name">⏱️ Sample Interval</span>
                             <div class="api-status">
                                 <span id="packet-interval" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
@@ -1863,9 +1863,17 @@
                             document.getElementById('active-viewers-count').textContent = data.active_viewers;
                         }
 
-                        // Update packets today
-                        if (data.packets_today !== undefined) {
-                            document.getElementById('packets-today').textContent = data.packets_today.toLocaleString();
+                        // Update Meter Reads (24h): fresh reads received vs expected over the last 24h
+                        const readsEl = document.getElementById('meter-reads');
+                        if (readsEl) {
+                            const r = data.reads_24h;
+                            if (r && r.expected) {
+                                readsEl.textContent =
+                                    `${r.received.toLocaleString()}/${r.expected.toLocaleString()}`;
+                            } else if (data.packets_today !== undefined) {
+                                // Fallback until the backend reports reads_24h (e.g. DB unreachable)
+                                readsEl.textContent = data.packets_today.toLocaleString();
+                            }
                         }
 
                         // Update packet interval (time between Eagle-200 packets)
