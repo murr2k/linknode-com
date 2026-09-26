@@ -10,6 +10,15 @@ kill_timeout = "5s"
   INFLUXDB_URL = "http://linknode-influxdb.internal:8086"
   INFLUXDB_ORG = "linknode"
   INFLUXDB_BUCKET = "energy"
+  # SQLite store and alert state live on the eagle_data volume
+  DB_PATH = "/data/energy.db"
+  MONITOR_STATE_FILE = "/data/monitor_state.json"
+
+# One volume, one machine: never scale this app past 1 (each machine would get
+# its own separate database).
+[mounts]
+  source = "eagle_data"
+  destination = "/data"
 
 [[services]]
   protocol = "tcp"
