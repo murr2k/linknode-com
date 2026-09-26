@@ -194,6 +194,22 @@ jobs:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       continue-on-error: false
 
+    - name: Set up Python for Eagle Monitor tests
+      if: |
+        (github.event_name == 'push' && steps.changes.outputs.eagle == 'true') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'eagle-monitor'))
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Test Eagle Monitor
+      if: |
+        (github.event_name == 'push' && steps.changes.outputs.eagle == 'true') ||
+        (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'eagle-monitor'))
+      run: |
+        pip install -q -r fly/eagle-monitor/requirements.txt
+        python -m unittest discover -s fly/eagle-monitor -p "test_*.py"
+
     - name: Deploy Eagle Monitor
       id: deploy-eagle
       if: |

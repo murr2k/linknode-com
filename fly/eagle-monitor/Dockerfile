@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 COPY security_monitor.py .
 COPY monitor_data_staleness.py .
+COPY store.py .
+COPY dashboard.py .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
