@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-27
+
 ### Changed
 - **Infrastructure consolidated from four Fly.io apps to one (2026-09-26/27)**, taking
   hosting from about $13.10 to about $2.09 a month
