@@ -2,8 +2,8 @@
 """
 Eagle-200 XML Monitor
 Receives XML POST data from Eagle-200 energy monitor and stores it in SQLite
-(store.py, on the Fly volume). InfluxDB receives a best-effort copy until it is
-retired. Includes data staleness monitoring with Slack/Pushover alerts.
+(store.py, on the Fly volume). Includes data staleness monitoring with
+Slack/Pushover alerts.
 """
 
 import os
@@ -12,8 +12,6 @@ from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import xml.etree.ElementTree as ET
-from influxdb_client import InfluxDBClient, Point
-from influxdb_client.client.write_api import SYNCHRONOUS
 import time
 from functools import wraps
 import hashlib
@@ -59,19 +57,9 @@ def add_security_headers(response):
     # Server header is handled at the web server level
     return response
 
-# InfluxDB configuration
-INFLUXDB_URL = os.getenv('INFLUXDB_URL', 'http://linknode-influxdb.internal:8086')
-INFLUXDB_TOKEN = os.getenv('INFLUXDB_TOKEN')  # Required - must be set via fly secrets
-INFLUXDB_ORG = os.getenv('INFLUXDB_ORG', 'linknode')
-INFLUXDB_BUCKET = os.getenv('INFLUXDB_BUCKET', 'energy')
-# Best-effort copy writes must fail fast: the Pi's POST timeout is 15s.
-INFLUXDB_WRITE_TIMEOUT_MS = 2_000
-
-# SQLite store (primary). /data is the Fly volume.
+# SQLite store. /data is the Fly volume.
 DB_PATH = os.getenv('DB_PATH', '/data/energy.db')
-# Which store /api/stats reads: 'influx' until the history backfill is verified, then 'sqlite'.
-STATS_BACKEND = os.getenv('STATS_BACKEND', 'influx')
-# Retention matches the InfluxDB bucket (43800h).
+# Retention: 5 years (43800h).
 RETENTION_DAYS = int(os.getenv('RETENTION_DAYS', '1825'))
 
 # API Authentication
@@ -127,7 +115,6 @@ stats = {
     'total_requests': 0,
     'successful_writes': 0,
     'failed_writes': 0,
-    'influx_failed_writes': 0,  # best-effort InfluxDB copy; does not affect freshness
     'filtered_requests': 0,
     'last_data_received': None,
     'previous_data_received': None,
@@ -154,11 +141,6 @@ scheduler = None
 
 # SQLite store, opened by init_store()
 db = None
-
-# Initialize InfluxDB client (queries) and a separate fast-timeout client (writes)
-influx_client = None
-influx_write_client = None
-write_api = None
 
 def check_rate_limit(identifier):
     """Check if request exceeds rate limit"""
@@ -258,29 +240,6 @@ def broadcast_power_update(power_w, timestamp, packet_interval_ms=None):
 
         for dead in dead_clients:
             sse_clients.remove(dead)
-
-def init_influxdb():
-    """Initialize InfluxDB connection"""
-    global influx_client, influx_write_client, write_api
-    try:
-        influx_client = InfluxDBClient(
-            url=INFLUXDB_URL,
-            token=INFLUXDB_TOKEN,
-            org=INFLUXDB_ORG,
-            timeout=30_000
-        )
-        influx_write_client = InfluxDBClient(
-            url=INFLUXDB_URL,
-            token=INFLUXDB_TOKEN,
-            org=INFLUXDB_ORG,
-            timeout=INFLUXDB_WRITE_TIMEOUT_MS
-        )
-        write_api = influx_write_client.write_api(write_options=SYNCHRONOUS)
-        logger.info(f"Connected to InfluxDB at {INFLUXDB_URL}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to connect to InfluxDB: {e}")
-        return False
 
 def init_store(path=None):
     """Open (creating if needed) the SQLite store"""
@@ -540,27 +499,6 @@ def parse_eagle_xml(xml_data):
 
 STORABLE_FIELDS = ('power_w', 'energy_delivered_kwh', 'energy_received_kwh',
                    'price_per_kwh', 'link_strength', 'message_text')
-NUMERIC_FIELDS = ('power_w', 'energy_delivered_kwh', 'energy_received_kwh', 'price_per_kwh')
-
-def write_influx_copy(data):
-    """Best-effort copy to InfluxDB while Grafana still reads it. Uses the 2s-timeout
-    client; failures are counted but never affect the response or freshness tracking."""
-    if not write_api:
-        return
-    try:
-        point = Point("energy_monitor") \
-            .tag("device_mac", data['device_mac']) \
-            .tag("meter_mac", data['meter_mac']) \
-            .tag("message_type", data.get('message_type', 'unknown')) \
-            .time(data['timestamp'])
-        for field in STORABLE_FIELDS:
-            if field in data:
-                value = data[field]
-                point.field(field, float(value) if field in NUMERIC_FIELDS else value)
-        write_api.write(bucket=INFLUXDB_BUCKET, record=point)
-    except Exception as e:
-        stats['influx_failed_writes'] += 1
-        logger.warning(f"InfluxDB copy failed: {e}")
 
 @app.route('/eagle', methods=['POST'])
 @require_auth
@@ -631,7 +569,7 @@ def eagle_webhook():
             stats['last_power_reading'] = data['power_w']
 
         # Write to SQLite. Freshness tracking, the staleness alarm and the live stream
-        # all key off this write, never off the best-effort InfluxDB copy.
+        # all key off this write.
         if db is None:
             stats['failed_writes'] += 1
             logger.error("SQLite store not initialized")
@@ -672,7 +610,6 @@ def eagle_webhook():
                 stats.get('packet_interval_ms')
             )
 
-        write_influx_copy(data)
         logger.info(f"Stored reading: {data}")
 
         return jsonify({'status': 'ok'}), 200
@@ -753,67 +690,10 @@ def health_check():
     health_status = {
         'status': 'healthy' if db_ok else 'unhealthy',
         'db_ok': db_ok,
-        # Read by the current web page's InfluxDB status dot; removed with InfluxDB.
-        'influxdb_connected': influx_client is not None,
         'uptime_seconds': (datetime.now(timezone.utc) - datetime.fromisoformat(stats['start_time'])).total_seconds()
     }
 
     return jsonify(health_status), 200 if health_status['status'] == 'healthy' else 503
-
-def _window_stats_influx(hours, billing_start):
-    """Raw window statistics from InfluxDB (the pre-SQLite path). None if not connected."""
-    if not influx_client:
-        return None
-    query_api = influx_client.query_api()
-    window = {'min': None, 'max': None, 'mean': None, 'count': 0,
-              'price': None, 'billing_energy_kwh': None}
-
-    # Get min/max/avg for the specified time period
-    query = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
-        |> range(start: -{hours}h)
-        |> filter(fn: (r) => r["_measurement"] == "energy_monitor")
-        |> filter(fn: (r) => r["_field"] == "power_w")
-    '''
-
-    # group() aggregates across all device_mac series
-    for key, reducer in (('min', 'min()'), ('max', 'max()'), ('mean', 'mean()')):
-        res = query_api.query(org=INFLUXDB_ORG, query=query + f'|> group() |> {reducer}')
-        if res and res[0].records:
-            window[key] = res[0].records[0].get_value()
-
-    count_result = query_api.query(org=INFLUXDB_ORG, query=query + '|> group() |> count()')
-    if count_result and count_result[0].records:
-        window['count'] = int(count_result[0].records[0].get_value() or 0)
-
-    # Get current electricity rate from InfluxDB (reported by Eagle from utility)
-    price_query = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
-        |> range(start: -{hours}h)
-        |> filter(fn: (r) => r["_measurement"] == "energy_monitor")
-        |> filter(fn: (r) => r["_field"] == "price_per_kwh")
-        |> group()
-        |> last()
-    '''
-    price_result = query_api.query(org=INFLUXDB_ORG, query=price_query)
-    if price_result and price_result[0].records:
-        window['price'] = price_result[0].records[0].get_value()
-
-    # Query cumulative energy for billing period using integral
-    billing_energy_query = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
-        |> range(start: {billing_start.strftime("%Y-%m-%dT%H:%M:%SZ")})
-        |> filter(fn: (r) => r["_measurement"] == "energy_monitor")
-        |> filter(fn: (r) => r["_field"] == "power_w")
-        |> integral(unit: 1h)
-        |> group()
-        |> sum()
-        |> map(fn: (r) => ({{r with _value: r._value / 1000.0}}))
-    '''
-    energy_result = query_api.query(org=INFLUXDB_ORG, query=billing_energy_query)
-    if energy_result and energy_result[0].records:
-        window['billing_energy_kwh'] = energy_result[0].records[0].get_value()
-    return window
 
 def _window_stats_sqlite(hours, billing_start):
     """Raw window statistics from the SQLite store. None if the store is not open."""
@@ -876,12 +756,9 @@ def get_stats():
 
     billing_start = get_billing_period_start()
     try:
-        if STATS_BACKEND == 'sqlite':
-            window = _window_stats_sqlite(hours, billing_start)
-        else:
-            window = _window_stats_influx(hours, billing_start)
+        window = _window_stats_sqlite(hours, billing_start)
     except Exception as e:
-        logger.error(f"Error querying {STATS_BACKEND} for stats: {e}")
+        logger.error(f"Error querying the store for stats: {e}")
         window = None
 
     if window is None:
@@ -1055,18 +932,6 @@ def get_security_stats():
 
 if __name__ == '__main__':
     init_store()
-
-    # Wait for InfluxDB to be ready
-    retries = 0
-    while retries < 30:
-        if init_influxdb():
-            break
-        retries += 1
-        logger.warning(f"Waiting for InfluxDB... retry {retries}/30")
-        time.sleep(2)
-    
-    if not influx_client:
-        logger.error("Failed to connect to InfluxDB after 30 retries")
 
     # Start the data staleness monitor
     start_data_monitor()

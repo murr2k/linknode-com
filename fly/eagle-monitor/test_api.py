@@ -57,12 +57,10 @@ class TestRoutes(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.assertTrue(monitor_app.init_store(os.path.join(self.tmp, 'energy.db')))
-        monitor_app.write_api = None
-        monitor_app.STATS_BACKEND = 'sqlite'
         monitor_app._dashboard_cache.clear()
         monitor_app.stats.update({'last_data_received': None, 'last_power_reading': None,
                                   'successful_writes': 0, 'failed_writes': 0,
-                                  'influx_failed_writes': 0, 'bypass_status': None})
+                                  'bypass_status': None})
         self.client = monitor_app.app.test_client()
 
     def tearDown(self):
@@ -86,15 +84,6 @@ class TestRoutes(unittest.TestCase):
         self.post(demand_xml(1000, ts))
         now_ms = int(time.time() * 1000)
         self.assertEqual(monitor_app.db.agg('power_w', 0, now_ms)['count'], 1)
-
-    def test_influx_copy_failure_does_not_affect_freshness(self):
-        monitor_app.write_api = MagicMock()
-        monitor_app.write_api.write.side_effect = TimeoutError('influx down')
-        r = self.post(demand_xml(800, time.time() - 5))
-        self.assertEqual(r.get_json(), {'status': 'ok'})
-        self.assertIsNotNone(monitor_app.stats['last_data_received'])
-        self.assertEqual(monitor_app.stats['influx_failed_writes'], 1)
-        self.assertEqual(monitor_app.stats['failed_writes'], 0)
 
     def test_store_failure_does_not_mark_fresh(self):
         monitor_app.db = MagicMock()

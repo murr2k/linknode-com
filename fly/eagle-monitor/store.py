@@ -72,8 +72,8 @@ INSERT_TEXT_IGNORE = "INSERT OR IGNORE INTO text_readings (field, ts_ms, value) 
 
 
 def to_ms(dt):
-    """Epoch milliseconds for an aware datetime. Integer floor, so live writes and the
-    InfluxDB backfill map the same instant to the same key (float math can differ by 1)."""
+    """Epoch milliseconds for an aware datetime. Integer floor, so the same instant
+    always maps to the same key (float math can differ by 1)."""
     return (dt - EPOCH) // timedelta(milliseconds=1)
 
 
