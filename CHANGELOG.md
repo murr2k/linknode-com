@@ -39,8 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   placeholders) and the Fly certificate-validation records
 
 ### Added
-- "This Bill So Far" tile on linknode.com: the current BC Hydro billing period's running total
-  including GST, the day of the period and kWh used, with the line-by-line breakdown on hover
+- **BC Hydro bill calculator.** The ingest service estimates the current bill from the stored
+  readings, built line by line like BC Hydro's residential tiered bill (rate schedule 1101):
+  basic charge, Tier 1/Tier 2 energy with the 22.1918 kWh/day threshold prorated over the
+  period, deferral account rate rider, regional transit levy and GST, each rounded to the cent.
+  Verified against the Jul 30, 2026 bill ($123.75), which `test_api.TestBilling` reproduces
+  exactly
+  - "This Bill So Far" tile on linknode.com: running total including GST, day of the period
+    and kWh used, with the bill lines on hover
+  - `GET /api/stats` `billing_period` gains `next_start` and `cycle_days`; its `tiered_cost`
+    gains `rider`, `transit_levy`, `subtotal` and `gst`, and `total_cost` is now the amount due
+  - Two-month billing cycle (periods start in odd months) counted in Vancouver time, using the
+    pinned `tzdata` package (BC is on permanent UTC-7 from 2026); `BILLING_PERIOD_START` pins an
+    exact start from a bill
+  - Every rate and bill line is a setting with a current default; see README "Bill Calculator"
 - Eagle-200 local-API bypass: a hot-standby failover uploader that keeps the data
   pipeline alive through the meter's hardware faults (`scripts/eagle_bypass.py`, `deploy/`)
   - Polls the Eagle's LAN REST API and forwards synthetic Rainforest XML to the Fly
@@ -110,11 +122,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `INFLUXDB_TOKEN` to GitHub repository secrets
 
 ### Fixed
-- The billing estimate matches a real BC Hydro bill: it now includes the deferral account rate
-  rider (-1.5%), the regional transit levy ($0.0624/day) and GST (5%), rounds each line to the
-  cent like the bill, uses the two-month billing cycle (periods start in odd months) and counts
-  days in Vancouver time. A unit test reproduces the Jul 30, 2026 bill ($123.75) exactly.
-  Timezone rules come from the pinned `tzdata` package (BC is on permanent UTC-7 from 2026)
+- The earlier billing estimate understated a bill by about 6.5% (no rate rider, transit levy
+  or GST), reset every month instead of every two months, and counted days in UTC; replaced by
+  the bill calculator (see Added)
 - Cost figures use BC Hydro's rates effective 2026-04-01 (Step 1 11.87 cents/kWh, basic charge
   23.44 cents/day; Step 2 14.08 cents and the 22.1918 kWh/day threshold unchanged) and the
   configured rates now take precedence over the price the Eagle reports, which still read the

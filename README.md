@@ -22,9 +22,15 @@ A real-time energy monitoring dashboard that tracks household power consumption 
 - **Real-time Power Monitoring**
   - Eagle-200 smart meter integration (XML format)
   - Live gauge driven by Server-Sent Events
-  - Power trend chart and stats for 1h, 6h, 24h, 7d or 30d: min/average/peak power, energy consumed, meter reading, rate, cost per hour, estimated cost
+  - Power trend chart for 1h, 6h, 24h, 7d or 30d (average line with a min-to-max band, so short peaks stay visible at every range) and stats: min/average/peak power, energy consumed, meter reading, rate, cost per hour, estimated cost
   - Time-series storage in SQLite on a Fly volume (5-year retention, daily snapshots)
   - Data staleness detection with age indicators
+
+- **BC Hydro Bill Calculator**
+  - "This Bill So Far" tile: the running total for the current two-month billing period, including GST, with the bill lines on hover
+  - Built line by line like a BC Hydro residential tiered bill: basic charge, Tier 1/Tier 2 energy, rate rider, transit levy, GST
+  - Verified against a real bill: a unit test reproduces the Jul 30, 2026 bill ($123.75) to the cent
+  - Details in [Bill Calculator](#bill-calculator)
 
 - **Outage Alerting**
   - Data staleness monitor detects when the power meter stops reporting
@@ -55,6 +61,47 @@ A real-time energy monitoring dashboard that tracks household power consumption 
   - Basic-auth ingest endpoint with rate limiting
   - CORS allow-list on the API
   - Security scanning in CI/CD
+
+## Bill Calculator
+
+The ingest service estimates the current BC Hydro bill from the readings it stores. It follows
+BC Hydro's residential tiered rate (rate schedule 1101) and builds the total the way the bill
+does, rounding each line to the cent:
+
+| Line | Calculation | Value (from Apr 1, 2026) |
+|---|---|---|
+| Basic charge | days x daily charge | $0.2344/day |
+| Tier 1 energy | kWh up to the threshold x Tier 1 rate | $0.1187/kWh |
+| Tier 2 energy | kWh above the threshold x Tier 2 rate | $0.1408/kWh |
+| Deferral account rate rider | % of basic charge + energy | -1.5% |
+| Regional transit levy | days x daily levy | $0.0624/day |
+| GST | % of the subtotal | 5% |
+
+The Tier 1 threshold is 22.1918 kWh per day, prorated over the days in the period (1,354 kWh
+for a 61-day period). Energy is the trapezoidal integral of the power readings, which matched
+the meter's own register to within 0.01% over 30 days.
+
+- **Billing period.** BC Hydro bills every two months. For this account the periods start in
+  odd months around the 26th (the day after the meter read), and days are counted in Vancouver
+  time. The read date drifts by a few days, so `BILLING_PERIOD_START` (the start date on the
+  latest bill) pins the period exactly.
+- **"So far" means "if the period ended today".** The threshold is prorated to the days
+  elapsed, so early in a period one heavy day can show some Tier 2 use that the full period
+  would absorb.
+- **Where it shows.** The This Bill So Far tile on linknode.com, and `billing_period` in
+  `GET /api/stats` (`start`, `next_start`, `days`, `cycle_days`, `energy_kwh` and a
+  `tiered_cost` breakdown whose `total_cost` is the amount due). The dashboard's rate, cost per
+  hour and estimated cost use the Tier 1 rate. The Eagle reports its own price
+  (`meter_price_per_kwh`), but BC Hydro doesn't update it when rates change, so it is shown and
+  never used for costs.
+- **Keeping it current.** BC Hydro raises the Tier 1 rate and the basic charge every April 1
+  (Tier 2 is held at 14.08 cents by BCUC order G-42-25), and the rider and transit levy change
+  from time to time. When a bill shows new values, update the defaults in
+  `fly/eagle-monitor/app.py` (or override them in `fly.toml` `[env]`) together with the
+  expected lines in `test_api.TestBilling`. Settings: `TIER1_RATE`, `TIER2_RATE`,
+  `DAILY_THRESHOLD_KWH`, `BASIC_CHARGE_DAILY`, `RATE_RIDER_PCT`, `TRANSIT_LEVY_DAILY`,
+  `GST_PCT`, `BILLING_CYCLE_MONTHS`, `BILLING_CYCLE_FIRST_MONTH`, `BILLING_CYCLE_START_DAY`,
+  `BILLING_PERIOD_START`, `BILLING_TZ`.
 
 ## Quick Start
 
@@ -172,6 +219,11 @@ ingest service. The page loads from Cloudflare's edge and calls the API directly
 data. See [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md) for detail.
 
 ## Recent Changes
+
+### 2026-09-27: BC Hydro bill calculator
+- "This Bill So Far" tile with the running total for the current billing period, including GST
+- Cost figures use BC Hydro's April 2026 rates; the rider, transit levy and GST are now included
+- Two-month billing cycle counted in Vancouver time; verified against a real bill to the cent
 
 ### 2026-09-27: Leaner stack (~$13 to ~$2.09 a month)
 - Replaced InfluxDB with SQLite inside the ingest service; 30 days of history carried over
