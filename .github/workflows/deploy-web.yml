@@ -1,0 +1,60 @@
+name: Deploy site to Cloudflare
+
+# linknode.com is a Cloudflare Worker serving web/public as static assets
+# (config: web/wrangler.jsonc). The Fly apps deploy separately (deploy-fly.yml).
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Generate build-info.json
+      run: |
+        cat > web/public/build-info.json << EOF
+        {
+          "version": "v1.0.${{ github.run_number }}",
+          "buildDate": "$(date -u +%Y-%m-%d)",
+          "buildTime": "$(date -u +%H:%M) UTC",
+          "commit": "$(echo ${{ github.sha }} | cut -c1-7)",
+          "commitFull": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "buildNumber": "${{ github.run_number }}",
+          "environment": "production"
+        }
+        EOF
+        cat web/public/build-info.json
+
+    - name: Deploy to Cloudflare
+      uses: cloudflare/wrangler-action@v3
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        workingDirectory: web
+        wranglerVersion: '4.141.0'
+        command: deploy
+
+    - name: Verify deployment
+      run: |
+        sleep 5
+        curl -sf https://linknode-web.murr2k.workers.dev/ | grep -q "Linknode"
+        curl -sf https://linknode-web.murr2k.workers.dev/build-info.json | grep -q "${{ github.sha }}"
+        echo "✅ Site deployed: https://linknode-web.murr2k.workers.dev"

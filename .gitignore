@@ -117,3 +117,8 @@ websites/
 fortis_bill_*
 Usage history*
 HANDOFF.md
+
+# Cloudflare site: generated at deploy time, and wrangler local state
+web/public/build-info.json
+.wrangler/
+web/.wrangler/

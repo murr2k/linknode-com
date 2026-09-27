@@ -9,13 +9,12 @@ on:
   workflow_dispatch:
     inputs:
       service:
-        description: 'Service to deploy (all, web, grafana, influxdb, eagle-monitor)'
+        description: 'Service to deploy (all, grafana, influxdb, eagle-monitor)'
         required: false
         default: 'all'
         type: choice
         options:
           - all
-          - web
           - grafana
           - influxdb
           - eagle-monitor
@@ -51,8 +50,6 @@ jobs:
       id: changes
       with:
         filters: |
-          web:
-            - 'fly/web/**'
           influxdb:
             - 'fly/influxdb/**'
           grafana:
@@ -106,23 +103,20 @@ jobs:
         INFLUXDB_VERSION=$(get_version linknode-influxdb)
         EAGLE_VERSION=$(get_version linknode-eagle-monitor)
         GRAFANA_VERSION=$(get_version linknode-grafana)
-        WEB_VERSION=$(get_version linknode-web)
         
         # Store versions in outputs
         echo "influxdb_version=$INFLUXDB_VERSION" >> $GITHUB_OUTPUT
         echo "eagle_version=$EAGLE_VERSION" >> $GITHUB_OUTPUT
         echo "grafana_version=$GRAFANA_VERSION" >> $GITHUB_OUTPUT
-        echo "web_version=$WEB_VERSION" >> $GITHUB_OUTPUT
         
         echo "Current versions:"
         echo "- InfluxDB: $INFLUXDB_VERSION"
         echo "- Eagle Monitor: $EAGLE_VERSION"
         echo "- Grafana: $GRAFANA_VERSION"
-        echo "- Web: $WEB_VERSION"
         
         # Warn if no versions were captured successfully
         if [ "$INFLUXDB_VERSION" = "none" ] && [ "$EAGLE_VERSION" = "none" ] && 
-           [ "$GRAFANA_VERSION" = "none" ] && [ "$WEB_VERSION" = "none" ]; then
+           [ "$GRAFANA_VERSION" = "none" ]; then
           echo "::warning::No deployment versions could be captured - rollback may not be possible"
         fi
       env:
@@ -306,71 +300,6 @@ jobs:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       continue-on-error: false
 
-    - name: Deploy Web Interface
-      id: deploy-web
-      if: |
-        (github.event_name == 'push' && steps.changes.outputs.web == 'true') ||
-        (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'web'))
-      run: |
-        cd fly/web
-        
-        # Generate build info
-        echo "Generating build-info.json..."
-        cat > build-info.json << EOF
-        {
-          "version": "v1.0.${{ github.run_number }}",
-          "buildDate": "$(date -u +%Y-%m-%d)",
-          "commit": "$(echo ${{ github.sha }} | cut -c1-7)",
-          "environment": "production",
-          "branch": "${{ github.ref_name }}",
-          "buildNumber": "${{ github.run_number }}",
-          "actor": "${{ github.actor }}"
-        }
-        EOF
-        
-        echo "Build info:"
-        cat build-info.json
-        
-        # Deploy with retry logic
-        RETRY_COUNT=0
-        MAX_RETRIES=2
-        
-        while [ $RETRY_COUNT -le $MAX_RETRIES ]; do
-          echo "Deployment attempt $((RETRY_COUNT + 1)) of $((MAX_RETRIES + 1))..."
-          
-          if flyctl deploy --remote-only --wait-timeout 300; then
-            echo "✅ Web interface deployed successfully"
-            
-            # Verify deployment health
-            sleep 10
-            if curl -sf https://linknode-web.fly.dev -m 10 | grep -q "Linknode"; then
-              echo "✅ Web interface health check passed"
-              break
-            else
-              echo "⚠️ Web interface health check failed"
-              if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-                echo "❌ Maximum retries reached"
-                exit 1
-              fi
-            fi
-          else
-            echo "❌ Deployment failed"
-            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-              echo "🔄 Attempting rollback to version ${{ steps.versions.outputs.web_version }}"
-              if [ "${{ steps.versions.outputs.web_version }}" != "none" ]; then
-                flyctl deploy --image "${{ steps.versions.outputs.web_version }}" -a linknode-web --yes || true
-              fi
-              exit 1
-            fi
-          fi
-          
-          RETRY_COUNT=$((RETRY_COUNT + 1))
-          [ $RETRY_COUNT -le $MAX_RETRIES ] && echo "Waiting 30 seconds before retry..." && sleep 30
-        done
-      env:
-        FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-      continue-on-error: false
-
     - name: Verify Deployments
       if: always()
       run: |
@@ -380,8 +309,6 @@ jobs:
         flyctl status -a linknode-eagle-monitor || echo "Eagle Monitor: Failed to get status"
         echo ""
         flyctl status -a linknode-grafana || echo "Grafana: Failed to get status"
-        echo ""
-        flyctl status -a linknode-web || echo "Web: Failed to get status"
       env:
         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
@@ -399,7 +326,6 @@ jobs:
           echo "- **Mode**: Automatic deployment based on changed files" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Services deployed:**" >> $GITHUB_STEP_SUMMARY
-          [ "${{ steps.changes.outputs.web }}" = "true" ] && echo "- ✅ Web Interface" >> $GITHUB_STEP_SUMMARY
           [ "${{ steps.changes.outputs.grafana }}" = "true" ] && echo "- ✅ Grafana" >> $GITHUB_STEP_SUMMARY
           [ "${{ steps.changes.outputs.eagle }}" = "true" ] && echo "- ✅ Eagle Monitor" >> $GITHUB_STEP_SUMMARY
           [ "${{ steps.changes.outputs.influxdb }}" = "true" ] && echo "- ✅ InfluxDB" >> $GITHUB_STEP_SUMMARY
@@ -408,7 +334,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Public Access URLs" >> $GITHUB_STEP_SUMMARY
         echo "- **Main Site**: https://linknode.com" >> $GITHUB_STEP_SUMMARY
-        echo "- **Direct Fly URL**: https://linknode-web.fly.dev" >> $GITHUB_STEP_SUMMARY
+        echo "- **Site**: Cloudflare Worker, deployed by deploy-web.yml" >> $GITHUB_STEP_SUMMARY
         echo "- **Grafana Dashboard**: https://linknode-grafana.fly.dev" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Service Endpoints" >> $GITHUB_STEP_SUMMARY
@@ -435,7 +361,6 @@ jobs:
           else
             # For push events, check if service files changed
             case $service in
-              web) [ "${{ steps.changes.outputs.web }}" = "true" ] ;;
               grafana) [ "${{ steps.changes.outputs.grafana }}" = "true" ] ;;
               eagle-monitor) [ "${{ steps.changes.outputs.eagle }}" = "true" ] ;;
               influxdb) [ "${{ steps.changes.outputs.influxdb }}" = "true" ] ;;
@@ -444,16 +369,6 @@ jobs:
         }
         
         # Check only deployed services
-        if was_deployed "web"; then
-          echo "🔍 Checking Web Interface..."
-          if curl -sf https://linknode-web.fly.dev -m 10 | grep -q "Linknode"; then
-            echo "✅ Web interface is healthy"
-          else
-            echo "❌ Web interface is not responding correctly"
-            FAILED_SERVICES="${FAILED_SERVICES}web "
-          fi
-        fi
-        
         if was_deployed "grafana"; then
           echo "🔍 Checking Grafana..."
           if curl -sf https://linknode-grafana.fly.dev/api/health -m 10; then
