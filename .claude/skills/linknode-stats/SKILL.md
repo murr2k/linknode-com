@@ -97,7 +97,7 @@ mode the outage log stops accruing, so the meaningful failure signals become `re
 ```bash
 curl -s https://linknode-eagle-monitor.fly.dev/api/stats | python -m json.tool
 curl -s https://linknode-eagle-monitor.fly.dev/health | python -m json.tool
-# Ops: fly status -a linknode-eagle-monitor ; fly logs -a linknode-eagle-monitor   (region ord)
+# Ops: fly status -a linknode-eagle-monitor ; fly logs -a linknode-eagle-monitor   (region iad)
 ```
 
 ### Key map (what to read, and the aliases that trip people up)

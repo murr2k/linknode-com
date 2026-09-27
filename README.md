@@ -45,7 +45,7 @@ A real-time energy monitoring dashboard that tracks household power consumption 
   - API status indicators
   - Responsive design (mobile to 4K)
 
-- **Lean infrastructure (~$2.58/month)**
+- **Lean infrastructure (~$2.09/month)**
   - One Fly.io machine (shared CPU, 256MB) with a 1GB volume
   - Static site on Cloudflare Workers (static assets are free)
   - Automated CI/CD via GitHub Actions; unit tests gate every backend deploy
@@ -173,7 +173,7 @@ data. See [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md) for detail.
 
 ## Recent Changes
 
-### 2026-09-27: Leaner stack (~$13 to ~$2.58 a month)
+### 2026-09-27: Leaner stack (~$13 to ~$2.09 a month)
 - Replaced InfluxDB with SQLite inside the ingest service; 30 days of history carried over
 - Replaced Grafana with a native uPlot chart and stat tiles on the main site, with a range picker
 - Moved the site from nginx on Fly to Cloudflare Workers; retired three of the four Fly apps

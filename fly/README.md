@@ -39,7 +39,7 @@ fly/
 
 ### Eagle Monitor Service
 - **Dockerfile**: `python:3.11-slim` with Flask and APScheduler
-- **fly.toml**: region `ord`, shared-cpu-1x 256MB, volume `eagle_data` mounted at
+- **fly.toml**: region `iad`, shared-cpu-1x 256MB, volume `eagle_data` mounted at
   `/data`, HTTP (`/health`) and TCP checks
 - **app.py**, **store.py**, **dashboard.py**, **monitor_data_staleness.py**,
   **security_monitor.py**: application code
@@ -60,7 +60,8 @@ flyctl deploy --remote-only
 second machine would get its own separate database. Never scale past one.
 
 The volume `eagle_data` is 1GB, encrypted, with daily snapshots kept 14 days. Cost is
-about $2.58/month (machine $2.43, volume $0.15).
+about $2.09/month (machine $1.94, volume $0.15) in `iad`, which has no regional
+price markup.
 
 ## Environment Variables
 

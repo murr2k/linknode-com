@@ -17,7 +17,8 @@ APIs. The static site is a Cloudflare Worker (static assets only) that charts th
 data natively with uPlot. Lightweight project, no Ruflo.
 
 Until 2026-09-27 this ran as four Fly apps (nginx site, Grafana, InfluxDB and the
-ingest service); the other three were retired to cut cost to ~$2.58/month. See
+ingest service); the other three were retired, and the machine moved from `ord` to
+`iad`, to cut cost to ~$2.09/month. See
 `CHANGELOG.md` and `docs/THEORY_OF_OPERATION.md`.
 
 ## Run / build / test
@@ -57,7 +58,7 @@ January 2026; those scripts no longer work.
   `eagle_data` volume attached to it; a second machine would get its own
   separate database. Never `fly scale count` above 1. **Why:** the volume is
   the only copy of the history (plus Fly's daily snapshots, kept 14 days).
-- **Never destroy the `eagle_data` volume** (`vol_re1oqe3mzqodx6d4`, ord).
+- **Never destroy the `eagle_data` volume** (`vol_491xj8k1y8wlgl3r`, iad).
   **Why:** everything since 2026-08-27 lives there; InfluxDB, which held the
   older history, was deliberately destroyed.
 - **The site's CSP lives in `web/public/_headers`**, and its `connect-src` must
@@ -81,7 +82,8 @@ January 2026; those scripts no longer work.
 ## Project-specific tooling
 
 - **flyctl**: manage the one Fly app (`fly status -a linknode-eagle-monitor`,
-  `fly logs`, `fly secrets`, `fly volumes list`). Region `ord`. The Fly MCP server
+  `fly logs`, `fly secrets`, `fly volumes list`). Region `iad` (moved from `ord`
+  2026-09-27: `iad`/`ewr` have no regional price markup, `ord` is 1.25x). The Fly MCP server
   (`flyctl mcp server`) is installed at user scope.
 - **wrangler** (repo devDependency): site preview and deploys.
 - **Cloudflare API MCP** (`https://mcp.cloudflare.com/mcp`): zone work (DNS,

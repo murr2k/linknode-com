@@ -31,7 +31,7 @@ graph TB
         E200 -->|"Local API (LAN)"| PI["Raspberry Pi<br/>eagle-bypass.service"]
     end
 
-    subgraph "Fly.io (ord)"
+    subgraph "Fly.io (iad)"
         EM["Eagle Monitor<br/>Python/Flask"] -->|"read and write"| DB[("SQLite<br/>eagle_data volume")]
     end
 
@@ -101,7 +101,7 @@ Always-on is the default mode: the Pi is the sole uploader and ships every cycle
 
 **Location:** `fly/eagle-monitor/app.py` (with `store.py`, `dashboard.py`, `monitor_data_staleness.py`)
 **Technology:** Python 3.11, Flask, APScheduler, SQLite (`sqlite3` standard library)
-**Deployment:** Fly.io app `linknode-eagle-monitor` (linknode-eagle-monitor.fly.dev), one shared-cpu-1x 256 MB machine in `ord`
+**Deployment:** Fly.io app `linknode-eagle-monitor` (linknode-eagle-monitor.fly.dev), one shared-cpu-1x 256 MB machine in `iad`
 
 ```mermaid
 flowchart LR
@@ -378,7 +378,7 @@ flowchart TB
 ```mermaid
 graph TB
     subgraph "Fly.io"
-        subgraph "Chicago (ord)"
+        subgraph "Ashburn (iad)"
             EM["linknode-eagle-monitor<br/>Flask, one machine"]
         end
     end
@@ -404,11 +404,11 @@ graph TB
 
 | Service | Platform | CPUs | Memory | Storage | Cost |
 |---------|----------|------|--------|---------|------|
-| Eagle Monitor | Fly.io (`ord`) | 1 shared | 256 MB | Volume (eagle_data, 1 GB) | ~$2.43 machine + $0.15 volume per month |
+| Eagle Monitor | Fly.io (`iad`) | 1 shared | 256 MB | Volume (eagle_data, 1 GB) | ~$1.94 machine + $0.15 volume per month |
 | Web (static site) | Cloudflare Workers | n/a | n/a | Static assets | Free tier |
 | Bypass uploader | Raspberry Pi, home LAN | n/a | n/a | SD card | n/a |
 
-Total hosting is about $2.58/month.
+Total hosting is about $2.09/month (`iad` has no regional markup; the same machine in `ord` cost $2.43).
 
 **One machine only.** The database lives on the machine's volume, so a second machine would get its own separate database. Never scale `linknode-eagle-monitor` past one machine.
 

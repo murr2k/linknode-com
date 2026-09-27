@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Infrastructure consolidated from four Fly.io apps to one (2026-09-26/27)**, taking
-  hosting from about $13.10 to about $2.58 a month
+  hosting from about $13.10 to about $2.09 a month
+  - The one remaining machine and its volume moved from `ord` (1.25x regional price markup)
+    to `iad` (1.0x), from $2.58 to $2.09 a month
   - Readings are stored in SQLite (`fly/eagle-monitor/store.py`) on the new `eagle_data`
     Fly volume (1GB, daily snapshots kept 14 days) instead of InfluxDB. Writing the same
     (field, timestamp) again overwrites, as InfluxDB did, so `reads_24h` still counts only

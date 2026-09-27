@@ -1,5 +1,5 @@
 app = "linknode-eagle-monitor"
-primary_region = "ord"
+primary_region = "iad"
 kill_signal = "SIGINT"
 kill_timeout = "5s"
 
