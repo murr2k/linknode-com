@@ -2063,6 +2063,7 @@
         let dashboardTimer = null;
         let dashboardGen = 0;
         let powerChart = null;
+        let chartWindow = null;  // [start, end] ms of the selected range: the x axis always spans it
 
         // Grafana stat-panel thresholds: steps above the green base, [from value, colour class]
         const STAT_THRESHOLDS = {
@@ -2127,7 +2128,8 @@
             };
         }
 
-        function renderPowerChart(series) {
+        function renderPowerChart(series, start, end) {
+            chartWindow = [start, end];
             const el = document.getElementById('power-chart');
             if (!series.length) {
                 if (powerChart) {
@@ -2154,7 +2156,10 @@
                 ms: 1,  // timestamps are epoch milliseconds
                 legend: { show: false },
                 cursor: { y: false, points: { size: 6 } },
-                scales: { y: { range: (u, min, max) => [0, max > 0 ? max * 1.1 : 1000] } },
+                scales: {
+                    x: { range: () => chartWindow },
+                    y: { range: (u, min, max) => [0, max > 0 ? max * 1.1 : 1000] }
+                },
                 series: [
                     {},
                     {
@@ -2183,7 +2188,7 @@
                     }
                     const d = await response.json();
                     if (gen === dashboardGen) {
-                        renderPowerChart(d.series);
+                        renderPowerChart(d.series, d.start, d.end);
                         setStat('dash-min', d.power.min, v => Math.round(v) + ' W');
                         setStat('dash-avg', d.power.mean, v => Math.round(v) + ' W');
                         setStat('dash-max', d.power.max, v => Math.round(v) + ' W');
