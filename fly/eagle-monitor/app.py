@@ -7,8 +7,10 @@ Slack/Pushover alerts.
 """
 
 import os
+import calendar
 import logging
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import xml.etree.ElementTree as ET
@@ -111,8 +113,21 @@ RAW_CAPTURE = os.getenv('RAW_CAPTURE', '') == '1'
 TIER1_RATE = float(os.getenv('TIER1_RATE', '0.1187'))  # $/kWh - Step 1, below threshold
 TIER2_RATE = float(os.getenv('TIER2_RATE', '0.1408'))  # $/kWh - Step 2, above threshold
 DAILY_THRESHOLD_KWH = float(os.getenv('DAILY_THRESHOLD_KWH', '22.1918'))  # kWh/day for tier boundary
-BILLING_CYCLE_START_DAY = int(os.getenv('BILLING_CYCLE_START_DAY', '26'))  # Day of month billing resets (BC Hydro)
 BASIC_CHARGE_DAILY = float(os.getenv('BASIC_CHARGE_DAILY', '0.2344'))  # $/day basic charge
+# The other lines on the bill (Jul 30, 2026): the deferral account rate rider on basic
+# charge + energy (it changes, and has been positive in past years), the regional
+# transit levy per day, and GST on the subtotal.
+RATE_RIDER_PCT = float(os.getenv('RATE_RIDER_PCT', '-1.5'))
+TRANSIT_LEVY_DAILY = float(os.getenv('TRANSIT_LEVY_DAILY', '0.0624'))  # $/day
+GST_PCT = float(os.getenv('GST_PCT', '5'))
+# Billing cycle: every 2 months, periods starting in odd months around the 26th (the day
+# after the meter read, which drifts by a few days). BILLING_PERIOD_START (YYYY-MM-DD,
+# from the latest bill) pins it exactly. Days are counted in local (Pacific) time.
+BILLING_CYCLE_MONTHS = int(os.getenv('BILLING_CYCLE_MONTHS', '2'))
+BILLING_CYCLE_FIRST_MONTH = int(os.getenv('BILLING_CYCLE_FIRST_MONTH', '1'))  # 1 = Jan, Mar, May...
+BILLING_CYCLE_START_DAY = int(os.getenv('BILLING_CYCLE_START_DAY', '26'))
+BILLING_PERIOD_START = os.getenv('BILLING_PERIOD_START')
+BILLING_TZ = ZoneInfo(os.getenv('BILLING_TZ', 'America/Vancouver'))
 
 # Statistics
 stats = {
@@ -623,24 +638,44 @@ def eagle_webhook():
         logger.error(f"Error processing request: {e}")
         return jsonify({'error': str(e)}), 500
 
-def get_billing_period_start():
-    """Calculate the start of the current billing period based on BILLING_CYCLE_START_DAY"""
-    now = datetime.now(timezone.utc)
-    # If we're past the billing start day this month, use this month
-    # Otherwise, use the previous month
-    if now.day >= BILLING_CYCLE_START_DAY:
-        billing_start = now.replace(day=BILLING_CYCLE_START_DAY, hour=0, minute=0, second=0, microsecond=0)
+def _add_months(dt, months):
+    """Same day-of-month `months` later (or earlier), clamped to the month's last day."""
+    total = dt.month - 1 + months
+    year, month = dt.year + total // 12, total % 12 + 1
+    day = min(dt.day, calendar.monthrange(year, month)[1])
+    return dt.replace(year=year, month=month, day=day)
+
+
+def get_billing_period_start(now=None):
+    """Start (local midnight, BILLING_TZ) of the billing period containing `now`.
+
+    BC Hydro bills every BILLING_CYCLE_MONTHS months. Without BILLING_PERIOD_START the
+    periods start on BILLING_CYCLE_START_DAY of every other month from
+    BILLING_CYCLE_FIRST_MONTH (odd months for this account). The real start is the day
+    after the meter is read, which drifts by a few days (bills ended Jul 28, Sep 25,
+    Nov 26, Jan 27, Mar 27, May 28), so for an exact match set BILLING_PERIOD_START to
+    the start date printed on the latest bill; it is stepped forward by whole cycles.
+    """
+    now = (now or datetime.now(timezone.utc)).astimezone(BILLING_TZ)
+    if BILLING_PERIOD_START:
+        anchor = datetime.strptime(BILLING_PERIOD_START, '%Y-%m-%d').replace(tzinfo=BILLING_TZ)
     else:
-        # Go to previous month
-        first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_month = first_of_month - timedelta(days=1)
-        billing_start = last_month.replace(day=BILLING_CYCLE_START_DAY, hour=0, minute=0, second=0, microsecond=0)
-    return billing_start
+        anchor = datetime(2000, BILLING_CYCLE_FIRST_MONTH, BILLING_CYCLE_START_DAY, tzinfo=BILLING_TZ)
+    months = (now.year - anchor.year) * 12 + (now.month - anchor.month)
+    k = months // BILLING_CYCLE_MONTHS
+    start = _add_months(anchor, k * BILLING_CYCLE_MONTHS)
+    if start > now:
+        start = _add_months(anchor, (k - 1) * BILLING_CYCLE_MONTHS)
+    return start
 
 
 def calculate_tiered_cost(energy_kwh, days_in_period, tier1_rate=None, tier2_rate=None):
     """
-    Calculate cost using BC Hydro tiered rate structure.
+    Bill for `energy_kwh` over `days_in_period` days, built line by line the way BC Hydro's
+    residential tiered bill (rate schedule 1101) is: each line rounded to the cent, the
+    deferral account rate rider applied to basic charge + energy, the regional transit
+    levy per day, then GST on the subtotal. Reproduces the Jul 30, 2026 bill exactly
+    (855 kWh over 61 days = $123.75); see test_api.TestBilling.
 
     Args:
         energy_kwh: Total energy consumed in kWh
@@ -649,39 +684,38 @@ def calculate_tiered_cost(energy_kwh, days_in_period, tier1_rate=None, tier2_rat
         tier2_rate: Rate for consumption above threshold (default: TIER2_RATE)
 
     Returns:
-        dict with cost breakdown
+        dict with cost breakdown; total_cost is the amount due including GST
     """
     tier1 = tier1_rate or TIER1_RATE
     tier2 = tier2_rate or TIER2_RATE
 
-    # Calculate threshold based on days in period
+    # The Step 1 threshold scales with the days in the period (1,354 kWh over 61 days)
     threshold_kwh = days_in_period * DAILY_THRESHOLD_KWH
+    tier1_kwh = min(energy_kwh, threshold_kwh)
+    tier2_kwh = max(0.0, energy_kwh - threshold_kwh)
 
-    # Calculate tiered costs
-    if energy_kwh <= threshold_kwh:
-        tier1_kwh = energy_kwh
-        tier2_kwh = 0
-        tier1_cost = tier1_kwh * tier1
-        tier2_cost = 0
-    else:
-        tier1_kwh = threshold_kwh
-        tier2_kwh = energy_kwh - threshold_kwh
-        tier1_cost = tier1_kwh * tier1
-        tier2_cost = tier2_kwh * tier2
-
-    # Basic charge
-    basic_charge = days_in_period * BASIC_CHARGE_DAILY
-
-    total_cost = tier1_cost + tier2_cost + basic_charge
+    basic_charge = round(days_in_period * BASIC_CHARGE_DAILY, 2)
+    tier1_cost = round(tier1_kwh * tier1, 2)
+    tier2_cost = round(tier2_kwh * tier2, 2)
+    rider = round((basic_charge + tier1_cost + tier2_cost) * RATE_RIDER_PCT / 100, 2)
+    transit_levy = round(days_in_period * TRANSIT_LEVY_DAILY, 2)
+    subtotal = round(basic_charge + tier1_cost + tier2_cost + rider + transit_levy, 2)
+    gst = round(subtotal * GST_PCT / 100, 2)
 
     return {
         'threshold_kwh': round(threshold_kwh, 2),
         'tier1_kwh': round(tier1_kwh, 2),
         'tier2_kwh': round(tier2_kwh, 2),
-        'tier1_cost': round(tier1_cost, 2),
-        'tier2_cost': round(tier2_cost, 2),
-        'basic_charge': round(basic_charge, 2),
-        'total_cost': round(total_cost, 2),
+        'tier1_cost': tier1_cost,
+        'tier2_cost': tier2_cost,
+        'basic_charge': basic_charge,
+        'rider_pct': RATE_RIDER_PCT,
+        'rider': rider,
+        'transit_levy': transit_levy,
+        'subtotal': subtotal,
+        'gst_pct': GST_PCT,
+        'gst': gst,
+        'total_cost': round(subtotal + gst, 2),
         'tier1_rate': tier1,
         'tier2_rate': tier2
     }
@@ -754,7 +788,9 @@ def get_stats():
         # Billing period info (tiered rates)
         'billing_period': {
             'start': None,
+            'next_start': None,
             'days': 0,
+            'cycle_days': 0,
             'energy_kwh': 0,
             'tiered_cost': None
         }
@@ -804,12 +840,15 @@ def get_stats():
         kwh = (result['avg_24h'] / 1000) * hours  # Convert W to kW and multiply by hours
         result['cost_24h'] = round(kwh * result['price_per_kwh'], 2)
 
-    # Calculate billing period with tiered rates
-    now = datetime.now(timezone.utc)
-    days_in_period = (now - billing_start).days + 1  # Include today
+    # Billing period so far, in local calendar days like the bill
+    today = datetime.now(timezone.utc).astimezone(BILLING_TZ).date()
+    days_in_period = (today - billing_start.date()).days + 1  # Include today
+    next_start = _add_months(billing_start, BILLING_CYCLE_MONTHS)
 
     result['billing_period']['start'] = billing_start.isoformat()
+    result['billing_period']['next_start'] = next_start.isoformat()
     result['billing_period']['days'] = days_in_period
+    result['billing_period']['cycle_days'] = (next_start.date() - billing_start.date()).days
 
     energy_kwh = window['billing_energy_kwh']
     if energy_kwh is not None:

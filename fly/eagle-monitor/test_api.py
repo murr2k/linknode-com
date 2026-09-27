@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 os.environ.pop('EAGLE_PASSWORD', None)  # Basic auth off for the webhook tests
@@ -113,6 +114,8 @@ class TestRoutes(unittest.TestCase):
         self.assertAlmostEqual(dash['meter_price_per_kwh'], 0.1172)
         self.assertEqual(body['reads_24h']['received'], 3)
         self.assertIsNotNone(body['billing_period']['tiered_cost'])
+        self.assertIn(body['billing_period']['cycle_days'], range(59, 63))
+        self.assertIsNotNone(body['billing_period']['next_start'])
 
     def test_heartbeat_survives_restart(self):
         r = self.post(bypass_xml())
@@ -176,6 +179,56 @@ class TestRoutes(unittest.TestCase):
         for origin in ('https://evil.example', 'https://linknode-web.workers.dev.evil.example'):
             r = self.client.get('/api/stats', headers={'Origin': origin})
             self.assertIsNone(r.headers.get('Access-Control-Allow-Origin'))
+
+
+class TestBilling(unittest.TestCase):
+    """The bill-so-far estimate against a real BC Hydro bill (Jul 30, 2026, rate 1101)."""
+
+    def test_matches_july_2026_invoice(self):
+        # May 29 - Jul 28, 2026: 855 kWh over 61 days, total due $123.75
+        bill = monitor_app.calculate_tiered_cost(855, 61)
+        self.assertEqual(bill['threshold_kwh'], 1353.70)   # printed as 1,354 kWh
+        self.assertEqual(bill['basic_charge'], 14.30)      # 61 days x $0.2344
+        self.assertEqual(bill['tier1_cost'], 101.49)       # 855 kWh x $0.1187
+        self.assertEqual(bill['tier2_cost'], 0.00)
+        self.assertEqual(bill['rider'], -1.74)             # deferral account rider -1.5%
+        self.assertEqual(bill['transit_levy'], 3.81)       # 61 days x $0.0624
+        self.assertEqual(bill['subtotal'], 117.86)
+        self.assertEqual(bill['gst'], 5.89)                # GST 5% on $117.86
+        self.assertEqual(bill['total_cost'], 123.75)
+
+    def test_usage_over_the_threshold_splits_into_tier2(self):
+        bill = monitor_app.calculate_tiered_cost(1500, 61)
+        self.assertEqual(bill['tier1_kwh'], 1353.70)
+        self.assertEqual(bill['tier2_kwh'], 146.30)
+        self.assertEqual(bill['tier2_cost'], round(146.30 * 0.1408, 2))
+
+    def start(self, when):
+        now = when if isinstance(when, datetime) else datetime.fromisoformat(when).replace(tzinfo=timezone.utc)
+        return monitor_app.get_billing_period_start(now).strftime('%Y-%m-%d')
+
+    def test_period_is_two_months_in_odd_months(self):
+        self.assertEqual(self.start('2026-09-27T12:00'), '2026-09-26')
+        self.assertEqual(self.start('2026-10-30T12:00'), '2026-09-26')
+        self.assertEqual(self.start('2027-01-10T12:00'), '2026-11-26')
+        self.assertEqual(self.start('2026-01-26T12:00'), '2026-01-26')
+
+    def test_period_boundary_is_local_midnight(self):
+        # Periods turn over at midnight in Vancouver, not UTC. The offset comes from the
+        # tz database (BC went to permanent UTC-7 in 2026), so derive it, don't hardcode it.
+        boundary = datetime(2026, 11, 26, tzinfo=monitor_app.BILLING_TZ).astimezone(timezone.utc)
+        self.assertNotEqual(boundary.hour, 0)
+        self.assertEqual(self.start(boundary - timedelta(minutes=1)), '2026-09-26')
+        self.assertEqual(self.start(boundary + timedelta(minutes=1)), '2026-11-26')
+
+    def test_period_start_from_the_bill_steps_by_whole_cycles(self):
+        saved = monitor_app.BILLING_PERIOD_START
+        monitor_app.BILLING_PERIOD_START = '2026-07-29'
+        try:
+            self.assertEqual(self.start('2026-09-27T12:00'), '2026-07-29')
+            self.assertEqual(self.start('2026-09-30T12:00'), '2026-09-29')
+        finally:
+            monitor_app.BILLING_PERIOD_START = saved
 
 
 if __name__ == '__main__':

@@ -72,8 +72,12 @@ Set in `fly/eagle-monitor/fly.toml` (`[env]`):
 - **MONITOR_STATE_FILE**: `/data/monitor_state.json`
 
 Optional, with defaults in `app.py`: `RETENTION_DAYS` (1825), `STALE_THRESHOLD_MINUTES`
-(5), `EAGLE_USERNAME` (`eagle`), and the BC Hydro rate settings (`TIER1_RATE`,
-`TIER2_RATE`, `DAILY_THRESHOLD_KWH`, `BILLING_CYCLE_START_DAY`, `BASIC_CHARGE_DAILY`).
+(5), `EAGLE_USERNAME` (`eagle`), and the BC Hydro billing settings: rates `TIER1_RATE`,
+`TIER2_RATE`, `DAILY_THRESHOLD_KWH`, `BASIC_CHARGE_DAILY` (Step 1 and the basic charge change
+every April 1); the other bill lines `RATE_RIDER_PCT` (-1.5), `TRANSIT_LEVY_DAILY` (0.0624),
+`GST_PCT` (5); and the cycle `BILLING_CYCLE_MONTHS` (2), `BILLING_CYCLE_FIRST_MONTH` (1, i.e.
+odd months), `BILLING_CYCLE_START_DAY` (26), `BILLING_PERIOD_START` (optional YYYY-MM-DD from
+the latest bill, for an exact period start), `BILLING_TZ` (`America/Vancouver`).
 
 ## Secrets Setup
 
