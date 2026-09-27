@@ -183,8 +183,18 @@ class Store:
         return [(min(bucket + bucket_ms, end_ms), mean) for bucket, mean in rows]
 
     def created_ms(self):
-        rows = self._query("SELECT value FROM meta WHERE key = 'created_ms'")
-        return int(rows[0][0]) if rows else None
+        value = self.get_meta('created_ms')
+        return int(value) if value is not None else None
+
+    def get_meta(self, key):
+        rows = self._query('SELECT value FROM meta WHERE key = ?', (key,))
+        return rows[0][0] if rows else None
+
+    def set_meta(self, key, value):
+        with self._write_lock, closing(self._connect()) as conn:
+            with conn:
+                conn.execute('INSERT INTO meta (key, value) VALUES (?, ?) '
+                             'ON CONFLICT (key) DO UPDATE SET value = excluded.value', (key, value))
 
     def ping(self):
         try:

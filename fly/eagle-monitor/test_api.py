@@ -43,6 +43,16 @@ def price_xml(price_hundredths, unix_ts):
     )
 
 
+def bypass_xml(data_uptime='99.92', cycle_period='34.6'):
+    return (
+        '<rainforest><BypassStatus>'
+        '<DeviceMacId>0xd8d5b9000000ef69</DeviceMacId>'
+        f'<DataUptimePct>{data_uptime}</DataUptimePct><DeviceUptimePct>100.0</DeviceUptimePct>'
+        f'<IntervalSeconds>30</IntervalSeconds><CyclePeriodSeconds>{cycle_period}</CyclePeriodSeconds>'
+        '</BypassStatus></rainforest>'
+    )
+
+
 class TestRoutes(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -107,6 +117,25 @@ class TestRoutes(unittest.TestCase):
         self.assertAlmostEqual(body['price_per_kwh'], 0.1172)
         self.assertEqual(body['reads_24h']['received'], 3)
         self.assertIsNotNone(body['billing_period']['tiered_cost'])
+
+    def test_heartbeat_survives_restart(self):
+        r = self.post(bypass_xml())
+        self.assertEqual(r.get_json(), {'status': 'ok', 'type': 'bypass_status'})
+        # A heartbeat is not meter data: it must not mask a staleness alert
+        self.assertIsNone(monitor_app.stats['last_data_received'])
+
+        monitor_app.stats['bypass_status'] = None          # a restart loses memory...
+        monitor_app.init_store(monitor_app.db.path)        # ...and startup restores it
+        body = self.client.get('/api/stats').get_json()
+        self.assertEqual(body['bypass_status']['data_uptime_pct'], 99.92)
+        self.assertEqual(body['reads_24h']['period_s'], 34.6)
+
+    def test_newer_heartbeat_replaces_saved_one(self):
+        self.post(bypass_xml(data_uptime='99.0'))
+        self.post(bypass_xml(data_uptime='98.5'))
+        monitor_app.stats['bypass_status'] = None
+        monitor_app.init_store(monitor_app.db.path)
+        self.assertEqual(monitor_app.stats['bypass_status']['data_uptime_pct'], 98.5)
 
     def test_stats_empty_window(self):
         body = self.client.get('/api/stats').get_json()

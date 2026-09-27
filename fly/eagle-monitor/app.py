@@ -292,6 +292,11 @@ def init_store(path=None):
     try:
         db = store.Store(path)
         logger.info(f"SQLite store ready at {db.path}")
+        # The Pi's heartbeat arrives every 15 minutes; restore the last one so a
+        # restart does not blank the uptime and sample-interval tiles until then.
+        saved = db.get_meta('bypass_status')
+        if saved:
+            stats['bypass_status'] = json.loads(saved)
         return True
     except Exception as e:
         db = None
@@ -604,6 +609,11 @@ def eagle_webhook():
             b = data.get('bypass', {})
             b['updated_at'] = datetime.now(timezone.utc).isoformat()
             stats['bypass_status'] = b
+            if db is not None:
+                try:
+                    db.set_meta('bypass_status', json.dumps(b))
+                except Exception as e:
+                    logger.warning(f"Could not persist bypass heartbeat: {e}")
             logger.info(f"Bypass heartbeat: data_uptime={b.get('data_uptime_pct')}% "
                         f"device_uptime={b.get('device_uptime_pct')}% "
                         f"outages={b.get('outage_count')}")
