@@ -1,0 +1,23 @@
+// linknode.com: a Cloudflare Worker serving static assets only (no Worker code runs,
+// so requests are free and unlimited). Live data comes from the Fly app
+// linknode-eagle-monitor, called cross-origin by the page.
+//
+// Deploy: CI (.github/workflows/deploy-web.yml) on pushes to main touching web/.
+// Local preview: run.cmd at the repo root (wrangler dev on port 8771).
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "linknode-web",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  },
+  "workers_dev": true,
+  "preview_urls": true,
+  // Routes on proxied placeholder DNS records (AAAA 100::). There is no origin
+  // behind them any more, so these routes are what serves linknode.com and www.
+  "routes": [
+    { "pattern": "linknode.com/*", "zone_name": "linknode.com" },
+    { "pattern": "www.linknode.com/*", "zone_name": "linknode.com" }
+  ]
+}

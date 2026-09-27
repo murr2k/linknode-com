@@ -1,97 +1,97 @@
-# Linknode Energy Monitor — Claude Code Configuration
+# Linknode Energy Monitor: Claude Code Configuration
 
 <!--
 Project-specific instructions. Loads after the global ~/.claude/CLAUDE.md,
 which already provides identity, cross-project rules, and workflow
-preferences — not duplicated here.
+preferences (not duplicated here).
 -->
 
 ## What this is
 
 Linknode Energy Monitor is a production web app that shows real-time household
-power consumption. An Eagle-200 smart meter on the home network POSTs XML to a
-Flask ingest service, which writes to InfluxDB (time-series); Grafana renders
-the dashboards and an nginx-served static site embeds them at
-[linknode.com](https://linknode.com). It runs as four Fly.io apps
-(`linknode-web`, `linknode-eagle-monitor`, `linknode-grafana`,
-`linknode-influxdb`). Lightweight project — no Ruflo. The repo root is primarily
-the **Playwright E2E/regression harness**; the deployed services live under
-`fly/`.
+power consumption at [linknode.com](https://linknode.com). A Raspberry Pi on the
+home network reads the Eagle-200 smart meter's local API and POSTs XML to a
+Flask ingest service on Fly.io (`linknode-eagle-monitor`), which stores every
+reading in SQLite on a Fly volume and serves the stats, dashboard and live-stream
+APIs. The static site is a Cloudflare Worker (static assets only) that charts the
+data natively with uPlot. Lightweight project, no Ruflo.
+
+Until 2026-09-27 this ran as four Fly apps (nginx site, Grafana, InfluxDB and the
+ingest service); the other three were retired to cut cost to ~$2.58/month. See
+`CHANGELOG.md` and `docs/THEORY_OF_OPERATION.md`.
 
 ## Run / build / test
 
-There is **no local long-running entry point** — the app is the deployed Fly.io
-stack, so there is no `run.cmd`. "Running" locally means exercising the E2E
-suite (which targets production) or deploying a service. Commands work from
-PowerShell or Git Bash.
-
 ```bash
-npm install                  # first time
-npx playwright install       # browser binaries (or: npm run playwright:install)
+npm install                  # first time (wrangler for the site)
+run.cmd                      # local site preview: wrangler dev on http://127.0.0.1:8771
+                             # (reads live data from the production API)
 
-# Test (Playwright; targets the live site)
-npm test                     # full suite
-npm run test:api             # @api    integration
-npm run test:visual          # @visual regression
-npm run test:perf            # @performance
-npm run test:a11y            # @accessibility
-npm run test:phase3          # advanced visual/perf profiling
+# Backend unit tests (also gate every eagle-monitor deploy in CI)
+python -m venv .venv && .venv\Scripts\pip install -r fly/eagle-monitor/requirements.txt
+.venv\Scripts\python -m unittest discover -s fly/eagle-monitor -p "test_*.py"
 
-# Regression baselines
-npm run baseline:compare     # compare live site to test-baselines/baseline.json
-npm run baseline:capture     # re-capture after an intentional change
-
-# Deploy (a push to main auto-deploys via GitHub Actions — see Invariants)
-cd fly/web && flyctl deploy            # or eagle-monitor / grafana / influxdb
+# Manual deploys (normally CI does it on push to main; see Invariants)
+cd fly/eagle-monitor && flyctl deploy --remote-only    # ingest API
+npx wrangler deploy --config web/wrangler.jsonc         # site (needs wrangler login)
 ```
+
+The Playwright suites the `package.json` scripts refer to were deleted in
+January 2026; those scripts no longer work.
 
 ## Architecture
 
 | Path | What |
 |---|---|
-| `fly/web/` | nginx + `index.html` (static front end, embeds Grafana). CSP lives in `fly/web/nginx.conf`. |
-| `fly/eagle-monitor/` | Python/Flask ingest API (`app.py`) — parses Eagle-200 XML, writes InfluxDB, serves `/api/stats`, `/health`. |
-| `fly/grafana/` | Grafana config + provisioned dashboards (`fly.toml`, `grafana.ini`). |
-| `fly/influxdb/` | InfluxDB time-series store. |
-| `e2e/` | Playwright tests (`tests/`, `pages/`, `utils/`). |
-| `scripts/` | `capture-baseline.ts` / `compare-baseline.ts` + deploy helpers. |
-| `test-baselines/` | Regression baselines (`baseline.json`, visual screenshots). |
-| `docs/THEORY_OF_OPERATION.md`, `docs/ARCHITECTURE.md` | System design + data flow (current, authoritative). |
-| `docs/archive/` | Historical docs, incl. the retired Kubernetes/Rackspace era. |
+| `fly/eagle-monitor/` | The only Fly app. `app.py` (Flask: `/eagle` ingest, `/api/stats`, `/api/dashboard`, `/api/stream` SSE, `/health`), `store.py` (SQLite), `dashboard.py` (chart + panel math), `monitor_data_staleness.py` (Slack/Pushover outage alerts). |
+| `web/public/` | The site: `index.html`, `_headers` (CSP and security headers), `404.html`, vendored uPlot. |
+| `web/wrangler.jsonc` | Cloudflare Worker config: assets only, routes `linknode.com/*` and `www.linknode.com/*`. |
+| `scripts/eagle_bypass.py`, `deploy/` | The Pi uploader (systemd `eagle-bypass.service`). |
+| `.github/workflows/` | `deploy-fly.yml` (eagle-monitor), `deploy-web.yml` (site). |
+| `docs/THEORY_OF_OPERATION.md` | System design + data flow (current, authoritative). |
+| `docs/archive/` | Historical docs: the retired Kubernetes/Rackspace era and the Grafana/InfluxDB stack. |
 
 ## Invariants & "do not regress"
 
-- **Grafana anonymous role must stay `Viewer`** (`GF_AUTH_ANONYMOUS_ORG_ROLE` in
-  `fly/grafana/fly.toml`). **Why:** it was once `Admin`, giving any anonymous
-  visitor full admin (edit/delete dashboards, datasources). Externally reported,
-  fixed Jan 2026. Never widen it.
+- **eagle-monitor runs exactly one machine.** The SQLite database lives on the
+  `eagle_data` volume attached to it; a second machine would get its own
+  separate database. Never `fly scale count` above 1. **Why:** the volume is
+  the only copy of the history (plus Fly's daily snapshots, kept 14 days).
+- **Never destroy the `eagle_data` volume** (`vol_re1oqe3mzqodx6d4`, ord).
+  **Why:** everything since 2026-08-27 lives there; InfluxDB, which held the
+  older history, was deliberately destroyed.
+- **The site's CSP lives in `web/public/_headers`**, and its `connect-src` must
+  list `https://linknode-eagle-monitor.fly.dev`. Change the API host and you must
+  change both, or the page's fetches and live stream break silently.
+- **eagle-monitor's CORS allow-list (`app.py`) must include `https://linknode.com`
+  and `https://www.linknode.com`.** The page calls the API cross-origin.
+- **Keep Rocket Loader off** for the linknode.com zone. It rewrites the page's
+  scripts and conflicts with the CSP.
+- **linknode.com, www and energy DNS records are proxied placeholders**
+  (`AAAA 100::`). Worker routes serve the site; a Cloudflare redirect rule sends
+  `energy.linknode.com` to `https://linknode.com/#energy-dashboard`. Don't point
+  them back at Fly hostnames: those apps no longer exist.
 - **No secrets in repo files** (scripts, docs, `.env`). **Why:** an InfluxDB
-  token (`my-super-secret-auth-token`) was committed and lived in git history;
-  rotated & revoked Jan 2026. Use Fly secrets + GitHub secrets only.
-- **Keep the `energy.linknode.com` Fly cert + its two Cloudflare DNS records.**
-  `_fly-ownership` TXT and `_acme-challenge` CNAME (both **DNS-only / grey
-  cloud**) must stay so Fly can auto-renew. **Why:** the cert lapsed once and the
-  subdomain returned Cloudflare 525 (SSL handshake failed) for ~2 months.
-- **If you change the Grafana host, update the CSP.** `index.html` embeds
-  `linknode-grafana.fly.dev`, which is whitelisted in `fly/web/nginx.conf`
-  (`frame-src` / `connect-src` / `script-src`). Change one without the other and
-  the embed silently breaks.
-- **Pushing to `main` is a production deploy** via
-  `.github/workflows/deploy-fly.yml`. Treat `git push` as outward-facing.
+  token was once committed and lived in git history. Use Fly secrets and GitHub
+  secrets only (`FLY_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`).
+- **Pushing to `main` is a production deploy**: `deploy-fly.yml` for
+  `fly/eagle-monitor/**`, `deploy-web.yml` for `web/**`. Treat `git push` as
+  outward-facing.
 
 ## Project-specific tooling
 
-- **flyctl** — deploy/manage the four Fly apps (`fly status -a linknode-<svc>`,
-  `fly certs ...`, `fly secrets ...`). App org/region: `ord`.
-- **Playwright** — E2E + visual + a11y + perf, plus a custom baseline-compare
-  regression system under `scripts/`.
+- **flyctl**: manage the one Fly app (`fly status -a linknode-eagle-monitor`,
+  `fly logs`, `fly secrets`, `fly volumes list`). Region `ord`. The Fly MCP server
+  (`flyctl mcp server`) is installed at user scope.
+- **wrangler** (repo devDependency): site preview and deploys.
+- **Cloudflare API MCP** (`https://mcp.cloudflare.com/mcp`): zone work (DNS,
+  redirect rules, zone settings, Worker routes).
+- **`linknode-stats` skill**: how to read health from the Pi and `/api/stats`.
 
 ## Open questions / known gaps
 
-- Actively developed — recent work (May 2026) added eagle-monitor in-process
-  staleness monitoring + Pushover outage alerting; accumulating work lives in
-  `CHANGELOG.md` under `[Unreleased]`.
-- The retired **Kubernetes/Rackspace** docs were archived to `docs/archive/`
-  (`PROJECT_STATE.md`, `PROJECT_STATUS.md`); `README.md` is the authoritative
-  current overview.
-- Potential next work (none committed): historical-data views, multi-region.
+- Fly `shared-cpu-1x` throttles to 6.25% of a core once burst credits run out;
+  keep one-off data jobs in the machine light (see project memory).
+- The disabled e2e/regression workflows reference deleted suites.
+- Potential next work (none committed): longer history views, CSP without
+  `'unsafe-inline'` (the page has inline scripts and styles).

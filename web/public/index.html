@@ -20,7 +20,7 @@
     <meta property="og:url" content="https://linknode.com/">
     <meta property="og:title" content="Linknode Energy Monitor - Real-Time Power Monitoring Dashboard">
     <meta property="og:description" content="Monitor your energy consumption in real-time with Linknode's smart power monitoring system. Features live dashboards and cloud-based energy management.">
-    <meta property="og:image" content="https://linknode.com/images/og-image.png">
+    <meta property="og:image" content="https://linknode.com/icon-512.png">
     <meta property="og:site_name" content="Linknode Energy Monitor">
     
     <!-- Twitter Card -->
@@ -28,7 +28,7 @@
     <meta name="twitter:url" content="https://linknode.com/">
     <meta name="twitter:title" content="Linknode Energy Monitor - Real-Time Power Monitoring">
     <meta name="twitter:description" content="Monitor your energy consumption in real-time with smart power monitoring. Live dashboards & IoT integration.">
-    <meta name="twitter:image" content="https://linknode.com/images/twitter-card.png">
+    <meta name="twitter:image" content="https://linknode.com/icon-512.png">
     
     <!-- Additional SEO Meta Tags -->
     <meta name="robots" content="index, follow">
@@ -503,51 +503,116 @@
             animation: pulse 1s infinite;
         }
         
-        .grafana-preview {
-            background: #111217;
-            border: 1px solid #1b1b1f;
-            border-radius: 2px;
-            padding: 16px;
+        /* Energy dashboard (chart + stat tiles) */
+        .energy-dashboard {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 16px;
+            padding: 2rem;
             margin: 2rem 0;
-            min-height: 450px;
-            position: relative;
-            overflow: hidden;
         }
-        
-        .grafana-preview iframe {
-            width: 100%;
-            height: 400px;
+
+        .dashboard-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .range-picker {
+            display: flex;
+            gap: 0.25rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 0.25rem;
+        }
+
+        .range-picker button {
+            background: none;
             border: none;
-            border-radius: 8px;
+            border-radius: 16px;
+            color: #888;
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.75rem;
+            transition: all 0.3s;
         }
-        
-        .grafana-overlay {
+
+        .range-picker button:hover {
+            color: #fff;
+        }
+
+        .range-picker button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .power-chart {
+            height: 400px;
+            position: relative;
+        }
+
+        .power-chart .uplot {
+            font-family: inherit;
+        }
+
+        .chart-tooltip {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            background: rgba(15, 15, 15, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            z-index: 10;
+            display: none;
+        }
+
+        .chart-message {
+            position: absolute;
+            inset: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 16px;
-            cursor: pointer;
-            transition: opacity 0.3s;
+            color: #666;
         }
-        
-        .grafana-overlay:hover {
-            opacity: 0.8;
+
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
-        .grafana-overlay-text {
+
+        .dashboard-stat {
             text-align: center;
         }
-        
-        .grafana-overlay-text h3 {
-            margin-bottom: 0.5rem;
+
+        .dashboard-stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
         }
-        
+
+        .dashboard-stat-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        /* Threshold colours carried over from the Grafana stat panels */
+        .th-green { color: #4ade80; }
+        .th-yellow { color: #fbbf24; }
+        .th-orange { color: #fb923c; }
+        .th-red { color: #ef4444; }
+
         .build-status {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 16px;
@@ -1001,11 +1066,14 @@
             .contact-buttons { flex-direction: column; }
             .live-metrics-grid { grid-template-columns: 1fr; }
             .api-status-grid { grid-template-columns: 1fr; }
+            .dashboard-stats { grid-template-columns: 1fr 1fr; }
+            .energy-dashboard { padding: 1rem; }
+            .power-chart { height: 300px; }
             .zero-dep-grid { grid-template-columns: 1fr; }
             .tech-stack-section h2 { font-size: 1.75rem; }
         }
     </style>
-    <!-- Chart.js removed - using embedded Grafana dashboard instead -->
+    <link rel="stylesheet" href="/vendor/uplot-1.6.32/uPlot.min.css">
     
     <!-- Structured Data / Schema.org -->
     <script type="application/ld+json">
@@ -1070,8 +1138,8 @@
                 "featureList": [
                     "Real-time power consumption monitoring",
                     "Eagle-200 smart meter integration",
-                    "InfluxDB time-series storage",
-                    "Interactive Grafana dashboards",
+                    "SQLite time-series storage",
+                    "Interactive power charts from 1 hour to 30 days",
                     "Server-Sent Events for live updates",
                     "BC Hydro tiered rate calculations"
                 ]
@@ -1099,7 +1167,7 @@
     <div class="container">
         <header>
             <h1>Linknode Energy Monitor</h1>
-            <p class="subtitle">Real-Time Power Monitoring by Murray Kopit • Powered by Fly.io</p>
+            <p class="subtitle">Real-Time Power Monitoring by Murray Kopit • Powered by Cloudflare + Fly.io</p>
         </header>
         
         <!-- Main Content Section with proper H1 for SEO -->
@@ -1109,7 +1177,7 @@
         
         <div class="metrics">
             <div class="metric">
-                <div class="metric-value" id="active-services">3</div>
+                <div class="metric-value" id="active-services">2</div>
                 <div class="metric-label">Active Services</div>
             </div>
             <div class="metric">
@@ -1193,13 +1261,6 @@
                     <h3 style="margin-bottom: 1rem;">🔌 Service Status</h3>
                     <div class="api-status-grid">
                         <div class="api-status-item">
-                            <span class="api-name">InfluxDB</span>
-                            <div class="api-status">
-                                <span class="status-dot" id="influx-status"></span>
-                                <span id="influx-status-text">Checking...</span>
-                            </div>
-                        </div>
-                        <div class="api-status-item">
                             <span class="api-name">Eagle Monitor</span>
                             <div class="api-status">
                                 <span class="status-dot" id="eagle-status"></span>
@@ -1207,10 +1268,10 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name">Grafana</span>
+                            <span class="api-name" title="SQLite on the eagle-monitor's Fly volume: every meter reading and the dashboard history">Database</span>
                             <div class="api-status">
-                                <span class="status-dot" id="grafana-status"></span>
-                                <span id="grafana-status-text">Checking...</span>
+                                <span class="status-dot" id="db-status"></span>
+                                <span id="db-status-text">Checking...</span>
                             </div>
                         </div>
                         <div class="api-status-item">
@@ -1235,26 +1296,28 @@
                 </div>
             </div>
 
-            <!-- Embedded Grafana Dashboard -->
-            <div class="grafana-preview">
-                <h3 style="text-align: center; margin-bottom: 1rem;">📊 Power Consumption Trends</h3>
-                <iframe 
-                    src="https://linknode-grafana.fly.dev/d-solo/power-monitoring/eagle-energy-monitor?orgId=1&theme=dark&panelId=2&refresh=15s&from=now-24h&to=now"
-                    width="100%"
-                    height="400"
-                    frameborder="0"
-                    loading="lazy"
-                    title="Grafana Power Consumption Dashboard - Real-time energy monitoring graph"
-                    style="border: 1px solid #262626; border-radius: 8px;"
-                    sandbox="allow-same-origin allow-scripts"
-                    allow="fullscreen">
-                </iframe>
-                <div style="text-align: center; margin-top: 1rem;">
-                    <a href="https://energy.linknode.com/d/power-monitoring/eagle-energy-monitor?orgId=1&refresh=5s" 
-                       target="_blank" 
-                       style="color: #667eea; text-decoration: none; font-size: 0.875rem;">
-                        Open full dashboard in new tab →
-                    </a>
+            <!-- Energy dashboard: chart and stats for a selectable time range, from /api/dashboard -->
+            <div class="energy-dashboard" id="energy-dashboard">
+                <div class="dashboard-header">
+                    <h3>📊 Power Consumption Trends</h3>
+                    <div class="range-picker" role="group" aria-label="Time range">
+                        <button type="button" data-range="1h" aria-pressed="false">1h</button>
+                        <button type="button" data-range="6h" aria-pressed="false">6h</button>
+                        <button type="button" data-range="24h" aria-pressed="true" class="active">24h</button>
+                        <button type="button" data-range="7d" aria-pressed="false">7d</button>
+                        <button type="button" data-range="30d" aria-pressed="false">30d</button>
+                    </div>
+                </div>
+                <div class="power-chart" id="power-chart" role="img" aria-label="Power demand over the selected time range"></div>
+                <div class="dashboard-stats">
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-min">--</div><div class="dashboard-stat-label">Min Power</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-avg">--</div><div class="dashboard-stat-label">Average Power</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-max">--</div><div class="dashboard-stat-label">Peak Power</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-energy">--</div><div class="dashboard-stat-label">Energy Consumed</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-meter">--</div><div class="dashboard-stat-label">Meter Reading (kWh)</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-rate">--</div><div class="dashboard-stat-label">Rate ($/kWh)</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-cost-hour">--</div><div class="dashboard-stat-label">Cost/Hour</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-cost">--</div><div class="dashboard-stat-label">Estimated Cost</div></div>
                 </div>
             </div>
         </section>
@@ -1276,7 +1339,7 @@
                             <li>No component library (Material UI, Chakra, Ant Design)</li>
                             <li>No CSS framework (Tailwind, Bootstrap)</li>
                             <li>No build step (Webpack, Vite, esbuild)</li>
-                            <li>No npm dependencies for the frontend</li>
+                            <li>One vendored library: uPlot (51KB) for the chart, served from this site, no CDN</li>
                         </ul>
                     </div>
                     <div class="zero-dep-column positive">
@@ -1292,9 +1355,9 @@
                 </div>
 
                 <div class="metrics-list">
-                    <div class="metrics-list-item">Frontend dependencies - <strong>0</strong></div>
+                    <div class="metrics-list-item">Frontend dependencies - <strong>1</strong> (uPlot, vendored)</div>
                     <div class="metrics-list-item">Build time - <strong>0ms</strong> (no build step)</div>
-                    <div class="metrics-list-item">Bundle size - <strong>~50KB</strong> (just HTML/CSS/JS)</div>
+                    <div class="metrics-list-item">Page weight - <strong>~150KB</strong> uncompressed (HTML/CSS/JS + uPlot)</div>
                     <div class="metrics-list-item">Time to Interactive - <strong>&lt; 1 second</strong></div>
                     <div class="metrics-list-item">Lighthouse Performance - <strong>95+</strong></div>
                 </div>
@@ -1311,7 +1374,7 @@
                         <div class="tech-line-item">JavaScript (ES6+) - Vanilla JS, no frameworks - lightweight and fast</div>
                         <div class="tech-line-item">HTML5 - Semantic markup with Schema.org structured data</div>
                         <div class="tech-line-item">CSS3 - Modern styling with Grid, Flexbox, animations</div>
-                        <div class="tech-line-item">Flux - InfluxDB time-series query language</div>
+                        <div class="tech-line-item">SQL - SQLite queries, including a window-function energy integral</div>
                         <div class="tech-line-item">XML - Eagle-200 smart meter data format</div>
                     </div>
 
@@ -1322,9 +1385,8 @@
                         <div class="tech-line-item">CSS3 Transforms - translateY, scale, rotate with GPU acceleration</div>
                         <div class="tech-line-item">CSS3 Filters - drop-shadow, blur, backdrop-filter for glass effects</div>
                         <div class="tech-line-item">Linear Gradients - Background animations and text gradients</div>
-                        <div class="tech-line-item">Grafana 11.4.0 - Embedded dashboards via iframe</div>
-                        <div class="tech-line-item">Grafana Plugins - briangann-gauge-panel, volkovlabs-echarts-panel</div>
-                        <div class="tech-line-item">Adaptive Resolution - Flux aggregateWindow() decimates data to match screen width</div>
+                        <div class="tech-line-item">uPlot 1.6 - Fast canvas time-series chart (the engine behind Grafana's time series panel)</div>
+                        <div class="tech-line-item">Range Picker - 1h to 30d, averaged server-side into buckets sized to the range</div>
                     </div>
 
                     <div class="tech-line">
@@ -1332,8 +1394,8 @@
                         <div class="tech-line-item">Flask 3.0.0 - Lightweight Python web framework</div>
                         <div class="tech-line-item">Flask-CORS - Cross-origin resource sharing</div>
                         <div class="tech-line-item">Werkzeug 3.0.1 - WSGI toolkit</div>
-                        <div class="tech-line-item">influxdb-client - Time-series database integration</div>
-                        <div class="tech-line-item">Nginx Alpine - High-performance reverse proxy with rate limiting</div>
+                        <div class="tech-line-item">sqlite3 (standard library) - Embedded time-series storage in WAL mode</div>
+                        <div class="tech-line-item">Cloudflare Workers Static Assets - The site is served from the edge, no origin server</div>
                     </div>
 
                     <div class="tech-line">
@@ -1346,18 +1408,18 @@
 
                     <div class="tech-line">
                         <div class="tech-line-header">Databases &amp; Storage</div>
-                        <div class="tech-line-item">InfluxDB 2.7 - Purpose-built time-series database</div>
-                        <div class="tech-line-item">Flux Queries - Functional data scripting language</div>
+                        <div class="tech-line-item">SQLite - Embedded in the ingest service, one row per meter reading</div>
+                        <div class="tech-line-item">SQL Window Functions - Trapezoid energy integral and bucketed averages</div>
                         <div class="tech-line-item">5-Year Retention - 43,800 hours of historical data</div>
-                        <div class="tech-line-item">Persistent Volumes - Durable storage on Fly.io</div>
+                        <div class="tech-line-item">Fly Volume - Encrypted, with daily snapshots kept 14 days</div>
                     </div>
 
                     <div class="tech-line">
                         <div class="tech-line-header">Infrastructure &amp; Deployment</div>
-                        <div class="tech-line-item">Fly.io - Global edge computing platform</div>
-                        <div class="tech-line-item">Docker - Containerized microservices (Alpine-based for minimal footprint)</div>
-                        <div class="tech-line-item">Private Mesh Network - Secure internal service communication (*.internal)</div>
-                        <div class="tech-line-item">Auto-scaling - Automatic instance management with health checks</div>
+                        <div class="tech-line-item">Fly.io - One machine running the ingest API and its database</div>
+                        <div class="tech-line-item">Cloudflare Workers - Static site at the edge on the free tier</div>
+                        <div class="tech-line-item">Docker - Containerized Python service (python:3.11-slim)</div>
+                        <div class="tech-line-item">Health Checks - Fly restarts the service if /health fails</div>
                     </div>
 
                     <div class="tech-line">
@@ -1368,7 +1430,6 @@
                         <div class="tech-line-item">HTTP/2 + HTTP/3 (QUIC) - Multiplexed, UDP-based transport</div>
                         <div class="tech-line-item">TLS 1.3 with 0-RTT - Fast, secure connections</div>
                         <div class="tech-line-item">Early Hints (103) - Preload resources before HTML arrives</div>
-                        <div class="tech-line-item">Rocket Loader - Async JavaScript optimization</div>
                         <div class="tech-line-item">Universal SSL - Wildcard certificate for all subdomains</div>
                     </div>
 
@@ -1377,15 +1438,14 @@
                         <div class="tech-line-item">GitHub Actions - Automated workflows</div>
                         <div class="tech-line-item">Change Detection - Smart deployments via dorny/paths-filter</div>
                         <div class="tech-line-item">Auto-Rollback - Version capture and recovery on failure</div>
+                        <div class="tech-line-item">Wrangler - Site deploys to Cloudflare from GitHub Actions</div>
                         <div class="tech-line-item">Slack Integration - Native GitHub notifications</div>
                     </div>
 
                     <div class="tech-line">
                         <div class="tech-line-header">Testing &amp; Quality</div>
-                        <div class="tech-line-item">Playwright - E2E browser automation</div>
-                        <div class="tech-line-item">axe-core - WCAG accessibility auditing</div>
-                        <div class="tech-line-item">TypeScript - Type-safe test scripts</div>
-                        <div class="tech-line-item">Visual Regression - Screenshot comparison testing</div>
+                        <div class="tech-line-item">unittest - Storage, panel math and API route tests gate every backend deploy</div>
+                        <div class="tech-line-item">Migration Verification - InfluxDB vs SQLite parity checked for every week of history</div>
                     </div>
 
                     <div class="tech-line">
@@ -1393,7 +1453,7 @@
                         <div class="tech-line-item">Semgrep - OWASP Top 10 + Flask/Python/JS scanning</div>
                         <div class="tech-line-item">Trivy - Docker image vulnerability scanning</div>
                         <div class="tech-line-item">Gitleaks - Secrets detection in code</div>
-                        <div class="tech-line-item">Rate Limiting - Nginx zones (30r/s general, 10r/s API, 5r/s sensitive)</div>
+                        <div class="tech-line-item">Rate Limiting - Per-client limit on the meter ingest endpoint</div>
                         <div class="tech-line-item">CSP Headers - Content Security Policy with specific directives</div>
                         <div class="tech-line-item">HSTS - HTTP Strict Transport Security</div>
                         <div class="tech-line-item">CORS Whitelist - Origin-specific cross-origin policies</div>
@@ -1420,9 +1480,10 @@
                     <h3>Project Economics</h3>
 
                     <div class="tech-line">
-                        <div class="tech-line-header">Monthly Infrastructure Cost - ~$15/month</div>
-                        <div class="tech-line-item">Fly.io Hosting - 5 VMs (shared CPU, 256-512MB RAM)</div>
-                        <div class="tech-line-item">Persistent Storage - 2GB for InfluxDB and Grafana data</div>
+                        <div class="tech-line-header">Monthly Infrastructure Cost - ~$4/month</div>
+                        <div class="tech-line-item">Fly.io Hosting - 1 VM (shared CPU, 256MB RAM)</div>
+                        <div class="tech-line-item">Persistent Storage - 1GB volume for the SQLite database</div>
+                        <div class="tech-line-item">Cloudflare Workers - $0 (static requests are free)</div>
                         <div class="tech-line-item">Domain - ~$1/month (amortized annual cost)</div>
                     </div>
 
@@ -1431,13 +1492,13 @@
                         <div class="tech-line-item">No React, Vue, Angular - Avoided complexity debt and bundle bloat</div>
                         <div class="tech-line-item">No CSS frameworks - No Tailwind/Bootstrap overhead</div>
                         <div class="tech-line-item">No build tooling - Zero Webpack/Vite configuration</div>
-                        <div class="tech-line-item">No npm dependencies - Zero supply chain risk</div>
+                        <div class="tech-line-item">One vendored library - uPlot pinned at 1.6.32, no CDN at runtime</div>
                     </div>
 
                     <div class="tech-line">
                         <div class="tech-line-header">Database &amp; Visualization - $0</div>
-                        <div class="tech-line-item">InfluxDB - Self-hosted open source (vs $50-200/mo for cloud)</div>
-                        <div class="tech-line-item">Grafana - Self-hosted open source (vs $100-500/mo for Datadog)</div>
+                        <div class="tech-line-item">SQLite - Embedded, no database server to run</div>
+                        <div class="tech-line-item">Native charts - Replaced a self-hosted Grafana + InfluxDB pair and their two VMs</div>
                     </div>
 
                     <div class="tech-line">
@@ -1457,15 +1518,15 @@
                     <div class="tech-line">
                         <div class="tech-line-header">Infrastructure Services - $0</div>
                         <div class="tech-line-item">Cloudflare Free Tier - CDN, DDoS protection, HTTP/3, compression</div>
-                        <div class="tech-line-item">SSL/TLS Certificates - Universal SSL via Cloudflare + Let's Encrypt via Fly.io</div>
-                        <div class="tech-line-item">Rate Limiting - Nginx built-in zones</div>
+                        <div class="tech-line-item">SSL/TLS Certificates - Cloudflare Universal SSL (site) + Fly.io (API)</div>
+                        <div class="tech-line-item">Rate Limiting - Built into the ingest API</div>
                         <div class="tech-line-item">Health Monitoring - Fly.io built-in checks</div>
                     </div>
 
                     <div class="tech-line">
                         <div class="tech-line-header">Total Savings</div>
                         <div class="tech-line-item">Typical SaaS stack for equivalent functionality - $300-1,000/month</div>
-                        <div class="tech-line-item">This project - ~$15/month</div>
+                        <div class="tech-line-item">This project - ~$4/month</div>
                         <div class="tech-line-item">Monthly savings - 95-98% cost reduction</div>
                     </div>
                 </div>
@@ -1476,11 +1537,12 @@
             <div class="card">
                 <span class="card-icon">🚀</span>
                 <h2>Cloud Native Architecture</h2>
-                <p>This energy monitoring system showcases a modern cloud-native application deployed on Fly.io's global edge network.</p>
+                <p>This energy monitoring system showcases a modern cloud-native application: the site runs on Cloudflare's edge and the ingest API and database run on Fly.io.</p>
                 <p>Built with containerization best practices and designed for global scalability.</p>
                 <div class="tech-stack">
                     <span class="tech-badge">Docker</span>
                     <span class="tech-badge">Fly.io</span>
+                    <span class="tech-badge">Cloudflare</span>
                     <span class="tech-badge">Python</span>
                 </div>
             </div>
@@ -1489,10 +1551,10 @@
                 <span class="card-icon">⚡</span>
                 <h2>Real-Time Data Processing</h2>
                 <p>Continuous monitoring of power consumption with sub-second data updates from Eagle-200 smart meter.</p>
-                <p>Time-series data stored in InfluxDB for efficient querying and visualization.</p>
+                <p>Readings are stored in SQLite and charted natively for any range from 1 hour to 30 days.</p>
                 <div class="tech-stack">
-                    <span class="tech-badge">InfluxDB</span>
-                    <span class="tech-badge">Grafana</span>
+                    <span class="tech-badge">SQLite</span>
+                    <span class="tech-badge">uPlot</span>
                     <span class="tech-badge">REST API</span>
                 </div>
             </div>
@@ -1512,10 +1574,10 @@
         
         <div class="pod-info">
             <strong>Deployment Information:</strong><br>
-            Platform: Fly.io Global Edge Network<br>
-            Services: Eagle Monitor, InfluxDB, Web Interface<br>
-            Region: Automatically selected based on your location<br>
-            Stack: Python/Flask, InfluxDB 2.x, Grafana
+            Platform: Cloudflare Workers (site) + Fly.io (API)<br>
+            Services: Eagle Monitor (ingest API + SQLite), static site<br>
+            Region: Site from the nearest Cloudflare edge; API in Chicago (ord)<br>
+            Stack: Python/Flask, SQLite, uPlot
         </div>
         
         <!-- Enterprise Solutions Section -->
@@ -1611,7 +1673,7 @@
         </div>
 
         <footer class="footer">
-            <p>Linknode Energy Monitor • Deployed on Fly.io</p>
+            <p>Linknode Energy Monitor • Deployed on Cloudflare + Fly.io</p>
             <p style="margin-top: 0.5rem; font-size: 0.875rem;">
                 Created by <a href="https://github.com/murr2k" style="color: #667eea; text-decoration: none;">Murray Kopit</a> • 
                 <a href="https://github.com/murr2k/linknode-com" style="color: #667eea; text-decoration: none;">View on GitHub</a>
@@ -1622,6 +1684,7 @@
         </footer>
     </div>
     
+    <script src="/vendor/uplot-1.6.32/uPlot.iife.min.js"></script>
     <script>
         // Load build info
         async function loadBuildInfo() {
@@ -1928,24 +1991,21 @@
 
         // Check API statuses
         async function checkAPIStatuses() {
-            // Check Eagle Monitor (which also indicates InfluxDB status)
             checkServiceStatus('https://linknode-eagle-monitor.fly.dev/health', 'eagle');
 
-            // Check Grafana (uses no-cors due to Grafana's CORS policy)
-            checkGrafanaStatus();
-
-            // InfluxDB status is derived from Eagle monitor
-            checkInfluxDBStatus();
+            // Database status is reported by the Eagle monitor's /health (db_ok)
+            checkDatabaseStatus();
         }
-        
-        async function checkInfluxDBStatus() {
+
+        async function checkDatabaseStatus() {
+            const statusDot = document.getElementById('db-status');
+            const statusText = document.getElementById('db-status-text');
             try {
-                const response = await fetch('https://linknode-eagle-monitor.fly.dev/health');
+                const response = await fetch('https://linknode-eagle-monitor.fly.dev/health', {
+                    signal: AbortSignal.timeout(5000)
+                });
                 const data = await response.json();
-                const statusDot = document.getElementById('influx-status');
-                const statusText = document.getElementById('influx-status-text');
-                
-                if (data.influxdb_connected) {
+                if (data.db_ok) {
                     statusDot.classList.add('online');
                     statusText.textContent = 'Online';
                 } else {
@@ -1953,33 +2013,7 @@
                     statusText.textContent = 'Offline';
                 }
             } catch (error) {
-                const statusDot = document.getElementById('influx-status');
-                const statusText = document.getElementById('influx-status-text');
                 statusDot.classList.remove('online');
-                statusText.textContent = 'Offline';
-            }
-        }
-
-        async function checkGrafanaStatus() {
-            const statusDot = document.getElementById('grafana-status');
-            const statusText = document.getElementById('grafana-status-text');
-
-            statusDot.classList.add('connecting');
-            statusText.textContent = 'Checking...';
-
-            try {
-                // Use no-cors mode since Grafana doesn't allow cross-origin API requests
-                // If the fetch succeeds (no network error), the server is reachable
-                await fetch('https://linknode-grafana.fly.dev/api/health', {
-                    mode: 'no-cors',
-                    signal: AbortSignal.timeout(5000)
-                });
-                // If we get here without throwing, server is reachable
-                statusDot.classList.remove('connecting');
-                statusDot.classList.add('online');
-                statusText.textContent = 'Online';
-            } catch (error) {
-                statusDot.classList.remove('connecting', 'online');
                 statusText.textContent = 'Offline';
             }
         }
@@ -2022,7 +2056,198 @@
             document.getElementById('active-services').textContent = count;
         }
 
-        // Chart.js code removed - using embedded Grafana dashboard instead
+        // Energy dashboard: chart and stat tiles for the selected range, from /api/dashboard.
+        // Reproduces the retired Grafana dashboard's panels, math and thresholds.
+        const DASHBOARD_REFRESH_MS = { '1h': 15000, '6h': 15000, '24h': 15000, '7d': 60000, '30d': 60000 };
+        let dashboardRange = '24h';
+        let dashboardTimer = null;
+        let dashboardGen = 0;
+        let powerChart = null;
+        let chartWindow = null;  // [start, end] ms of the selected range: the x axis always spans it
+
+        // Grafana stat-panel thresholds: steps above the green base, [from value, colour class]
+        const STAT_THRESHOLDS = {
+            'dash-min': [[500, 'th-yellow'], [1000, 'th-orange']],
+            'dash-avg': [[2000, 'th-yellow'], [3000, 'th-orange']],
+            'dash-max': [[3000, 'th-yellow'], [5000, 'th-red']],
+            'dash-energy': [[5000, 'th-yellow'], [10000, 'th-orange']],   // Wh
+            'dash-meter': [[50000, 'th-yellow'], [100000, 'th-orange']],
+            'dash-rate': [[0.15, 'th-yellow'], [0.25, 'th-red']],
+            'dash-cost-hour': [[0.25, 'th-yellow'], [0.5, 'th-red']],
+            'dash-cost': [[5, 'th-yellow'], [10, 'th-orange']]
+        };
+
+        function setStat(id, value, format) {
+            const el = document.getElementById(id);
+            el.classList.remove('th-green', 'th-yellow', 'th-orange', 'th-red');
+            if (value === null || value === undefined) {
+                el.textContent = '--';
+                return;
+            }
+            let cls = 'th-green';
+            for (const [threshold, name] of STAT_THRESHOLDS[id]) {
+                if (value >= threshold) cls = name;
+            }
+            el.classList.add(cls);
+            el.textContent = format(value);
+        }
+
+        function formatWatts(w) {
+            return Math.abs(w) >= 1000 ? (w / 1000).toFixed(1) + ' kW' : Math.round(w) + ' W';
+        }
+
+        function formatEnergy(wh) {
+            if (wh >= 1e6) return (wh / 1e6).toFixed(2) + ' MWh';
+            if (wh >= 1e3) return (wh / 1e3).toFixed(2) + ' kWh';
+            return wh.toFixed(2) + ' Wh';
+        }
+
+        // Hover tooltip: the bucket average, plus its min to max range when bucketed
+        function chartTooltipPlugin() {
+            let tip;
+            return {
+                hooks: {
+                    init: u => {
+                        tip = document.createElement('div');
+                        tip.className = 'chart-tooltip';
+                        u.over.appendChild(tip);
+                    },
+                    setCursor: u => {
+                        const i = u.cursor.idx;
+                        const v = i === null || i === undefined ? null : u.data[1][i];
+                        if (v === null || v === undefined) {
+                            tip.style.display = 'none';
+                            return;
+                        }
+                        const hi = u.data[2][i], lo = u.data[3][i];
+                        const range = hi !== lo ? `  (${formatWatts(lo)} to ${formatWatts(hi)})` : '';
+                        tip.textContent = `${new Date(u.data[0][i]).toLocaleString()}  ${formatWatts(v)}${range}`;
+                        tip.style.display = 'block';
+                        tip.style.left = Math.max(0, Math.min(u.cursor.left + 12, u.over.clientWidth - tip.offsetWidth)) + 'px';
+                        tip.style.top = Math.max(0, u.valToPos(hi, 'y') - 36) + 'px';
+                    }
+                }
+            };
+        }
+
+        function renderPowerChart(series, start, end) {
+            chartWindow = [start, end];
+            const el = document.getElementById('power-chart');
+            if (!series.length) {
+                if (powerChart) {
+                    powerChart.destroy();
+                    powerChart = null;
+                }
+                el.innerHTML = '<div class="chart-message">No data in this range</div>';
+                return;
+            }
+            // [t, mean, min, max] per bucket; tolerate the older [t, value] shape
+            const data = [
+                series.map(p => p[0]),
+                series.map(p => p[1]),
+                series.map(p => p.length > 3 ? p[3] : p[1]),  // bucket max
+                series.map(p => p.length > 3 ? p[2] : p[1])   // bucket min
+            ];
+            if (powerChart) {
+                powerChart.setData(data);
+                return;
+            }
+            el.innerHTML = '';
+            const axis = {
+                stroke: '#888',
+                grid: { stroke: 'rgba(255, 255, 255, 0.06)' },
+                ticks: { stroke: 'rgba(255, 255, 255, 0.1)' }
+            };
+            powerChart = new uPlot({
+                width: el.clientWidth,
+                height: el.clientHeight,
+                ms: 1,  // timestamps are epoch milliseconds
+                legend: { show: false },
+                cursor: { y: false, points: { size: 6 } },
+                scales: {
+                    x: { range: () => chartWindow },
+                    y: { range: (u, min, max) => [0, max > 0 ? max * 1.1 : 1000] }
+                },
+                series: [
+                    {},
+                    {   // bucket average
+                        stroke: '#4ade80',
+                        width: 2,
+                        fill: 'rgba(74, 222, 128, 0.06)',
+                        paths: uPlot.paths.spline(),
+                        points: { show: false }
+                    },
+                    {   // bucket max: keeps short peaks the average flattens
+                        stroke: 'rgba(74, 222, 128, 0.35)',
+                        width: 1,
+                        paths: uPlot.paths.spline(),
+                        points: { show: false }
+                    },
+                    {   // bucket min
+                        stroke: 'rgba(74, 222, 128, 0.35)',
+                        width: 1,
+                        paths: uPlot.paths.spline(),
+                        points: { show: false }
+                    }
+                ],
+                bands: [{ series: [2, 3], fill: 'rgba(74, 222, 128, 0.18)' }],
+                axes: [axis, Object.assign({}, axis, { size: 70, values: (u, vals) => vals.map(formatWatts) })],
+                plugins: [chartTooltipPlugin()]
+            }, data, el);
+        }
+
+        async function fetchDashboard() {
+            const gen = ++dashboardGen;  // a newer call (range change) supersedes this one
+            clearTimeout(dashboardTimer);
+            if (!document.hidden) {
+                try {
+                    const response = await fetch(
+                        `https://linknode-eagle-monitor.fly.dev/api/dashboard?range=${dashboardRange}`,
+                        { signal: AbortSignal.timeout(15000) });
+                    if (!response.ok) {
+                        throw new Error('API returned status ' + response.status);
+                    }
+                    const d = await response.json();
+                    if (gen === dashboardGen) {
+                        renderPowerChart(d.series, d.start, d.end);
+                        setStat('dash-min', d.power.min, v => Math.round(v) + ' W');
+                        setStat('dash-avg', d.power.mean, v => Math.round(v) + ' W');
+                        setStat('dash-max', d.power.max, v => Math.round(v) + ' W');
+                        setStat('dash-energy', d.energy_wh, formatEnergy);
+                        setStat('dash-meter', d.meter_kwh, v => String(Math.round(v)));
+                        setStat('dash-rate', d.price_per_kwh, v => '$' + v.toFixed(4));
+                        setStat('dash-cost-hour', d.cost_per_hour, v => '$' + v.toFixed(2));
+                        setStat('dash-cost', d.estimated_cost, v => '$' + v.toFixed(2));
+                    }
+                } catch (error) {
+                    console.error('Error fetching dashboard data:', error);
+                }
+            }
+            if (gen === dashboardGen) {
+                dashboardTimer = setTimeout(fetchDashboard, DASHBOARD_REFRESH_MS[dashboardRange]);
+            }
+        }
+
+        document.querySelectorAll('.range-picker button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                dashboardRange = btn.dataset.range;
+                document.querySelectorAll('.range-picker button').forEach(b => {
+                    b.classList.toggle('active', b === btn);
+                    b.setAttribute('aria-pressed', String(b === btn));
+                });
+                fetchDashboard();
+            });
+        });
+
+        // Refresh immediately when the tab comes back into view (polling pauses while hidden)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) fetchDashboard();
+        });
+
+        new ResizeObserver(() => {
+            const el = document.getElementById('power-chart');
+            if (powerChart) powerChart.setSize({ width: el.clientWidth, height: el.clientHeight });
+        }).observe(document.getElementById('power-chart'));
 
         // Server-Sent Events for real-time power updates
         let sseConnection = null;
@@ -2120,6 +2345,9 @@
 
         // Connect to SSE for real-time gauge updates
         connectSSE();
+
+        // Chart and stat tiles for the selected range
+        fetchDashboard();
 
         // Fetch 24h stats less frequently (every 30 seconds) since SSE handles real-time gauge
         setInterval(fetchPowerData, 30000);

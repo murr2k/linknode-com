@@ -1,39 +1,48 @@
 # Quick CI/CD Setup - Final Steps
 
-Your CI/CD pipeline is configured and ready! Just one final step:
+Two GitHub Actions workflows deploy production on pushes to `main`:
 
-## Recent Fix Applied
-The CI/CD pipeline has been fixed to properly authenticate with Fly.io by adding the FLY_API_TOKEN environment variable to all deployment steps.
+| Workflow | Trigger paths | Deploys |
+|----------|---------------|---------|
+| `deploy-fly.yml` | `fly/eagle-monitor/**` | Fly app `linknode-eagle-monitor` (unit tests first, rollback image captured) |
+| `deploy-web.yml` | `web/**` | Cloudflare Worker `linknode-web` (the linknode.com site) |
 
-## Add the Fly.io Token to GitHub
+Docs-only changes deploy nothing.
+
+## Add the Secrets to GitHub
 
 1. Go to: https://github.com/murr2k/linknode-com/settings/secrets/actions
-2. Click "New repository secret"
-3. Add:
-   - **Name**: `FLY_API_TOKEN`
-   - **Value**: 
-   ```
-   fm2_lJPECAAAAAAACXgyxBCYjdRj5aVkY+BKaui5hwpewrVodHRwczovL2FwaS5mbHkuaW8vdjGUAJLOABIpYR8Lk7lodHRwczovL2FwaS5mbHkuaW8vYWFhL3YxxDzgIxOM2H++WwdOtguqr/Cs9/k3zk2jAvTeeas8vSdEmwuHd0bUTf5E29FmLyI7zrIGemY5B8885JUExt7ETuIaDo8fx3UoIiO7YSA+ObWEBn3SvUm1y41QQukeTwjd8tJldpPBQ1atuMhC9Xxw+heA3UDKm90hxavvKEtb37VOoml+9cmNeKOuF6LkScQgCql3/MA+xZ8qzYXWgXLAfDPQv4uayqfJvlz4FLweNqQ=,fm2_lJPETuIaDo8fx3UoIiO7YSA+ObWEBn3SvUm1y41QQukeTwjd8tJldpPBQ1atuMhC9Xxw+heA3UDKm90hxavvKEtb37VOoml+9cmNeKOuF6LkScQQSUnP6ilFUZy/UXJuKViOGsO5aHR0cHM6Ly9hcGkuZmx5LmlvL2FhYS92MZYEks5ofTJezmh9NNQXzgARdJQKkc4AEXSUxCCfdhmlqOlGO3PF/QYwTcEZYklJ3g1C4Q0uieEU6bYzLQ==,fo1_Y5pGCL8RVBDxH1Im44QF-ENj567IB4WavDw_ymSIzno
-   ```
-4. Click "Add secret"
+2. Click "New repository secret" for each:
+   - **`FLY_API_TOKEN`**: a Fly.io deploy token. Create one with
+     `fly tokens create org personal --name github-actions-deploy` (see
+     [FLY_TOKEN_UPDATE_PROCEDURE.md](FLY_TOKEN_UPDATE_PROCEDURE.md)).
+   - **`CLOUDFLARE_API_TOKEN`**: a Cloudflare API token that can edit Workers for the
+     account and the `linknode.com` zone routes.
+   - **`CLOUDFLARE_ACCOUNT_ID`**: the Cloudflare account ID.
+3. Never paste token values into docs, commits or issues.
+
+`INFLUXDB_TOKEN` and `GRAFANA_ADMIN_PASSWORD` are retired and can be deleted.
 
 ## Test Your Setup
 
-Once the token is added, test the deployment:
+Run either workflow by hand from the Actions tab (both accept `workflow_dispatch`), or
+push a change under the trigger paths:
 
 ```bash
-# Make a small change
-echo "<!-- Updated: $(date) -->" >> fly/web/index.html
-
-# Commit and push
-git add fly/web/index.html
-git commit -m "Test CI/CD pipeline"
-git push origin main
+gh workflow run deploy-web.yml
+gh workflow run deploy-fly.yml
+gh run list -L 3
 ```
 
 Then watch the deployment at:
 https://github.com/murr2k/linknode-com/actions
 
+After a site deploy, `https://linknode-web.murr2k.workers.dev/build-info.json` shows the
+deployed commit. After a Fly deploy, `https://linknode-eagle-monitor.fly.dev/health`
+should return `"status":"healthy"`.
+
 ## That's it! 🎉
 
-Your CI/CD pipeline is now active. Every push to the main branch that changes files in the `fly/` directory will automatically deploy to Fly.io.
+Your CI/CD pipeline is now active. Every push to `main` that changes
+`fly/eagle-monitor/**` or `web/**` deploys that part automatically. Treat `git push` to
+`main` as a production deploy.
