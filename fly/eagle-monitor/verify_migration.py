@@ -11,7 +11,7 @@ Runs INSIDE the eagle-monitor machine (upload like migrate_influx.py):
 field the row count, time span and tag sets. Several tag sets on one field mean the
 Grafana/Flux per-series integral differed from a merged one.
 
-Default: for fixed windows (1h, 24h, 7d, 30d, then each calendar month of history)
+Default: for fixed windows (1h, 24h, 7d, then each ISO week of history)
 compare count/min/max/mean and the power integral. Flux side uses merged-series
 semantics (group() |> sort(_time)) because that is what SQLite computes; the
 per-series Grafana integral is printed alongside for reference. All windows end at
@@ -92,19 +92,21 @@ def precheck(flux):
 
 
 def windows(db, flux, stop):
-    fixed = [('1h', stop - timedelta(hours=1)), ('24h', stop - timedelta(days=1)),
-             ('7d', stop - timedelta(days=7)), ('30d', stop - timedelta(days=30))]
-    for label, start in fixed:
-        yield label, start, stop
+    """1h, 24h, 7d back from stop, then every ISO week of history. Windows stay at a
+    week or less because the merged integral sorts the window in InfluxDB's memory."""
+    for label, span in (('1h', timedelta(hours=1)), ('24h', timedelta(days=1)),
+                        ('7d', timedelta(days=7))):
+        yield label, stop - span, stop
     first = flux.rows(f'{flux.base("power_w", datetime(1970, 1, 1, tzinfo=timezone.utc), stop)} '
                       f'|> first() |> keep(columns: ["_time"])')
     if not first:
         return
-    month = min(r.get_time() for r in first).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    while month < stop:
-        nxt = (month + timedelta(days=32)).replace(day=1)
-        yield f'{month:%Y-%m}', month, min(nxt, stop)
-        month = nxt
+    day = min(r.get_time() for r in first).replace(hour=0, minute=0, second=0, microsecond=0)
+    week = day - timedelta(days=day.weekday())
+    while week < stop:
+        nxt = week + timedelta(days=7)
+        yield f'{week:%G-W%V}', week, min(nxt, stop)
+        week = nxt
 
 
 def close(a, b):
