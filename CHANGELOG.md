@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Infrastructure consolidated from four Fly.io apps to one (2026-09-26/27)**, taking
+  hosting from about $13.10 to about $2.58 a month
+  - Readings are stored in SQLite (`fly/eagle-monitor/store.py`) on the new `eagle_data`
+    Fly volume (1GB, daily snapshots kept 14 days) instead of InfluxDB. Writing the same
+    (field, timestamp) again overwrites, as InfluxDB did, so `reads_24h` still counts only
+    fresh reads. 30 days of history were imported from InfluxDB and checked against it
+    (count/min/max/mean and the energy integral: no differences); older history was retired
+  - New `GET /api/dashboard?range=1h|6h|24h|7d|30d` serves the chart series and the
+    retired Grafana dashboard's stat panels (trapezoid energy integral, cost estimate)
+  - The site moved from nginx on Fly (`linknode-web`) to a Cloudflare Worker serving static
+    assets (`web/`, `web/wrangler.jsonc`, deployed by `deploy-web.yml`); linknode.com and www
+    are Worker routes
+  - The Grafana iframe is replaced by a native uPlot chart and eight stat tiles with a
+    1h/6h/24h/7d/30d range picker; `energy.linknode.com` redirects (301) to
+    `https://linknode.com/#energy-dashboard`
+  - The page's security headers, including a CSP, now come from `web/public/_headers`.
+    nginx never applied its CSP to `/` (add_header does not inherit into location blocks),
+    so this is the first CSP the page has actually carried
+  - Cloudflare Rocket Loader turned off for the zone (it conflicts with the CSP)
+  - `deploy-fly.yml` deploys only eagle-monitor and runs its unit tests first
+
+### Removed
+- Fly apps `linknode-web`, `linknode-grafana` and `linknode-influxdb`, with their volumes and
+  Fly certificates; `fly/grafana/` and `fly/influxdb/`; the `influxdb-client` dependency and
+  `INFLUXDB_*` configuration; the `influxdb_connected` field of `/health` (use `db_ok`)
+- DNS records pointing at the retired Fly hostnames (now proxied `AAAA 100::`
+  placeholders) and the Fly certificate-validation records
+
 ### Added
 - Eagle-200 local-API bypass: a hot-standby failover uploader that keeps the data
   pipeline alive through the meter's hardware faults (`scripts/eagle_bypass.py`, `deploy/`)
@@ -77,6 +106,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `INFLUXDB_TOKEN` to GitHub repository secrets
 
 ### Fixed
+- The Pi's uptime heartbeat is saved in the store and restored at startup, so a restart no
+  longer blanks the Data Uptime and Sample Interval tiles for up to 15 minutes
+- A failed database write no longer counts as fresh data for the staleness alarm; the
+  freshness bookkeeping depends only on the primary store's write
+- CORS now allows `https://www.linknode.com` (the page's API calls failed from www)
+- `/api/stats?hours=` rejects non-integer or out-of-range values with 400 instead of a 500
 - Restored GitHub Actions auto-deploy to Fly.io
   - `FLY_API_TOKEN` had an expired third-party discharge token, so every push-triggered deploy was failing authentication
   - Rotated to a fresh org deploy token; push-to-`main` now deploys changed services automatically again

@@ -37,7 +37,6 @@ app = Flask(__name__)
 CORS(app, origins=[
     "https://linknode.com",
     "https://www.linknode.com",
-    "https://linknode-web.fly.dev",
     # Cloudflare Worker serving the site: production and preview-version hosts
     r"^https://([a-z0-9-]+-)?linknode-web\.[a-z0-9-]+\.workers\.dev$",
     # Local site preview (run.cmd, port from ~/.claude/port-registry.md)

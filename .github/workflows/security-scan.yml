@@ -16,7 +16,7 @@ on:
       - '**/package*.json'
       - '**/Dockerfile*'
       - '**/.env*'
-      - '**/nginx.conf'
+      - '**/_headers'
       - '**/*.toml'
       - '**/*.conf'
       - '**/*.config'
@@ -36,7 +36,7 @@ on:
       - '**/package*.json'
       - '**/Dockerfile*'
       - '**/.env*'
-      - '**/nginx.conf'
+      - '**/_headers'
       - '**/*.toml'
       - '**/*.conf'
       - '**/*.config'
@@ -79,11 +79,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Validate nginx security headers
+    - name: Validate site security headers
       run: |
-        echo "🔍 Checking nginx security headers..."
+        echo "🔍 Checking site security headers (web/public/_headers)..."
         
-        # Check for required security headers in nginx.conf
+        # Check for required security headers in the Cloudflare _headers file
         REQUIRED_HEADERS=(
           "Content-Security-Policy"
           "X-Frame-Options"
@@ -96,7 +96,7 @@ jobs:
         MISSING_HEADERS=()
         
         for header in "${REQUIRED_HEADERS[@]}"; do
-          if ! grep -q "$header" fly/web/nginx.conf; then
+          if ! grep -q "$header" web/public/_headers; then
             MISSING_HEADERS+=("$header")
           fi
         done
@@ -230,7 +230,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        service: [web, eagle-monitor, grafana, influxdb]
+        service: [eagle-monitor]
     steps:
     - name: Checkout code
       uses: actions/checkout@v4

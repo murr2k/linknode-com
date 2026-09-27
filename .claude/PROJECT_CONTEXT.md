@@ -30,11 +30,11 @@ git push                   # Auto-deploys to Fly.io
 5. Added build status display to homepage
 
 ## Architecture
-- **Frontend**: Static HTML/CSS/JS served by nginx
-- **Backend**: Eagle Monitor API (Node.js)
-- **Database**: InfluxDB for time series data
-- **Monitoring**: Grafana dashboards
-- **Hosting**: Fly.io (4 services)
+- **Frontend**: Static HTML/CSS/JS on a Cloudflare Worker (static assets), uPlot chart
+- **Backend**: Eagle Monitor API (Python/Flask) on Fly.io, one machine
+- **Database**: SQLite on the eagle_data Fly volume (InfluxDB retired 2026-09-27)
+- **Dashboard**: native chart and stat tiles on linknode.com (Grafana retired 2026-09-27)
+- **Hosting**: Fly.io (1 app) + Cloudflare Workers
 
 ## Testing Infrastructure
 - **Phase 1**: Smoke tests (basic functionality)

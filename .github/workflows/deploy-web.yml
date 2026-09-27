@@ -5,9 +5,7 @@ name: Deploy site to Cloudflare
 
 on:
   push:
-    # migration/sqlite-cloudflare deploys during the Fly->Cloudflare migration, while
-    # main stays equal to production. Drop it when the branch merges.
-    branches: [ main, migration/sqlite-cloudflare ]
+    branches: [ main ]
     paths:
       - 'web/**'
       - '.github/workflows/deploy-web.yml'

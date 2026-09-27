@@ -108,7 +108,7 @@ curl -s https://linknode-eagle-monitor.fly.dev/health | python -m json.tool
 | Last bypass heartbeat time | **`bypass_status.updated_at`** | **not** `received_at` (that key does not exist) |
 | Live uptime tile values | `bypass_status.data_uptime_pct` / `.device_uptime_pct` | shipped by the Pi heartbeat every 15 min |
 | Dashboard "Meter Reads (24h)" (received/expected, rolling 24h) | `reads_24h.received` / `.expected` | **fresh** reads passed on, the completeness gauge the dashboard shows; `.period_s` (the measured cycle time used to size `expected`) and `.window_hours` included. `null` if the DB is unreachable |
-| Data points stored today (legacy counter) | `packets_today` (root) | successful InfluxDB writes since midnight UTC; still emitted but the dashboard now uses `reads_24h` |
+| Data points stored today (legacy counter) | `packets_today` (root) | successful store (SQLite) writes since midnight UTC; still emitted but the dashboard now uses `reads_24h` |
 | Current power (W) | `current_power` (root) | last power reading |
 | Gap between last two points (ms) | `packet_interval_ms` (root) | |
 
@@ -127,7 +127,11 @@ renames of the Pi's internal `*_s` fields. `interval_s` is the nominal `--interv
 is the Pi's **measured** true cycle time, EMA of sleep + per-cycle work, ~35s, and is what actually
 sizes `reads_24h.expected`.)
 
-`/health`: `{influxdb_connected, status, uptime_seconds}`.
+`/health`: `{db_ok, status, uptime_seconds}` (503 when the SQLite store is unavailable).
+
+The service stores readings in SQLite on the `eagle_data` Fly volume (InfluxDB and Grafana
+were retired 2026-09-27). The last `bypass_status` heartbeat is saved there too and restored
+on restart, so it no longer goes null after a deploy.
 
 ### Healthy Fly baseline
 
@@ -136,14 +140,14 @@ sizes `reads_24h.expected`.)
 - `packets_today` climbing.
 - `bypass_status.data_uptime_pct` / `.device_uptime_pct` near `100.0`, and
   `bypass_status.updated_at` within the last ~15 minutes (the heartbeat interval).
-- `/health` -> `status: healthy`, `influxdb_connected: true`.
+- `/health` -> `status: healthy`, `db_ok: true`.
 
 ---
 
 ## Cross-checks and interpretation
 
 - **`packets_today` < Pi `messages_sent`, and that is expected.** The Pi ships ~3 messages per cycle,
-  but only data-bearing messages become InfluxDB writes; metadata-only messages (DeviceInfo,
+  but only data-bearing messages become store writes; metadata-only messages (DeviceInfo,
   BillingPeriodList, etc.) are acknowledged without a write. So `packets_today` counts stored points,
   not raw messages.
 - **`reads_24h` is the completeness gauge the dashboard shows ("Meter Reads (24h)").** `received`
@@ -166,7 +170,7 @@ sizes `reads_24h.expected`.)
   data and suppress a real staleness alert. Judge freshness by `last_update`, judge the Pi's
   self-reported uptime by `bypass_status`.
 - **Diagnosing "site looks stale":** if `last_update` is old but the Pi shows `messages_failed: 0`
-  and low `read_failures`, suspect the Fly side (endpoint/InfluxDB). If the Pi shows rising
+  and low `read_failures`, suspect the Fly side (endpoint/database). If the Pi shows rising
   `read_failures`, the Eagle stopped answering. If `messages_failed` is rising, the endpoint is
   rejecting. `bypass_status.updated_at` much older than 15 min means the Pi itself stopped shipping.
 - **Meter/HAN health lives only on the Pi** (`meter_status`, `meter_link_pct`); the Fly side has no
