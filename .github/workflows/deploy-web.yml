@@ -54,7 +54,14 @@ jobs:
 
     - name: Verify deployment
       run: |
-        sleep 5
-        curl -sf https://linknode-web.murr2k.workers.dev/ | grep -q "Linknode"
-        curl -sf https://linknode-web.murr2k.workers.dev/build-info.json | grep -q "${{ github.sha }}"
-        echo "✅ Site deployed: https://linknode-web.murr2k.workers.dev"
+        # The edge can serve the previous version for a few seconds after a deploy
+        for i in $(seq 1 12); do
+          if curl -sf https://linknode-web.murr2k.workers.dev/build-info.json | grep -q "${{ github.sha }}"; then
+            curl -sf https://linknode-web.murr2k.workers.dev/ | grep -q "Linknode"
+            echo "✅ Site deployed: https://linknode-web.murr2k.workers.dev (after $((i * 5))s)"
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "❌ New build-info.json not served within 60s"
+        exit 1
