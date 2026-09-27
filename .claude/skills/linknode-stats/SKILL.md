@@ -110,10 +110,11 @@ curl -s https://linknode-eagle-monitor.fly.dev/health | python -m json.tool
 | Dashboard "Meter Reads (24h)" (received/expected, rolling 24h) | `reads_24h.received` / `.expected` | **fresh** reads passed on, the completeness gauge the dashboard shows; `.period_s` (the measured cycle time used to size `expected`) and `.window_hours` included. `null` if the DB is unreachable |
 | Data points stored today (legacy counter) | `packets_today` (root) | successful store (SQLite) writes since midnight UTC; still emitted but the dashboard now uses `reads_24h` |
 | Current power (W) | `current_power` (root) | last power reading |
+| Electricity rate used for costs | `price_per_kwh` (root) | the configured BC Hydro Step 1 rate (`TIER1_RATE`); the Eagle's own, stale price is `meter_price_per_kwh` |
 | Gap between last two points (ms) | `packet_interval_ms` (root) | |
 
 Root keys: `active_viewers, avg_24h, billing_period, bypass_status, cost_24h, current_power,
-last_update, max_24h, min_24h, monitor_stats, packet_interval_ms, packets_today, price_per_kwh,
+last_update, max_24h, meter_price_per_kwh, min_24h, monitor_stats, packet_interval_ms, packets_today, price_per_kwh,
 reads_24h`.
 
 `monitor_stats` (the ingest service's internal counters) keys: `bypass_status, failed_writes,

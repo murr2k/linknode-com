@@ -14,6 +14,7 @@ import dashboard
 import store
 
 H = 3_600_000  # ms per hour
+RATE = 0.1187  # a configured Step 1 rate
 
 
 class StoreTestCase(unittest.TestCase):
@@ -128,19 +129,21 @@ class TestDashboard(StoreTestCase):
         self.db.write(now - 60_000, {'energy_delivered_kwh': 4321.0})
         self.db.write(now - 3 * H, {'price_per_kwh': 0.1172})
 
-        p = dashboard.build(self.db, '6h', now)
+        p = dashboard.build(self.db, '6h', now, RATE)
         self.assertEqual(p['power']['current'], 2000.0)
         self.assertEqual(p['power']['min'], 1000.0)
         self.assertEqual(p['power']['max'], 2000.0)
         self.assertEqual(p['meter_kwh'], 4321.0)
-        self.assertEqual(p['price_per_kwh'], 0.1172)
-        self.assertAlmostEqual(p['cost_per_hour'], 2.0 * 0.1172)
-        self.assertAlmostEqual(p['estimated_cost'], p['energy_wh'] / 1000 * 0.1172 * 1.1)
+        # The configured rate wins; the Eagle's stale price is only reported
+        self.assertEqual(p['price_per_kwh'], RATE)
+        self.assertEqual(p['meter_price_per_kwh'], 0.1172)
+        self.assertAlmostEqual(p['cost_per_hour'], 2.0 * RATE)
+        self.assertAlmostEqual(p['estimated_cost'], p['energy_wh'] / 1000 * RATE * 1.1)
 
     def test_stale_current_and_meter_are_none(self):
         now = 10 * H
         self.db.write(now - 10 * 60_000, {'power_w': 1000})
-        p = dashboard.build(self.db, '1h', now)
+        p = dashboard.build(self.db, '1h', now, RATE)
         self.assertIsNone(p['power']['current'])
         self.assertIsNone(p['meter_kwh'])
         self.assertIsNone(p['cost_per_hour'])
@@ -149,7 +152,7 @@ class TestDashboard(StoreTestCase):
         now = 10 * H
         for ts in (now - 50 * 60_000, now - 49 * 60_000, now - 10 * 60_000):
             self.db.write(ts, {'power_w': 500})
-        series = dashboard.build(self.db, '1h', now)['series']
+        series = dashboard.build(self.db, '1h', now, RATE)['series']
         self.assertEqual([p[1] for p in series], [500.0, 500.0, None, 500.0])
         self.assertEqual(series[2], [series[1][0] + 1, None, None, None])
 
@@ -160,7 +163,7 @@ class TestDashboard(StoreTestCase):
         start = now - 3 * 3_600_000
         for i in range(30):
             self.db.write(start + i * 30_000, {'power_w': 7000 if i == 10 else 1000})
-        p = dashboard.build(self.db, '7d', now)
+        p = dashboard.build(self.db, '7d', now, RATE)
         mean, lo, hi = zip(*[pt[1:] for pt in p['series'] if pt[1] is not None])
         self.assertEqual(max(hi), 7000.0)
         self.assertEqual(max(hi), p['power']['max'])
@@ -169,7 +172,7 @@ class TestDashboard(StoreTestCase):
 
     def test_every_range_builds(self):
         for key in dashboard.RANGES:
-            p = dashboard.build(self.db, key, 40 * 86_400_000)
+            p = dashboard.build(self.db, key, 40 * 86_400_000, RATE)
             self.assertEqual(p['range'], key)
             self.assertEqual(p['series'], [])
             self.assertIsNone(p['energy_wh'])

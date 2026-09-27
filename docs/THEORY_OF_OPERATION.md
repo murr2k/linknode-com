@@ -146,7 +146,7 @@ flowchart LR
 | `7d` | 15-minute means | 60 s |
 | `30d` | 1-hour means | 60 s |
 
-Alongside the series it returns min/average/max power over the range, energy consumed (trapezoidal integral of `power_w` in Wh, gaps bridged), the latest meter reading (kWh, within 5 minutes), the rate (latest `price_per_kwh` within 24 hours), cost per hour (current power x rate) and estimated cost (energy x rate x 1.1). The series carries null markers across gaps longer than three buckets (three minutes for raw points), so outages show as breaks in the chart. This reproduces the panels and math of the retired Grafana dashboard.
+Alongside the series it returns min/average/max power over the range, energy consumed (trapezoidal integral of `power_w` in Wh, gaps bridged), the latest meter reading (kWh, within 5 minutes), the rate (the configured BC Hydro Step 1 rate, `TIER1_RATE`), cost per hour (current power x rate) and estimated cost (energy x rate x 1.1). The price the Eagle itself reports is returned separately as `meter_price_per_kwh`: it is not updated when BC Hydro changes rates, so it is never used for costs. The series carries null markers across gaps longer than three buckets (three minutes for raw points), so outages show as breaks in the chart. This reproduces the panels and math of the retired Grafana dashboard.
 
 **Data Processing Flow:**
 
@@ -265,7 +265,7 @@ flowchart TB
 
 2. **24-Hour Statistics**
    - Minimum, Maximum, Average power
-   - Estimated cost from average power and the meter-reported rate
+   - Estimated cost from average power and the configured BC Hydro Step 1 rate
 
 3. **Power Consumption Trends** (`#energy-dashboard`)
    - uPlot chart and 8 stat tiles from `/api/dashboard`, range picker 1h/6h/24h/7d/30d

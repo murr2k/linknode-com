@@ -18,6 +18,7 @@ ZIGBEE_EPOCH_OFFSET = 946684800
 
 STATS_KEYS = {
     'current_power', 'min_24h', 'max_24h', 'avg_24h', 'cost_24h', 'price_per_kwh',
+    'meter_price_per_kwh',
     'last_update', 'active_viewers', 'packet_interval_ms', 'packets_today', 'reads_24h',
     'bypass_status', 'monitor_stats', 'billing_period',
 }
@@ -103,7 +104,13 @@ class TestRoutes(unittest.TestCase):
         self.assertEqual(body['min_24h'], 1000.0)
         self.assertEqual(body['max_24h'], 3000.0)
         self.assertAlmostEqual(body['avg_24h'], 2000.0)
-        self.assertAlmostEqual(body['price_per_kwh'], 0.1172)
+        # Billing uses the configured BC Hydro rates, not the Eagle's stale price
+        self.assertEqual(body['price_per_kwh'], monitor_app.TIER1_RATE)
+        self.assertAlmostEqual(body['meter_price_per_kwh'], 0.1172)
+        self.assertEqual(body['billing_period']['tiered_cost']['tier1_rate'], monitor_app.TIER1_RATE)
+        dash = self.client.get('/api/dashboard?range=24h').get_json()
+        self.assertEqual(dash['price_per_kwh'], monitor_app.TIER1_RATE)
+        self.assertAlmostEqual(dash['meter_price_per_kwh'], 0.1172)
         self.assertEqual(body['reads_24h']['received'], 3)
         self.assertIsNotNone(body['billing_period']['tiered_cost'])
 

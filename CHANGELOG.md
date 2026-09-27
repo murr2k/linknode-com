@@ -108,6 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `INFLUXDB_TOKEN` to GitHub repository secrets
 
 ### Fixed
+- Cost figures use BC Hydro's rates effective 2026-04-01 (Step 1 11.87 cents/kWh, basic charge
+  23.44 cents/day; Step 2 14.08 cents and the 22.1918 kWh/day threshold unchanged) and the
+  configured rates now take precedence over the price the Eagle reports, which still read the
+  April 2025 Step 1 of 11.72 cents. The Eagle's value stays visible as `meter_price_per_kwh`
 - The Pi's uptime heartbeat is saved in the store and restored at startup, so a restart no
   longer blanks the Data Uptime and Sample Interval tiles for up to 15 minutes
 - A failed database write no longer counts as fresh data for the staleness alarm; the

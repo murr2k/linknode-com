@@ -101,13 +101,18 @@ SENSITIVE_FIELD_TAGS = ('InstallCode', 'LinkKey')
 # whether the utility text channel is truly empty. Off by default; safe to leave in.
 RAW_CAPTURE = os.getenv('RAW_CAPTURE', '') == '1'
 
-# BC Hydro Tiered Rate Configuration
+# BC Hydro residential tiered rate (rate schedule 1101), effective 2026-04-01:
 # https://app.bchydro.com/accounts-billing/rates-energy-use/electricity-rates/residential-rates/tiered.html
-TIER1_RATE = float(os.getenv('TIER1_RATE', '0.1172'))  # $/kWh - below threshold
-TIER2_RATE = float(os.getenv('TIER2_RATE', '0.1408'))  # $/kWh - above threshold
+# BCUC order G-42-25 holds Step 2 at 14.08 cents and raises Step 1 and the basic charge
+# each April 1, so check these every April. They are the authoritative rates: the price
+# the Eagle reports (PriceCluster) is not updated when BC Hydro changes rates (it still
+# read 0.1172, the April 2025 Step 1, after the April 2026 change) and is only exposed as
+# meter_price_per_kwh.
+TIER1_RATE = float(os.getenv('TIER1_RATE', '0.1187'))  # $/kWh - Step 1, below threshold
+TIER2_RATE = float(os.getenv('TIER2_RATE', '0.1408'))  # $/kWh - Step 2, above threshold
 DAILY_THRESHOLD_KWH = float(os.getenv('DAILY_THRESHOLD_KWH', '22.1918'))  # kWh/day for tier boundary
 BILLING_CYCLE_START_DAY = int(os.getenv('BILLING_CYCLE_START_DAY', '26'))  # Day of month billing resets (BC Hydro)
-BASIC_CHARGE_DAILY = float(os.getenv('BASIC_CHARGE_DAILY', '0.2330'))  # $/day fixed charge
+BASIC_CHARGE_DAILY = float(os.getenv('BASIC_CHARGE_DAILY', '0.2344'))  # $/day basic charge
 
 # Statistics
 stats = {
@@ -733,7 +738,9 @@ def get_stats():
         'max_24h': 0,
         'avg_24h': 0,
         'cost_24h': 0,
-        'price_per_kwh': 0,
+        # The configured Step 1 rate; the Eagle's own (stale) price is meter_price_per_kwh
+        'price_per_kwh': TIER1_RATE,
+        'meter_price_per_kwh': None,
         'last_update': stats.get('last_data_received'),
         'active_viewers': active_viewers,
         'packet_interval_ms': stats.get('packet_interval_ms'),
@@ -790,10 +797,9 @@ def get_stats():
         'window_hours': hours,
     }
 
-    if window['price'] is not None:
-        result['price_per_kwh'] = window['price']
+    result['meter_price_per_kwh'] = window['price']
 
-    # Calculate cost using avg power * hours * actual rate from utility (simple estimate)
+    # Calculate cost using avg power * hours * the Step 1 rate (simple estimate)
     if result['avg_24h'] > 0 and result['price_per_kwh'] > 0:
         kwh = (result['avg_24h'] / 1000) * hours  # Convert W to kW and multiply by hours
         result['cost_24h'] = round(kwh * result['price_per_kwh'], 2)
@@ -809,9 +815,8 @@ def get_stats():
     if energy_kwh is not None:
         result['billing_period']['energy_kwh'] = round(energy_kwh, 2)
 
-        # Calculate tiered cost using Eagle-reported Tier 1 rate if available
-        tier1_rate = result['price_per_kwh'] if result['price_per_kwh'] > 0 else TIER1_RATE
-        tiered = calculate_tiered_cost(energy_kwh, days_in_period, tier1_rate=tier1_rate)
+        # Tiered cost from the configured BC Hydro rates
+        tiered = calculate_tiered_cost(energy_kwh, days_in_period)
         result['billing_period']['tiered_cost'] = tiered
 
     return jsonify(result), 200
@@ -836,7 +841,7 @@ def get_dashboard():
         if cached and now - cached[0] < DASHBOARD_CACHE_SECONDS:
             return jsonify(cached[1]), 200
     try:
-        payload = dashboard.build(db, range_key, store.now_ms())
+        payload = dashboard.build(db, range_key, store.now_ms(), TIER1_RATE)
     except Exception as e:
         logger.error(f"Error building dashboard ({range_key}): {e}")
         return jsonify({'error': 'query failed'}), 500

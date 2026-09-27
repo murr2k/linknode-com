@@ -10,9 +10,11 @@ flattens them. Panel math mirrors the Flux queries it replaces:
   min/max/mean    power_w over the selected range
   energy_wh       integral(power_w, unit: 1h), gaps bridged
   meter_kwh       last energy_delivered_kwh within 5 minutes
-  price_per_kwh   last price_per_kwh within 24 hours (newest by time)
-  cost_per_hour   current power / 1000 * price
-  estimated_cost  energy_wh / 1000 * price * 1.1
+  price_per_kwh   the configured BC Hydro Step 1 rate (Grafana used the Eagle's
+                  reported price, which is not updated when rates change; that
+                  value is still returned as meter_price_per_kwh)
+  cost_per_hour   current power / 1000 * rate
+  estimated_cost  energy_wh / 1000 * rate * 1.1
 """
 
 # range key -> (span in seconds, bucket in seconds; None = raw points)
@@ -50,7 +52,7 @@ def break_gaps(points, max_gap_ms):
     return out
 
 
-def build(store, range_key, now_ms):
+def build(store, range_key, now_ms, rate):
     span_s, bucket_s = RANGES[range_key]
     end = now_ms
     start = end - span_s * 1000
@@ -63,7 +65,6 @@ def build(store, range_key, now_ms):
     energy_wh = store.integral_wh(start, end)
 
     current_w = current[1] if current else None
-    rate = price[1] if price else None
     cost_per_hour = (current_w / 1000.0 * rate
                      if current_w is not None and rate is not None else None)
     estimated_cost = (energy_wh / 1000.0 * rate * ESTIMATE_RATE_FACTOR
@@ -90,6 +91,7 @@ def build(store, range_key, now_ms):
         'meter_kwh': meter[1] if meter else None,
         'meter_ts': meter[0] if meter else None,
         'price_per_kwh': rate,
+        'meter_price_per_kwh': price[1] if price else None,
         'cost_per_hour': cost_per_hour,
         'estimated_cost': estimated_cost,
     }
