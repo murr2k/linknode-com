@@ -3,7 +3,9 @@
 Payload for GET /api/dashboard: the ten panels of the retired Grafana dashboard
 (uid power-monitoring, live version 44), computed from the SQLite store.
 
-Panel math mirrors the Flux queries it replaces:
+The chart series is the bucket mean with a min/max envelope, so short peaks (a
+7 kW element for a minute) stay visible at wide ranges where the mean alone
+flattens them. Panel math mirrors the Flux queries it replaces:
   current power   last power_w within 5 minutes
   min/max/mean    power_w over the selected range
   energy_wh       integral(power_w, unit: 1h), gaps bridged
@@ -34,15 +36,16 @@ GAP_BUCKETS = 3
 
 
 def break_gaps(points, max_gap_ms):
-    """Insert a [t, None] marker inside any gap longer than max_gap_ms so the chart
-    shows outages instead of drawing a straight line across them. Chart-only: the
-    energy integral deliberately bridges gaps, as Grafana's did."""
+    """[[t, mean, min, max]], with a [t, None, None, None] marker inside any gap longer
+    than max_gap_ms so the chart shows outages instead of drawing a straight line
+    across them. Chart-only: the energy integral deliberately bridges gaps, as
+    Grafana's did."""
     out = []
     prev_t = None
-    for t, v in points:
+    for t, mean, lo, hi in points:
         if prev_t is not None and t - prev_t > max_gap_ms:
-            out.append([prev_t + 1, None])
-        out.append([t, round(v, 1)])
+            out.append([prev_t + 1, None, None, None])
+        out.append([t, round(mean, 1), round(lo, 1), round(hi, 1)])
         prev_t = t
     return out
 

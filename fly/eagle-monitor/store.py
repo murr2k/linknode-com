@@ -169,18 +169,21 @@ class Store:
         return (total or 0.0) / 3_600_000.0  # W*ms -> Wh
 
     def series(self, field, start_ms, end_ms, bucket_ms=None):
-        """[(t_ms, value)] over [start_ms, end_ms). With bucket_ms, epoch-aligned bucket
-        means stamped at the bucket's end, clipped to end_ms (aggregateWindow semantics)."""
+        """[(t_ms, mean, min, max)] over [start_ms, end_ms). With bucket_ms, epoch-aligned
+        buckets stamped at the bucket's end, clipped to end_ms (aggregateWindow semantics).
+        Min and max keep short peaks that the mean averages away; raw points repeat
+        the value for both."""
         fid = FIELD_IDS[field]
         if not bucket_ms:
-            return self._query(
+            rows = self._query(
                 'SELECT ts_ms, value FROM readings WHERE field_id = ? AND ts_ms >= ? AND ts_ms < ? '
                 'ORDER BY ts_ms', (fid, start_ms, end_ms))
+            return [(ts, value, value, value) for ts, value in rows]
         rows = self._query(
-            'SELECT (ts_ms / ?) * ? AS bucket, AVG(value) FROM readings '
+            'SELECT (ts_ms / ?) * ? AS bucket, AVG(value), MIN(value), MAX(value) FROM readings '
             'WHERE field_id = ? AND ts_ms >= ? AND ts_ms < ? GROUP BY bucket ORDER BY bucket',
             (bucket_ms, bucket_ms, fid, start_ms, end_ms))
-        return [(min(bucket + bucket_ms, end_ms), mean) for bucket, mean in rows]
+        return [(min(bucket + bucket_ms, end_ms), mean, lo, hi) for bucket, mean, lo, hi in rows]
 
     def created_ms(self):
         value = self.get_meta('created_ms')

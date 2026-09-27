@@ -2102,7 +2102,7 @@
             return wh.toFixed(2) + ' Wh';
         }
 
-        // Single-value hover tooltip (Grafana tooltip mode "single")
+        // Hover tooltip: the bucket average, plus its min to max range when bucketed
         function chartTooltipPlugin() {
             let tip;
             return {
@@ -2119,10 +2119,12 @@
                             tip.style.display = 'none';
                             return;
                         }
-                        tip.textContent = `${new Date(u.data[0][i]).toLocaleString()}  ${formatWatts(v)}`;
+                        const hi = u.data[2][i], lo = u.data[3][i];
+                        const range = hi !== lo ? `  (${formatWatts(lo)} to ${formatWatts(hi)})` : '';
+                        tip.textContent = `${new Date(u.data[0][i]).toLocaleString()}  ${formatWatts(v)}${range}`;
                         tip.style.display = 'block';
                         tip.style.left = Math.max(0, Math.min(u.cursor.left + 12, u.over.clientWidth - tip.offsetWidth)) + 'px';
-                        tip.style.top = Math.max(0, u.valToPos(v, 'y') - 36) + 'px';
+                        tip.style.top = Math.max(0, u.valToPos(hi, 'y') - 36) + 'px';
                     }
                 }
             };
@@ -2139,7 +2141,13 @@
                 el.innerHTML = '<div class="chart-message">No data in this range</div>';
                 return;
             }
-            const data = [series.map(p => p[0]), series.map(p => p[1])];
+            // [t, mean, min, max] per bucket; tolerate the older [t, value] shape
+            const data = [
+                series.map(p => p[0]),
+                series.map(p => p[1]),
+                series.map(p => p.length > 3 ? p[3] : p[1]),  // bucket max
+                series.map(p => p.length > 3 ? p[2] : p[1])   // bucket min
+            ];
             if (powerChart) {
                 powerChart.setData(data);
                 return;
@@ -2162,14 +2170,27 @@
                 },
                 series: [
                     {},
-                    {
+                    {   // bucket average
                         stroke: '#4ade80',
                         width: 2,
-                        fill: 'rgba(74, 222, 128, 0.1)',
+                        fill: 'rgba(74, 222, 128, 0.06)',
+                        paths: uPlot.paths.spline(),
+                        points: { show: false }
+                    },
+                    {   // bucket max: keeps short peaks the average flattens
+                        stroke: 'rgba(74, 222, 128, 0.35)',
+                        width: 1,
+                        paths: uPlot.paths.spline(),
+                        points: { show: false }
+                    },
+                    {   // bucket min
+                        stroke: 'rgba(74, 222, 128, 0.35)',
+                        width: 1,
                         paths: uPlot.paths.spline(),
                         points: { show: false }
                     }
                 ],
+                bands: [{ series: [2, 3], fill: 'rgba(74, 222, 128, 0.18)' }],
                 axes: [axis, Object.assign({}, axis, { size: 70, values: (u, vals) => vals.map(formatWatts) })],
                 plugins: [chartTooltipPlugin()]
             }, data, el);

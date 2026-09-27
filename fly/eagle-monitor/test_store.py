@@ -90,19 +90,19 @@ class TestStore(StoreTestCase):
         for ts, w in ((10_000, 100), (20_000, 300), (70_000, 500)):
             self.db.write(ts, {'power_w': w})
         self.assertEqual(self.db.series('power_w', 0, 100_000, 60_000),
-                         [(60_000, 200.0), (100_000, 500.0)])
+                         [(60_000, 200.0, 100.0, 300.0), (100_000, 500.0, 500.0, 500.0)])
 
     def test_series_raw(self):
         self.db.write(20, {'power_w': 2})
         self.db.write(10, {'power_w': 1})
-        self.assertEqual(self.db.series('power_w', 0, 100), [(10, 1.0), (20, 2.0)])
+        self.assertEqual(self.db.series('power_w', 0, 100), [(10, 1.0, 1.0, 1.0), (20, 2.0, 2.0, 2.0)])
 
     def test_insert_ignore_keeps_existing(self):
         self.db.write(1000, {'power_w': 100})
         self.db.insert_ignore([(store.FIELD_IDS['power_w'], 1000, 999.0),
                                (store.FIELD_IDS['power_w'], 2000, 200.0)],
                               [('message_text', 1000, 'hello')])
-        self.assertEqual(self.db.series('power_w', 0, 10_000), [(1000, 100.0), (2000, 200.0)])
+        self.assertEqual([p[:2] for p in self.db.series('power_w', 0, 10_000)], [(1000, 100.0), (2000, 200.0)])
         self.assertEqual(self.db._query('SELECT value FROM text_readings'), [('hello',)])
 
     def test_prune(self):
@@ -110,7 +110,7 @@ class TestStore(StoreTestCase):
             self.db.write(ts, {'power_w': 1, 'link_strength': '0x10'})
         deleted = self.db.prune(15 * 86_400_000)
         self.assertEqual(deleted, 4)
-        self.assertEqual(self.db.series('power_w', 0, 30 * 86_400_000), [(20 * 86_400_000, 1.0)])
+        self.assertEqual([p[:2] for p in self.db.series('power_w', 0, 30 * 86_400_000)], [(20 * 86_400_000, 1.0)])
 
     def test_created_ms_survives_reopen(self):
         created = self.db.created_ms()
@@ -150,7 +150,22 @@ class TestDashboard(StoreTestCase):
         for ts in (now - 50 * 60_000, now - 49 * 60_000, now - 10 * 60_000):
             self.db.write(ts, {'power_w': 500})
         series = dashboard.build(self.db, '1h', now)['series']
-        self.assertEqual([v for _, v in series], [500.0, 500.0, None, 500.0])
+        self.assertEqual([p[1] for p in series], [500.0, 500.0, None, 500.0])
+        self.assertEqual(series[2], [series[1][0] + 1, None, None, None])
+
+    def test_bucket_envelope_keeps_short_peaks(self):
+        # A 1-minute 7 kW spike inside a 15-minute bucket of ~1 kW readings: the
+        # mean flattens it, the envelope must not.
+        now = 40 * 86_400_000
+        start = now - 3 * 3_600_000
+        for i in range(30):
+            self.db.write(start + i * 30_000, {'power_w': 7000 if i == 10 else 1000})
+        p = dashboard.build(self.db, '7d', now)
+        mean, lo, hi = zip(*[pt[1:] for pt in p['series'] if pt[1] is not None])
+        self.assertEqual(max(hi), 7000.0)
+        self.assertEqual(max(hi), p['power']['max'])
+        self.assertLess(max(mean), 2000)
+        self.assertEqual(min(lo), 1000.0)
 
     def test_every_range_builds(self):
         for key in dashboard.RANGES:
