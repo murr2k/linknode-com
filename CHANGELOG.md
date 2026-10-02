@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Selectable skins** on the site: a Classic / Scope picker under the page title. Classic is
+  the existing look, unchanged and still the default. Scope is a bench-instrument look (flat
+  panels on a graticule, phosphor green readouts, amber chart trace, monospace type, CRT
+  scanlines, edge vignette and phosphor bloom),
+  written as an `html[data-skin="scope"]` override block in `web/public/index.html`. The
+  choice is kept in `localStorage` (`linknode-skin`) and applied before first paint;
+  `?skin=scope` selects it by URL. Colours the script sets (gauge needle, sample interval,
+  chart canvas) now come from CSS variables so each skin can define them
+
 ## [2.0.0] - 2026-09-27
 
 ### Changed
