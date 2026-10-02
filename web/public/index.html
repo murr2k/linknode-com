@@ -40,7 +40,7 @@
         (function () {
             try {
                 var skin = new URLSearchParams(location.search).get('skin') || localStorage.getItem('linknode-skin');
-                if (skin === 'scope') document.documentElement.dataset.skin = skin;
+                if (skin === 'scope' || skin === 'notch') document.documentElement.dataset.skin = skin;
             } catch (e) { /* storage blocked: stay on the default skin */ }
         })();
     </script>
@@ -1444,6 +1444,392 @@
         html[data-skin="scope"] .gauge-needle {
             filter: drop-shadow(0 0 4px currentColor);
         }
+
+        /* ---- Skin: Notch ----
+           Borrowed from the visual language of Bklit UI (bklit.com, MIT): neutral
+           near-black on a dot grid, hairline cards, a cyan chart ramp, a notched gauge
+           track, hatched fills, mono numerals. Overrides only. */
+        html[data-skin="notch"] {
+            --text-primary: #fafafa;
+            --status-ok: #53eafd;
+            --status-warn: #fbbf24;
+            --status-bad: #fb7185;
+            --status-stale: #52525c;
+            --gauge-text: #fafafa;
+            --chart-axis: #9f9fa9;
+            --chart-grid: rgba(255, 255, 255, 0.07);
+            --chart-tick: rgba(255, 255, 255, 0.12);
+            --chart-line: #53eafd;
+            --chart-fill: rgba(83, 234, 253, 0.07);
+            --chart-envelope: rgba(0, 184, 219, 0.5);
+            --chart-band: rgba(0, 184, 219, 0.14);
+            --chart-font: 11px 'Geist Mono', ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+        }
+
+        html[data-skin="notch"] body {
+            background: #0a0a0a;
+            color: #fafafa;
+            font-family: Geist, Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        html[data-skin="notch"] ::selection {
+            background: #6366f1;
+            color: #fafafa;
+        }
+
+        html[data-skin="notch"] .bg-animation {
+            animation: none;
+            background-color: #0a0a0a;
+            background-image: radial-gradient(circle, rgba(250, 250, 250, 0.12) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+
+        html[data-skin="notch"] .particle {
+            display: none;
+        }
+
+        /* Headings: solid, tight, with the blinking underscore caret */
+        html[data-skin="notch"] h1,
+        html[data-skin="notch"] .metric-value,
+        html[data-skin="notch"] .power-value,
+        html[data-skin="notch"] .showcase-section h2,
+        html[data-skin="notch"] .tech-stack-section h2 {
+            background: none;
+            -webkit-text-fill-color: currentColor;
+            color: #fafafa;
+        }
+
+        html[data-skin="notch"] h1,
+        html[data-skin="notch"] h2 {
+            font-weight: 600;
+            letter-spacing: -0.04em;
+        }
+
+        html[data-skin="notch"] header h1::after {
+            content: '_';
+            color: #53eafd;
+            animation: notch-caret 1.06s step-end infinite;
+        }
+
+        @keyframes notch-caret {
+            50% { opacity: 0; }
+        }
+
+        /* Numerals in mono, tabular */
+        html[data-skin="notch"] .metric-value,
+        html[data-skin="notch"] .power-status-value,
+        html[data-skin="notch"] .dashboard-stat-value,
+        html[data-skin="notch"] .status-value,
+        html[data-skin="notch"] .metric-item .number,
+        html[data-skin="notch"] .gauge-value-text,
+        html[data-skin="notch"] .gauge-label,
+        html[data-skin="notch"] .api-status,
+        html[data-skin="notch"] .pod-info,
+        html[data-skin="notch"] .metrics-table td:last-child,
+        html[data-skin="notch"] #time {
+            font-family: 'Geist Mono', ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+            font-variant-numeric: tabular-nums;
+        }
+
+        html[data-skin="notch"] .metric-value {
+            font-size: 2rem;
+            font-weight: 500;
+            letter-spacing: -0.03em;
+        }
+
+        html[data-skin="notch"] .dashboard-stat-value,
+        html[data-skin="notch"] .power-status-value {
+            font-weight: 500;
+        }
+
+        /* Cards: near-opaque zinc, hairline border */
+        html[data-skin="notch"] .card,
+        html[data-skin="notch"] .metric,
+        html[data-skin="notch"] .power-widget,
+        html[data-skin="notch"] .energy-dashboard,
+        html[data-skin="notch"] .api-status-item,
+        html[data-skin="notch"] .build-status,
+        html[data-skin="notch"] .status-item,
+        html[data-skin="notch"] .capability-card,
+        html[data-skin="notch"] .services-offered,
+        html[data-skin="notch"] .highlight-box,
+        html[data-skin="notch"] .cta-section,
+        html[data-skin="notch"] .tech-highlight-box,
+        html[data-skin="notch"] .pod-info,
+        html[data-skin="notch"] .range-picker,
+        html[data-skin="notch"] .skin-picker {
+            background: rgba(17, 17, 19, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            backdrop-filter: none;
+            box-shadow: none;
+        }
+
+        html[data-skin="notch"] .api-status-item,
+        html[data-skin="notch"] .status-item,
+        html[data-skin="notch"] .range-picker,
+        html[data-skin="notch"] .skin-picker {
+            border-radius: 8px;
+        }
+
+        html[data-skin="notch"] .card:hover,
+        html[data-skin="notch"] .metric:hover,
+        html[data-skin="notch"] .api-status-item:hover,
+        html[data-skin="notch"] .capability-card:hover {
+            border-color: rgba(255, 255, 255, 0.28);
+        }
+
+        html[data-skin="notch"] .metric:hover {
+            transform: none;
+        }
+
+        html[data-skin="notch"] .power-widget::before {
+            display: none;
+        }
+
+        /* Hatched fill (after the library's PatternLines) on the call-out boxes */
+        html[data-skin="notch"] .highlight-box,
+        html[data-skin="notch"] .cta-section {
+            background:
+                repeating-linear-gradient(135deg, rgba(83, 234, 253, 0.07) 0 1px, transparent 1px 7px),
+                rgba(17, 17, 19, 0.92);
+        }
+
+        html[data-skin="notch"] .metrics-table {
+            background: rgba(17, 17, 19, 0.92);
+        }
+
+        html[data-skin="notch"] .tech-stack-list {
+            border-top-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Text: primary, body, muted */
+        html[data-skin="notch"] .card h2,
+        html[data-skin="notch"] .power-status-value,
+        html[data-skin="notch"] .dashboard-stat-value,
+        html[data-skin="notch"] .build-status h3,
+        html[data-skin="notch"] .highlight-box h3,
+        html[data-skin="notch"] .services-offered h3,
+        html[data-skin="notch"] .cta-section h3,
+        html[data-skin="notch"] .zero-dep-column h4,
+        html[data-skin="notch"] .tech-line-header,
+        html[data-skin="notch"] .tech-highlight-box h3,
+        html[data-skin="notch"] .tech-stack-list h3 {
+            color: #fafafa;
+        }
+
+        html[data-skin="notch"] .card p,
+        html[data-skin="notch"] .zero-dep-column li,
+        html[data-skin="notch"] .metrics-list-item,
+        html[data-skin="notch"] .tech-line-item {
+            color: #d4d4d8;
+        }
+
+        html[data-skin="notch"] .subtitle,
+        html[data-skin="notch"] .metric-label,
+        html[data-skin="notch"] .metric-sublabel,
+        html[data-skin="notch"] .power-unit,
+        html[data-skin="notch"] .power-status-label,
+        html[data-skin="notch"] .dashboard-stat-label,
+        html[data-skin="notch"] .status-label,
+        html[data-skin="notch"] .footer,
+        html[data-skin="notch"] .metric-item .label,
+        html[data-skin="notch"] .intent-quote,
+        html[data-skin="notch"] .chart-message,
+        html[data-skin="notch"] .range-picker button,
+        html[data-skin="notch"] .skin-picker button {
+            color: #9f9fa9;
+        }
+
+        /* Stat thresholds (restated: the primary-text rule above outranks the base ones) */
+        html[data-skin="notch"] .th-green { color: #53eafd; }
+        html[data-skin="notch"] .th-yellow { color: #fbbf24; }
+        html[data-skin="notch"] .th-orange { color: #fb923c; }
+        html[data-skin="notch"] .th-red { color: #fb7185; }
+
+        /* Accent: Classic's violet and green become the cyan ramp */
+        html[data-skin="notch"] .tech-badge {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #d4d4d8;
+            font-family: 'Geist Mono', ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+            font-size: 0.8rem;
+        }
+
+        html[data-skin="notch"] .capability-card h4,
+        html[data-skin="notch"] .metric-item .number,
+        html[data-skin="notch"] .metrics-list-item strong,
+        html[data-skin="notch"] .metrics-list-item::before,
+        html[data-skin="notch"] .tech-line-item::before,
+        html[data-skin="notch"] .zero-dep-column.positive li::before,
+        html[data-skin="notch"] .metrics-table td:last-child {
+            color: #53eafd;
+        }
+
+        html[data-skin="notch"] .zero-dep-column li::before {
+            color: #fb7185;
+        }
+
+        /* The one inline green in the markup */
+        html[data-skin="notch"] .tech-highlight-box strong {
+            color: #53eafd !important;
+        }
+
+        html[data-skin="notch"] .metrics-table th {
+            background: rgba(255, 255, 255, 0.04);
+            color: #9f9fa9;
+        }
+
+        html[data-skin="notch"] .intent-quote {
+            background: rgba(255, 255, 255, 0.03);
+            border-left-color: #00b8db;
+        }
+
+        html[data-skin="notch"] .range-picker button,
+        html[data-skin="notch"] .skin-picker button {
+            border-radius: 6px;
+        }
+
+        html[data-skin="notch"] .range-picker button:hover,
+        html[data-skin="notch"] .skin-picker button:hover {
+            color: #fafafa;
+        }
+
+        html[data-skin="notch"] .range-picker button.active,
+        html[data-skin="notch"] .skin-picker button.active {
+            background: #fafafa;
+            color: #0a0a0a;
+        }
+
+        html[data-skin="notch"] .btn-primary,
+        html[data-skin="notch"] .btn-secondary {
+            border-radius: 8px;
+        }
+
+        html[data-skin="notch"] .btn-primary {
+            background: #fafafa;
+            color: #0a0a0a;
+        }
+
+        html[data-skin="notch"] .btn-primary:hover {
+            background: #53eafd;
+        }
+
+        html[data-skin="notch"] .btn-secondary {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fafafa;
+        }
+
+        html[data-skin="notch"] .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fafafa;
+        }
+
+        /* !important: these links and build values carry inline or id colours */
+        html[data-skin="notch"] .footer a {
+            color: #fafafa !important;
+        }
+
+        html[data-skin="notch"] .footer a:hover {
+            color: #53eafd !important;
+        }
+
+        html[data-skin="notch"] .status-value {
+            color: #fafafa !important;
+        }
+
+        html[data-skin="notch"] .status-value a {
+            color: #53eafd !important;
+        }
+
+        /* Gauge: the track is cut into notches (40 around the 345.6-unit arc); the
+           typical-range zone runs through it as a thin solid arc */
+        html[data-skin="notch"] .gauge-bg {
+            stroke: #fafafa;
+            stroke-opacity: 0.16;
+            stroke-linecap: butt;
+            stroke-dasharray: 4 4.64;
+        }
+
+        html[data-skin="notch"] .gauge-zone {
+            stroke-width: 4;
+            stroke-linecap: butt;
+            opacity: 1;
+        }
+
+        html[data-skin="notch"] .gauge-zone-yellow {
+            stroke: #00b8db;
+        }
+
+        html[data-skin="notch"] .gauge-needle {
+            filter: none;
+        }
+
+        html[data-skin="notch"] .gauge-center {
+            fill: #0a0a0a;
+            stroke: rgba(255, 255, 255, 0.3);
+        }
+
+        html[data-skin="notch"] .gauge-value-text {
+            font-weight: 500;
+        }
+
+        html[data-skin="notch"] .gauge-unit-text,
+        html[data-skin="notch"] .gauge-label {
+            fill: #9f9fa9;
+        }
+
+        html[data-skin="notch"] .gauge-live-dot,
+        html[data-skin="notch"] .update-indicator,
+        html[data-skin="notch"] .status-indicator,
+        html[data-skin="notch"] .status-dot.online {
+            background: #53eafd;
+            animation-name: notch-pulse;
+        }
+
+        @keyframes notch-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(83, 234, 253, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(83, 234, 253, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(83, 234, 253, 0); }
+        }
+
+        html[data-skin="notch"] .status-dot.online {
+            animation: none;
+        }
+
+        html[data-skin="notch"] .status-dot {
+            background: #fb7185;
+        }
+
+        html[data-skin="notch"] .status-dot.connecting,
+        html[data-skin="notch"] .update-indicator.updating {
+            background: #fbbf24;
+        }
+
+        html[data-skin="notch"] .gauge-live-text {
+            color: #53eafd;
+            font-family: 'Geist Mono', ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        html[data-skin="notch"] .gauge-live-dot.stale {
+            background: #52525c;
+            animation: none;
+        }
+
+        html[data-skin="notch"] .gauge-live-text.stale {
+            color: #71717b;
+        }
+
+        html[data-skin="notch"] .chart-tooltip {
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(8px);
+            border-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-family: 'Geist Mono', ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
+        }
     </style>
     <link rel="stylesheet" href="/vendor/uplot-1.6.32/uPlot.min.css">
     
@@ -1543,6 +1929,7 @@
             <div class="skin-picker" role="group" aria-label="Skin">
                 <button type="button" data-skin-choice="classic" aria-pressed="true" class="active">Classic</button>
                 <button type="button" data-skin-choice="scope" aria-pressed="false">Scope</button>
+                <button type="button" data-skin-choice="notch" aria-pressed="false">Notch</button>
             </div>
         </header>
         
@@ -2682,7 +3069,7 @@
         // Skin picker. "classic" is the page as written (no data-skin attribute); the
         // others are override blocks in the stylesheet. The choice is kept in localStorage
         // and applied before first paint by the script in <head>.
-        const SKINS = { classic: '#667eea', scope: '#070b09' };  // name: theme-color
+        const SKINS = { classic: '#667eea', scope: '#070b09', notch: '#0a0a0a' };  // name: theme-color
 
         function currentSkin() {
             const skin = document.documentElement.dataset.skin;

@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   choice is kept in `localStorage` (`linknode-skin`) and applied before first paint;
   `?skin=scope` selects it by URL. Colours the script sets (gauge needle, sample interval,
   chart canvas) now come from CSS variables so each skin can define them
+- **Notch skin** (`?skin=notch`), a third choice in the picker, borrowing the visual language
+  of Bklit UI (bklit.com): neutral near-black on a dot grid, hairline cards, a cyan chart
+  ramp, a notched gauge track, hatched call-out boxes and mono numerals. No Bklit code or
+  fonts are used; it is a CSS override block like Scope
 
 ## [2.0.0] - 2026-09-27
 
