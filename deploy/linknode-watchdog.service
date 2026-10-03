@@ -1,7 +1,7 @@
 [Unit]
 # Outside watcher for linknode.com: one pass of scripts/linknode_watchdog.py, started
 # every 2 minutes by linknode-watchdog.timer. Alerts through Pushover when the Fly
-# ingest service or the site stops answering. See the script for the full rationale.
+# ingest service or the site stops answering. How it decides: docs/ALERTING.md.
 Description=Linknode watchdog (ingest service and site reachability)
 After=network-online.target
 Wants=network-online.target
@@ -19,12 +19,18 @@ EnvironmentFile=/etc/linknode-watchdog.env
 ExecStart=/usr/bin/python3 /opt/linknode-watchdog/linknode_watchdog.py
 SyslogIdentifier=linknode-watchdog
 
-# Failure counts and the alerted flags (/var/lib/linknode-watchdog). Written only when
-# something changes, so a healthy system does not touch the SD card.
-StateDirectory=linknode-watchdog
+# Failure counts and the alerted flags live in RAM (/run/linknode-watchdog) and are
+# kept between passes. A pass writes nothing to the SD card, so a card that has gone
+# read-only or is full cannot stop the watchdog counting. A reboot clears them.
+RuntimeDirectory=linknode-watchdog
+RuntimeDirectoryPreserve=yes
+Environment=WATCH_STATE_DIR=%t/linknode-watchdog
 
 # Light hardening: the script only talks to the network and writes its state file.
+# PrivateTmp=disconnected (systemd 257 or later) gives the unit a private /tmp and
+# /var/tmp in RAM. With "true", systemd makes and removes a directory under /var/tmp,
+# which is on the card, on every pass.
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-PrivateTmp=true
+PrivateTmp=disconnected
