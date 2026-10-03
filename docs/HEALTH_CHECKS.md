@@ -45,25 +45,30 @@ flyctl checks list -a linknode-eagle-monitor
 own alarm; the full account is in [ALERTING.md](ALERTING.md).
 
 - **URL**: `https://linknode-eagle-monitor.fly.dev/health/data`
-- **Expected Response**: 200 with `status: fresh` while the newest power reading is 5
+- **Expected Response**: 200 with `status: fresh` while the newest power reading is 30
   minutes old or less; 503 with `stale`, `no_data` or `unavailable` otherwise
 - **What it measures**: the age of the newest power reading by the reading's own
   timestamp (the Eagle's last contact with the meter), not the time a POST last arrived
 
 ```bash
 curl -s https://linknode-eagle-monitor.fly.dev/health/data
-# Expected: {"last_reading":"...","power_w":383.0,"reading_age_seconds":29.8,"stale_after_seconds":300,"status":"fresh"}
+# Expected: {"last_reading":"...","power_w":383.0,"reading_age_seconds":29.8,"stale_after_seconds":1800,"status":"fresh"}
 ```
 
 Inside the app an APScheduler job judges the same reading every 5 minutes
 (`monitor_data_staleness.py`):
 
 - **Unhealthy** when the newest power reading is more than `STALE_THRESHOLD_MINUTES`
-  (default 5) old by its own timestamp, or is zero or missing
-- **On healthy to unhealthy**: Slack alert plus a Pushover emergency siren (one attempt)
+  (30, set in `fly.toml`) old by its own timestamp, when it is zero or missing, or when
+  the meter's kWh register has not changed in 2 hours although readings keep arriving
+- **On healthy to unhealthy**: Slack alert plus a Pushover emergency siren. The siren is
+  sent again on every run until Pushover accepts it
+- **While unhealthy**: a normal-priority Pushover reminder every 24 hours
 - **On recovery**: Slack alert only
 - State persists in `/data/monitor_state.json` (created at the first change of state),
   so a restart does not repeat an alert
+- The same job reports a Pi watchdog that has made no request to `/health/data` for 6
+  hours (a normal-priority Pushover message)
 
 Do not judge freshness by `last_update` in `/api/stats`. It is the arrival time of the
 last stored POST, and it stays current while the Eagle keeps answering with a frozen
@@ -144,13 +149,15 @@ curl -sf https://linknode-web.murr2k.workers.dev/ | grep -q "Linknode"
 curl -sf https://linknode-web.murr2k.workers.dev/build-info.json | grep -q "${{ github.sha }}"
 ```
 
-`deploy-fly.yml` is written to redeploy the image it captured before the deploy when the
-deploy fails. As of 2026-10-03 that capture fails on every run (the log warns "Could not
-capture the current image; rollback will not be possible"), and the branch where the
-deploy succeeds but the `/health` curl fails has no rollback step at all. So nothing rolls
-back: a bad release stays on the machine, unrouted while `/health` fails, until a good one
-is deployed (revert the commit and push, or run `flyctl deploy --remote-only` from
-`fly/eagle-monitor` at the last good commit).
+`deploy-fly.yml` captures the running image before it deploys (the run logs
+`Current image: registry.fly.io/linknode-eagle-monitor:...`) and redeploys that image if
+`flyctl deploy` fails on the last of its three attempts. The capture was broken until
+2026-10-03, and the rollback step itself has never run, so its first real use is its
+first test. It restores the image only: the failed commit's `fly.toml` is applied with
+it. The other branch, a deploy that succeeds and then fails the `/health` curl, has no
+rollback step: that release stays on the machine, unrouted while `/health` fails, until
+a good one is deployed (revert the commit and push, or run `flyctl deploy --remote-only`
+from `fly/eagle-monitor` at the last good commit).
 
 ## Health Check Standards
 

@@ -34,10 +34,10 @@ A real-time energy monitoring dashboard that tracks household power consumption 
   - Details in [Bill Calculator](#bill-calculator)
 
 - **Outage Alerting**
-  - Data staleness monitor detects when the power meter stops reporting
+  - Data staleness monitor detects when the power meter stops reporting (no new reading for 30 minutes) or its readings freeze
   - Slack notifications on outage and recovery (fires once per state change, no spam)
-  - Pushover emergency-priority siren that repeats every 60 s until acknowledged, for up to about 50 minutes
-  - A watchdog on the Raspberry Pi reports the ingest service or the site going down
+  - Pushover emergency-priority siren that repeats every 60 s until acknowledged, for up to about 50 minutes; it is retried until delivered, and a reminder follows each day the outage lasts
+  - A watchdog on the Raspberry Pi reports the ingest service or the site going down, and the ingest service reports the watchdog going quiet
   - How the two fit together, and what neither sees: [docs/ALERTING.md](docs/ALERTING.md)
 
 - **Failover & Resilience** (the Eagle-200 meter is failing; see [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md))

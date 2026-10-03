@@ -12,7 +12,9 @@ gauge and dashboard, and raises outage alerts.
 - Statistics endpoint at `/api/stats` and dashboard endpoint at `/api/dashboard`
 - Live power stream (Server-Sent Events) at `/api/stream`
 - Health check endpoint at `/health`, telemetry freshness at `/health/data`
-- Data staleness monitor with Slack and Pushover alerts
+- Data staleness monitor with Slack and Pushover alerts: a siren that is retried until
+  delivered, a daily reminder, a frozen-register rule, and a message when the Pi watchdog
+  stops calling
 - Minimal resource usage (one shared-cpu-1x machine, 256MB RAM)
 
 ## Configuration
@@ -65,9 +67,9 @@ second machine would have its own separate database.
 - `SLACK_WEBHOOK_URL` - Outage and recovery alerts (set as secret)
 - `PUSHOVER_API_TOKEN`, `PUSHOVER_USER_KEY` - Emergency siren on outage (set as secrets)
 - `STALE_THRESHOLD_MINUTES` - Age in minutes of the newest power reading, by its own
-  timestamp, past which the feed is stale (default: 5). Must be an integer: on `2.5` or
-  `5.0` the service does not start. Used by both `/health/data` and the alarm (see
-  `docs/ALERTING.md`)
+  timestamp, past which the feed is stale (default: 5; `fly.toml` sets 30). Must be an
+  integer: on `2.5` or `5.0` the service does not start. Used by both `/health/data` and
+  the alarm (see `docs/ALERTING.md`)
 - `EAGLE_API_KEY` - Optional API key for the read endpoints (not set: they are public)
 - `ADMIN_API_KEY` - Optional key for `/api/security/stats` (not set)
 

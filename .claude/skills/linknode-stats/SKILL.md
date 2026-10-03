@@ -146,8 +146,10 @@ on restart, so it no longer goes null after a deploy.
 - `/health/data` -> `status: fresh`, `reading_age_seconds` under about a minute.
 - `last_update` within ~1 minute of now (30s poll cadence). This shows only that POSTs are
   arriving. The dashboard flags data stale after 2 minutes without one; the Pushover outage alert
-  fires when the newest reading is more than 5 minutes old at a 5-minute check, so 5 to 10 minutes
-  after the last good reading.
+  fires when the newest reading is more than 30 minutes old at a 5-minute check, so 30 to 35
+  minutes after the last good reading (`STALE_THRESHOLD_MINUTES` is 30 in `fly.toml`).
+- `monitor_stats.watchdog_last_seen` under about 3 minutes old: the Pi watchdog asks
+  `/health/data` every 2 minutes. Six hours without it draws a "Linknode watchdog: silent" message.
 - `packets_today` climbing.
 - `bypass_status.data_uptime_pct` / `.device_uptime_pct` near `100.0`, and
   `bypass_status.updated_at` within the last ~15 minutes (the heartbeat interval).
@@ -182,11 +184,13 @@ on restart, so it no longer goes null after a deploy.
   data. Judge freshness by `/health/data` (`last_update` shows only that POSTs are arriving), judge
   the Pi's self-reported uptime by `bypass_status`.
 - **Frozen reading:** `/health/data` is `stale` while `last_update` is current. POSTs are arriving
-  but the newest power reading's timestamp is over 5 minutes old. Expected cause: the Eagle is
+  but the newest power reading's timestamp is over 30 minutes old. Expected cause: the Eagle is
   answering the Pi with a `LastContact` that has stopped advancing. On the Pi, read
   `meter_last_contact` twice, a minute apart: unchanged confirms it (`meter_status` can still say
   `Connected`). If it is advancing, look at `journalctl -u eagle-bypass -n 3`: `demand=NonekW` means
   the Eagle is serving summation or price without demand, which gives the same picture.
+  If the timestamps advance but the values do not, `/health/data` stays `fresh` and the alarm's
+  frozen-register rule reports it instead ("Meter readings look frozen!", about 2 hours in).
 - **Diagnosing "site looks stale":** if `last_update` is old but the Pi shows `messages_failed: 0`
   and low `read_failures`, suspect the Fly side (endpoint/database). If the Pi shows rising
   `read_failures`, the Eagle stopped answering. If `messages_failed` is rising, the endpoint is

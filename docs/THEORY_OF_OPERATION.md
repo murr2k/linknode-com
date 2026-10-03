@@ -495,22 +495,25 @@ Data Age > 120s   → stale: gauge greyed, age shown ("Xm ago", "Xh Xm ago", "Xd
 No timestamp      → "No data"
 ```
 
-Data age here is the time since the last stored POST, not the age of the reading. While the Eagle keeps answering with a frozen reading, the gauge goes on saying "Live". Once that reading is over 5 minutes old `/health/data` reports stale and the alarm fires, but only if its timestamp is frozen too, that is, if the Eagle's `LastContact` stays at the last real contact. That is assumed, not captured on the device (see [ALERTING.md](ALERTING.md)).
+Data age here is the time since the last stored POST, not the age of the reading. While the Eagle keeps answering with a frozen reading, the gauge goes on saying "Live". Once that reading is over 30 minutes old `/health/data` reports stale and the alarm fires, but only if its timestamp is frozen too, that is, if the Eagle's `LastContact` stays at the last real contact. That is assumed, not captured on the device. If the timestamps keep advancing, the alarm's frozen-register rule reports it instead, about 2 hours in (see [ALERTING.md](ALERTING.md)).
 
 ### Outage Alerting
 
 The full account, with diagrams, is in [ALERTING.md](ALERTING.md).
 
-The ingest service runs two APScheduler jobs: a data-freshness check every 5 minutes and a retention prune once a day. The freshness check marks the feed unhealthy when the newest power reading in the store is older than `STALE_THRESHOLD_MINUTES` (default 5) or is zero or missing. It goes by the reading's own time, which the Pi takes from the Eagle's last contact with the meter, not by when a POST last arrived: the case it is built for is the Eagle answering after it has lost the meter, with the Pi re-posting the same reading under the same timestamp. The check alerts only on state transitions, so one continuous outage gets one alert from it (the watchdog, below, can add a second). Each alert is a single attempt and is not retried:
+The ingest service runs two APScheduler jobs: a data-freshness check every 5 minutes and a retention prune once a day. The freshness check marks the feed unhealthy when the newest power reading in the store is older than `STALE_THRESHOLD_MINUTES` (30, set in `fly.toml`; the code's default is 5), when it is zero or missing, or when the meter's kWh register has not changed in 2 hours although readings keep arriving. It goes by the reading's own time, which the Pi takes from the Eagle's last contact with the meter, not by when a POST last arrived: the case it is built for is the Eagle answering after it has lost the meter, with the Pi re-posting the same reading under the same timestamp. The register rule does not trust timestamps at all, so it catches a frozen reading that arrives stamped as new. The check alerts on state transitions, so one continuous outage gets one siren from it:
 
-- **healthy to unhealthy:** Slack (`SLACK_WEBHOOK_URL`) plus a Pushover emergency siren (priority 2, repeats every 60 s until acknowledged, at most 50 times)
+- **healthy to unhealthy:** Slack (`SLACK_WEBHOOK_URL`), once, plus a Pushover emergency siren (priority 2, repeats every 60 s until acknowledged, at most 50 times). If Pushover does not accept the siren it is sent again on every run until it does; a 4xx reply holds it off for 24 hours
+- **while unhealthy:** a normal-priority Pushover reminder 24 hours after each accepted message
 - **unhealthy to healthy:** Slack only
 
-The state is saved to `/data/monitor_state.json` on the volume (the file is created at the first transition), so a restart does not make the alarm repeat its alert.
+The state is saved to `/data/monitor_state.json` on the volume (the file is created at the first transition), so a restart neither repeats a siren that got through nor drops one that did not.
+
+The same job notes when the Pi watchdog last asked `/health/data` (by its User-Agent) and sends a normal-priority message if it has been silent for 6 hours while readings keep arriving.
 
 `GET /health/data` exposes the freshness half of that signal: 200 while the newest reading is fresh, 503 once it is stale. `/health` stays Fly's service check (process up, store answering). While it fails Fly stops routing requests to the machine and does not restart it, so wiring freshness into it would cut off the uploads whenever the feed went stale.
 
-The ingest service cannot report its own death, so the Pi runs the other half: `scripts/linknode_watchdog.py`, a systemd timer every 2 minutes (`deploy/linknode-watchdog.*`). It checks that `/health/data` answers, that linknode.com serves the dashboard, and that `/api/stats` answers with the CORS header the page needs and a `current_power` value, and sends its own Pushover siren after three consecutive failures. It also treats a reading more than 15 minutes old as a failure, so a long telemetry outage with the Pi online alerts twice. A restart of the ingest service while no power readings are arriving also sets it off, because `/api/stats` then has no `current_power`. Each watcher covers the other's main blind spot. Nothing watches the watchdog itself; that case and the others that go unreported are listed in ALERTING.md.
+The ingest service cannot report its own death, so the Pi runs the other half: `scripts/linknode_watchdog.py`, a systemd timer every 2 minutes (`deploy/linknode-watchdog.*`). It checks that `/health/data` answers, that linknode.com serves the dashboard, and that `/api/stats` answers with the CORS header the page needs and a `current_power` value, and sends its own Pushover siren after three consecutive failures. It also treats a reading more than 24 hours old as a failure (`WATCH_BACKSTOP_SECS`), so a telemetry outage that is still open a day later, with the Pi online, gets a second siren from the watchdog. Its state is kept in RAM, so a full or read-only SD card cannot stop it counting. Each watcher covers the other's main blind spot. What still goes unreported, a watchdog that calls but cannot alert among it, is listed in ALERTING.md.
 
 ---
 
@@ -561,7 +564,7 @@ linknode-com/
 
 Pushing to `main` is a production deploy:
 
-- `fly/eagle-monitor/**` triggers `.github/workflows/deploy-fly.yml`: runs the unit tests, deploys (with retries) and checks `/health`. It is meant to capture the current image first and redeploy it if the deploy fails, but as of 2026-10-03 that capture fails on every run (the log warns "Could not capture the current image; rollback will not be possible"), so nothing rolls back: a bad release stays on the machine until a good one is deployed.
+- `fly/eagle-monitor/**` triggers `.github/workflows/deploy-fly.yml`: runs the unit tests, captures the current image, deploys (with retries) and checks `/health`. If `flyctl deploy` fails on the last of its three attempts it redeploys the captured image. The capture was broken until 2026-10-03, and the rollback step itself has never run. It restores the image only (the failed commit's `fly.toml` is applied with it), and a deploy that succeeds and then fails the `/health` check is not rolled back.
 - `web/**` triggers `.github/workflows/deploy-web.yml`: writes `build-info.json`, deploys with Wrangler, and verifies the preview URL.
 
 ```bash
@@ -613,7 +616,7 @@ GitHub Actions secrets: `FLY_API_TOKEN` (Fly deploy), `CLOUDFLARE_API_TOKEN` and
 |---------|------|---------|
 | 1.0 | 2026-01-14 | Initial document creation |
 | 2.0 | 2026-09-27 | SQLite replaces InfluxDB, native chart replaces Grafana, Cloudflare Worker replaces nginx on Fly; Pi uploader and alerting documented |
-| 2.1 | 2026-10-03 | Pi watchdog and `/health/data` documented (2026-10-02); outage alerting, troubleshooting, rate-limit and rollback statements corrected against the code and the live system |
+| 2.1 | 2026-10-03 | Pi watchdog and `/health/data` documented (2026-10-02); outage alerting, troubleshooting, rate-limit and rollback statements corrected against the code and the live system; alerting retuned and extended (30-minute threshold, siren retry and daily reminder, frozen-register rule, watchdog-silent message, 24-hour backstop) |
 
 ---
 

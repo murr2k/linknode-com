@@ -76,6 +76,15 @@ January 2026; those scripts no longer work.
 - **No secrets in repo files** (scripts, docs, `.env`). **Why:** an InfluxDB
   token was once committed and lived in git history. Use Fly secrets and GitHub
   secrets only (`FLY_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`).
+- **The Pi watchdog's backstop must stay well above the alarm's threshold.**
+  `WATCH_BACKSTOP_SECS` in `/etc/linknode-watchdog.env` on the Pi is 86400;
+  `STALE_THRESHOLD_MINUTES` in `fly/eagle-monitor/fly.toml` is 30 (and must be an
+  integer, or the service does not start). **Why:** at or below the threshold the
+  watchdog's siren comes within minutes of the alarm's on every outage.
+- **The Pi's files are installed over SSH, not by CI** (`deploy/README.md`). The
+  watchdog judges `/health/data`, `/api/stats` and the page by the shape of their
+  replies: before a push that renames or removes what it reads, install a watchdog that
+  accepts both the old and the new reply.
 - **Pushing to `main` is a production deploy**: `deploy-fly.yml` for
   `fly/eagle-monitor/**`, `deploy-web.yml` for `web/**`. Treat `git push` as
   outward-facing.
@@ -94,13 +103,13 @@ January 2026; those scripts no longer work.
 
 ## Open questions / known gaps
 
-- **Outage alerting: the bar, and seven agreed fixes.** linknode.com is not mission
-  critical. The alerting only has to say that the system has stopped reporting, so it can
-  be fixed within a day or two: an outage that is never reported, and noise, matter; the
-  speed of an alert matters little. A review on 2026-10-03 found many defects. Seven fixes
-  were agreed against that bar, none of them built as of that date. `docs/ALERTING.md`
-  ("Planned fixes") lists the seven with their status and names the defects deliberately
-  left alone. Do not gold-plate the alerting beyond that bar.
+- **Outage alerting: the bar.** linknode.com is not mission critical. The alerting only
+  has to say that the system has stopped reporting, so it can be fixed within a day or
+  two: an outage that is never reported, and noise, matter; the speed of an alert matters
+  little. A review on 2026-10-03 found many defects. Seven fixes were agreed against that
+  bar and made the same day; `docs/ALERTING.md` ("Changes made on 2026-10-03") lists them
+  and names the defects deliberately left alone. Do not gold-plate the alerting beyond
+  that bar.
 
 - **BC Hydro billing values change every April 1** (Step 1 rate and basic charge under
   BCUC order G-42-25; the rate rider and transit levy change too). The defaults live in

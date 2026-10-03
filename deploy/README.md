@@ -160,7 +160,16 @@ journalctl -u linknode-watchdog.service -f
 ```
 
 State (failure counts, which checks have alerted) is in
-`/var/lib/linknode-watchdog/state.json`, written only when something changes.
+`/run/linknode-watchdog/state.json`, written only when something changes. `/run` is RAM,
+and the unit's temp directories are in RAM too (`PrivateTmp=disconnected`, which needs
+systemd 257 or later), so a pass writes nothing to the SD card and a card that has gone
+read-only or is full cannot stop the watchdog counting. A reboot clears the counts and
+the alerted marks.
+
+The env file also carries the backstop, `WATCH_BACKSTOP_SECS=86400`: the watchdog sends a
+siren of its own only when the newest reading is over a day old. It has to stay well above
+the Fly service's `STALE_THRESHOLD_MINUTES` (30 minutes), or that siren comes within
+minutes of the Fly alarm's.
 
 The test message goes at normal priority, as root, with the env file read by the shell.
 It proves the credentials as the shell reads them and the path to the phone. It does not
@@ -170,17 +179,22 @@ exercise the siren request, or the env file as systemd reads it: systemd keeps a
 crashes, but the siren request carries the comment inside the credential. Pushover answers
 an invalid credential with a 4xx, so no siren reaches the phone: the watchdog logs
 `pushover send failed` and tries again on each failing pass. So put nothing
-after a value in `/etc/linknode-watchdog.env`, and after any edit run one real pass and
-check that both credential lines are bare values (the second command must print 2):
+after a value in `/etc/linknode-watchdog.env`, and after any edit run one real pass,
+check that both credential lines are bare values (the second command must print 2), and
+read the backstop back as systemd reads it (the third must print 86400; a line left
+commented out prints nothing, and the watchdog then runs on the script's default of 900):
 
 ```sh
 sudo systemctl start linknode-watchdog.service && echo ok
 sudo grep -cE '^PUSHOVER_(API_TOKEN|USER_KEY)=[A-Za-z0-9]{30}$' /etc/linknode-watchdog.env
+sudo systemd-run --quiet --wait --pipe -p EnvironmentFile=/etc/linknode-watchdog.env /usr/bin/printenv WATCH_BACKSTOP_SECS
 ```
 
 To update the watchdog later, copy, strip and install only the script. The next timer
 pass runs the new one; nothing needs restarting. If a unit file changed, install it too,
 then `sudo systemctl daemon-reload` and `sudo systemctl restart linknode-watchdog.timer`.
+After a change to `linknode-watchdog.service`, `systemctl show linknode-watchdog.service -p
+PrivateTmpEx` should print `PrivateTmpEx=disconnected`.
 Leave `/etc/linknode-watchdog.env` alone.
 
 The watchdog changes only when someone installs it, while a push to `main` deploys the
