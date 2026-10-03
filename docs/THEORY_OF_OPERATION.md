@@ -496,6 +496,8 @@ No timestamp      → "No data"
 
 ### Outage Alerting
 
+The full account, with diagrams, is in [ALERTING.md](ALERTING.md).
+
 The ingest service runs two APScheduler jobs: a data-freshness check every 5 minutes and a retention prune once a day. The freshness check marks the feed unhealthy when the newest power reading in the store is older than `STALE_THRESHOLD_MINUTES` (default 5) or is zero or missing. It goes by the reading's own time, which the Pi takes from the Eagle's last contact with the meter, not by when a POST last arrived: the Pi keeps re-posting a frozen reading while the Eagle answers but has lost the meter. Alerts fire only on state transitions, once per outage:
 
 - **healthy to unhealthy:** Slack (`SLACK_WEBHOOK_URL`) plus a Pushover emergency siren (priority 2, repeats every 60 s until acknowledged, expires after 1 hour)
