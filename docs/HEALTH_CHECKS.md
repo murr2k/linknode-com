@@ -23,8 +23,9 @@ have no health checks.
   # Expected: {"db_ok":true,"status":"healthy","uptime_seconds":373.3}
   ```
 
-### Fly.io Machine Checks
-Defined in `fly/eagle-monitor/fly.toml` and run by Fly against the single machine:
+### Fly.io Service Checks
+Defined in `fly/eagle-monitor/fly.toml` and run by Fly against the single machine. While
+a check fails, Fly stops routing requests to the machine. It does not restart it.
 
 | Check | Interval | Timeout | Grace | Target |
 |-------|----------|---------|-------|--------|
@@ -40,20 +41,33 @@ flyctl checks list -a linknode-eagle-monitor
 ```
 
 ### Data Freshness (Staleness Monitor)
-`/health` can be green while no readings arrive. Freshness is watched inside the app
-by an APScheduler job every 5 minutes (`monitor_data_staleness.py`):
+`/health` can be green while no readings arrive. Freshness has its own endpoint and its
+own alarm; the full account is in [ALERTING.md](ALERTING.md).
 
-- **Unhealthy** when no reading has been stored for more than `STALE_THRESHOLD_MINUTES`
-  (default 5) or the last power reading is zero or missing
-- **On healthy to unhealthy**: Slack alert plus a Pushover emergency siren
-- **On recovery**: Slack alert only
-- State persists in `/data/monitor_state.json`, so a restart does not repeat an alert
-
-To check freshness by hand, read `last_update` and `reads_24h` from `/api/stats`:
+- **URL**: `https://linknode-eagle-monitor.fly.dev/health/data`
+- **Expected Response**: 200 with `status: fresh` while the newest power reading is 5
+  minutes old or less; 503 with `stale`, `no_data` or `unavailable` otherwise
+- **What it measures**: the age of the newest power reading by the reading's own
+  timestamp (the Eagle's last contact with the meter), not the time a POST last arrived
 
 ```bash
-curl -s https://linknode-eagle-monitor.fly.dev/api/stats | python -m json.tool
+curl -s https://linknode-eagle-monitor.fly.dev/health/data
+# Expected: {"last_reading":"...","power_w":383.0,"reading_age_seconds":29.8,"stale_after_seconds":300,"status":"fresh"}
 ```
+
+Inside the app an APScheduler job judges the same reading every 5 minutes
+(`monitor_data_staleness.py`):
+
+- **Unhealthy** when the newest power reading is more than `STALE_THRESHOLD_MINUTES`
+  (default 5) old by its own timestamp, or is zero or missing
+- **On healthy to unhealthy**: Slack alert plus a Pushover emergency siren (one attempt)
+- **On recovery**: Slack alert only
+- State persists in `/data/monitor_state.json` (created at the first change of state),
+  so a restart does not repeat an alert
+
+Do not judge freshness by `last_update` in `/api/stats`. It is the arrival time of the
+last stored POST, and it stays current while the Eagle keeps answering with a frozen
+reading. `reads_24h` in the same reply counts only readings with a new timestamp.
 
 The upstream side (the Raspberry Pi uploader) keeps its own counters in
 `/run/eagle-bypass/stats.json`; see `deploy/README.md`.
@@ -110,6 +124,9 @@ check_service "Web Interface" \
 
 check_service "Dashboard API" \
   "curl -sf -m 15 'https://linknode-eagle-monitor.fly.dev/api/dashboard?range=1h' >/dev/null"
+
+check_service "Telemetry freshness" \
+  "curl -sf -m 10 https://linknode-eagle-monitor.fly.dev/health/data >/dev/null"
 ```
 
 ## Deployment Workflow Integration
@@ -127,16 +144,25 @@ curl -sf https://linknode-web.murr2k.workers.dev/ | grep -q "Linknode"
 curl -sf https://linknode-web.murr2k.workers.dev/build-info.json | grep -q "${{ github.sha }}"
 ```
 
-If the Fly deploy itself fails after its retries, `deploy-fly.yml` redeploys the image
-it captured before the deploy.
+`deploy-fly.yml` is written to redeploy the image it captured before the deploy when the
+deploy fails. As of 2026-10-03 that capture fails on every run (the log warns "Could not
+capture the current image; rollback will not be possible"), and the branch where the
+deploy succeeds but the `/health` curl fails has no rollback step at all. So nothing rolls
+back: a bad release stays on the machine, unrouted while `/health` fails, until a good one
+is deployed (revert the commit and push, or run `flyctl deploy --remote-only` from
+`fly/eagle-monitor` at the last good commit).
 
 ## Health Check Standards
 
-1. **Response Time**: All health endpoints MUST respond within 10 seconds
+1. **Response Time**: `/health` MUST respond within 2 seconds, the timeout of Fly's own
+   check on it: a slower reply fails the check, and while the check fails Fly stops routing
+   to the machine. Every other health endpoint MUST respond within 10 seconds, the curl
+   timeout used in this file
 2. **Authentication**: Health endpoints SHOULD NOT require authentication
 3. **Status Codes**:
    - 200 OK - Service is healthy
-   - 503 Service Unavailable - Service is up but its store is not
+   - 503 Service Unavailable - Service is up but its store is not, or (`/health/data`)
+     the telemetry is stale
    - Any other code - Service is unhealthy
 4. **Content**: Health responses SHOULD include:
    - Service version (when applicable)
@@ -152,14 +178,23 @@ it captured before the deploy.
    - Check network connectivity
    - Verify service is actually running (`flyctl status -a linknode-eagle-monitor`)
 
-2. **503 with `db_ok: false`**
-   - Check logs for `/data is not a mounted volume` or SQLite errors:
-     `flyctl logs -a linknode-eagle-monitor`
-   - Confirm the `eagle_data` volume is attached: `flyctl volumes list -a linknode-eagle-monitor`
+2. **503 with `db_ok: false`, or the API answers with an error page or not at all**
+   - Check logs for SQLite errors: `flyctl logs -a linknode-eagle-monitor`
+   - The app answers `/health` with 503 and `db_ok: false`. While that check fails Fly
+     routes no requests to the machine, so the app's replies stop reaching callers: expect
+     an error from Fly's proxy, or no answer (not exercised here).
+     `flyctl checks list -a linknode-eagle-monitor` shows the check's own output
+   - Fly does not restart the machine: fix the cause, then
+     `flyctl machine restart <machine-id> -a linknode-eagle-monitor`
+   - A machine that started without its volume is a different case. It logs
+     `/data is not a mounted volume`, opens an empty store and answers `/health` with 200.
+     Confirm the `eagle_data` volume is attached: `flyctl volumes list -a linknode-eagle-monitor`
 
-3. **Healthy but stale data**
-   - The ingest service is fine; the Pi or the Eagle is not delivering
-   - Check the Pi: `journalctl -u eagle-bypass` and `/run/eagle-bypass/stats.json`
+3. **Healthy but stale data** (`/health` is 200, `/health/data` is 503 `stale`)
+   - The ingest service is answering and no new reading is being stored. Usually the Pi
+     or the Eagle is not delivering
+   - Check the Pi: `journalctl -u eagle-bypass -n 20` and `/run/eagle-bypass/stats.json`.
+     The steps for each case are in [ALERTING.md](ALERTING.md), "When an alert arrives"
 
 4. **SSL/TLS Errors**
    - Use `-k` flag for self-signed certificates (not recommended for production)
@@ -192,4 +227,5 @@ When adding a new service to Linknode:
 
 - [GitHub Actions Workflows](../.github/workflows/README.md)
 - [Theory of Operation](./THEORY_OF_OPERATION.md)
-- [Pi Bypass Deployment](../deploy/README.md)
+- [Outage Alerting](./ALERTING.md)
+- [Pi Uploader and Watchdog Deployment](../deploy/README.md)

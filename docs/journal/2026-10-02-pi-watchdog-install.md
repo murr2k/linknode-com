@@ -114,3 +114,34 @@ reached the network and wrote its state through `StateDirectory=`.
   same check; I did not inspect them.
 - Run the failure drill described above once, so the siren has been heard from this path
   before it is needed.
+
+## Corrections (2026-10-03)
+
+Added the next day, after a review of the alerting against the code and the live system.
+The entry above is left as written.
+
+- **Observation 1, the CRLF inference, was wrong.** Tested on the Pi (systemd 257): systemd
+  strips the carriage return when it reads an `EnvironmentFile`, so a CRLF env file reaches
+  the unit clean. The unit-file half (`User=pi\r`) was not tested on the Pi; systemd's
+  parser treats `\r\n` as a line ending there too. What does break is the shell: `. /etc/linknode-watchdog.env` keeps the
+  `\r` on each value, so the documented `--test-alert` command would have sent credentials
+  with a trailing carriage return. Converting the files was still the right call, for that
+  reason and not the one I gave.
+- **The coverage table's backstop row is too narrow.** "Ingest alive but its own stale-data
+  alarm silent for 15 minutes" describes the intent. The code fails the `ingest` check for
+  any reading over 15 minutes old, alarm silent or not, so a long telemetry outage with the
+  Pi online gets a second siren from the watchdog at about 19 to 22 minutes.
+- **The table's home-internet row needs a caveat.** The retry holds only while the check is
+  still failing. When the link returns, the watchdog can also send a DOWN for services that
+  never went down.
+- **The suggested drill trips two checks, not one.** `WATCH_SITE_URL` is also the `Origin`
+  the `api` check sends, so pointing it at a dead host fails the `api` check as well.
+  Setting `WATCH_SITE_MARKER` to a string the page does not contain fails only the `site`
+  check.
+- **Observation 4** holds for the script; it is not established for the pass as a whole.
+  systemd still journals every pass; on this Pi the journal is kept in RAM
+  (`Storage=volatile`). The unit's `PrivateTmp=true` also makes systemd create and remove
+  a private directory under `/tmp` and under `/var/tmp` on every pass, and where those two
+  are mounted on this Pi was not checked.
+
+The corrected account is in [ALERTING.md](../ALERTING.md).

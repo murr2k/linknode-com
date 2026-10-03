@@ -14,6 +14,7 @@ A real-time energy monitoring dashboard that tracks household power consumption 
 - **Eagle Monitor API**: https://linknode-eagle-monitor.fly.dev/api/stats
 - **Dashboard API**: https://linknode-eagle-monitor.fly.dev/api/dashboard?range=24h
 - **Health Check**: https://linknode-eagle-monitor.fly.dev/health
+- **Telemetry Freshness**: https://linknode-eagle-monitor.fly.dev/health/data
 
 `energy.linknode.com`, the old Grafana dashboard, redirects to the dashboard section of the main site.
 
@@ -35,7 +36,9 @@ A real-time energy monitoring dashboard that tracks household power consumption 
 - **Outage Alerting**
   - Data staleness monitor detects when the power meter stops reporting
   - Slack notifications on outage and recovery (fires once per state change, no spam)
-  - Pushover emergency-priority siren that repeats until acknowledged
+  - Pushover emergency-priority siren that repeats every 60 s until acknowledged, for up to about 50 minutes
+  - A watchdog on the Raspberry Pi reports the ingest service or the site going down
+  - How the two fit together, and what neither sees: [docs/ALERTING.md](docs/ALERTING.md)
 
 - **Failover & Resilience** (the Eagle-200 meter is failing; see [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md))
   - Local-API bypass: a Raspberry Pi on the home network polls the meter's LAN API and
@@ -188,7 +191,8 @@ npx wrangler deploy --config web/wrangler.jsonc     # needs wrangler login
 | Document | Description |
 |----------|-------------|
 | [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md) | System architecture and data flow |
-| [deploy/README.md](deploy/README.md) | Eagle-200 failover bypass: install and operate on the Pi |
+| [docs/ALERTING.md](docs/ALERTING.md) | Outage alerting: the two watchers, what each alert means, what to do when one arrives |
+| [deploy/README.md](deploy/README.md) | Pi uploader and watchdog: install and operate |
 | [docs/HEALTH_CHECKS.md](docs/HEALTH_CHECKS.md) | Service health endpoints |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 
@@ -219,7 +223,7 @@ flowchart LR
     Browser -->|"stats, dashboard, SSE"| Monitor
 ```
 
-The Pi reads the meter over the LAN every ~35 seconds and posts each reading to the
+The Pi reads the meter over the LAN about every 33 seconds and posts each reading to the
 ingest service. The page loads from Cloudflare's edge and calls the API directly for
 data. See [docs/THEORY_OF_OPERATION.md](docs/THEORY_OF_OPERATION.md) for detail.
 

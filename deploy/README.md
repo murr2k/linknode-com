@@ -1,8 +1,9 @@
 # Deploying the Eagle-200 local-API bypass
 
 `scripts/eagle_bypass.py` reads the Eagle's meter over the LAN and forwards it to
-our Fly `/eagle` endpoint as synthetic Rainforest XML, but only while the real
-cloud path is stale: a hot standby that fills gaps without duplicating data.
+our Fly `/eagle` endpoint as synthetic Rainforest XML, every cycle. It is the only
+uploader: the Eagle's own cloud upload was removed. (`--failover` restores the older
+hot-standby mode, which ships only while the cloud path is stale; see Notes.)
 
 It must run on a host that can reach the Eagle (`10.0.0.222`); Fly cannot. The
 always-on home is the Raspberry Pi, run under systemd.
@@ -25,9 +26,15 @@ scp deploy/eagle-bypass.service   pi@<pi-ip>:/tmp/
 # 2. Install the script (owned by root, world-readable, executable).
 sudo install -D -m 0755 /tmp/eagle_bypass.py /opt/eagle-bypass/eagle_bypass.py
 
-# 3. Secrets: create the env file root-only, fill it in.
-#    (start from deploy/eagle-bypass.env.example, copy it over too if you like)
-sudo install -m 0600 /dev/null /etc/eagle-bypass.env
+# 3. Secrets: create the env file root-only, fill it in. First install only: the
+#    guard keeps a re-run from emptying a file that already holds the credentials.
+#    (To start from deploy/eagle-bypass.env.example instead, scp it to /tmp too and
+#    install it in place of /dev/null. From a Windows checkout strip its CRLF line endings
+#    first: sed -i 's/\r$//' /tmp/eagle-bypass.env.example. systemd accepts them; the
+#    shell that reads the file under "Verify before trusting it" does not.)
+#    One setting per line, nothing after the value: systemd keeps a trailing
+#    "# comment" as part of it.
+[ -e /etc/eagle-bypass.env ] || sudo install -m 0600 /dev/null /etc/eagle-bypass.env
 sudoedit /etc/eagle-bypass.env         # set EAGLE_IP, EAGLE_CLOUD_ID,
                                        # EAGLE_INSTALL_CODE, EAGLE_UPLOAD_PASSWORD
 
@@ -41,24 +48,34 @@ sudo systemctl enable --now eagle-bypass.service
 journalctl -u eagle-bypass.service -f
 ```
 
-A healthy log alternates between `standby` (cloud fine) and, during an outage,
-`ACTIVATING` then `shipped 3/3 messages`. Every `--probe-secs` while active it
-pauses one cycle to check whether Rainforest recovered.
+A healthy log shows `shipped 3/3 messages` every cycle (about every 33 s).
+`local read failed ...; nothing to ship` means the Eagle did not answer that cycle.
+(In `--failover` mode the log instead alternates between `standby` and, during an
+outage, `ACTIVATING` then `shipped 3/3 messages`.)
+
+To update the script later, copy and install only the script (the first `scp` in step 1,
+then step 2), then `sudo systemctl restart eagle-bypass.service`: a running service keeps
+the old code until it is restarted. If `eagle-bypass.service` changed, copy and install
+it too and run `sudo systemctl daemon-reload` before the restart. Leave
+`/etc/eagle-bypass.env` alone.
 
 ## Verify before trusting it
 
 Run one cycle by hand first. This reads the meter and prints the XML without
-sending anything:
+sending anything (`sudo`, because the env file is root-only):
 
 ```sh
-set -a; . /etc/eagle-bypass.env; set +a
-python3 /opt/eagle-bypass/eagle_bypass.py --dry-run --once -v
+sudo sh -c 'set -a; . /etc/eagle-bypass.env; python3 /opt/eagle-bypass/eagle_bypass.py --dry-run --once -v'
 ```
 
-Then a single real send while the cloud is down (`-v` shows HTTP 200 per message):
+Then a single real send (`-v` shows HTTP 200 per message). It needs no outage: the
+script ships every cycle. It also posts a heartbeat built from that one run's counters,
+which replaces the service's on the dashboard until the service's next heartbeat (up to
+15 minutes). Where the service is already running, its own log line
+`shipped 3/3 messages` is the same proof without that side effect.
 
 ```sh
-python3 /opt/eagle-bypass/eagle_bypass.py --once -v
+sudo sh -c 'set -a; . /etc/eagle-bypass.env; python3 /opt/eagle-bypass/eagle_bypass.py --once -v'
 ```
 
 ## Stats
@@ -110,7 +127,8 @@ sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
 `scripts/linknode_watchdog.py` is the outside half of the outage alerting. The ingest
 service on Fly alerts when telemetry stops; it cannot alert when it is itself down, so
 the Pi checks it, the site, and the stats API every 2 minutes and sends a Pushover
-siren after three consecutive failures. Standard library only, like the bypass.
+siren after three consecutive failures. Standard library only, like the bypass. How it
+decides, and what it misses, is in [docs/ALERTING.md](../docs/ALERTING.md).
 
 ```sh
 # From a machine with this repo:
@@ -118,8 +136,15 @@ scp scripts/linknode_watchdog.py deploy/linknode-watchdog.service \
     deploy/linknode-watchdog.timer deploy/linknode-watchdog.env.example pi@<pi-ip>:/tmp/
 
 # --- the rest runs on the Pi ---
+# From a Windows checkout the copies have CRLF line endings. systemd and Python accept
+# them, but the shell does not when it reads the env file below, so strip them first.
+sed -i 's/\r$//' /tmp/linknode_watchdog.py /tmp/linknode-watchdog.service \
+    /tmp/linknode-watchdog.timer /tmp/linknode-watchdog.env.example
+
 sudo install -D -m 0755 /tmp/linknode_watchdog.py /opt/linknode-watchdog/linknode_watchdog.py
-sudo install -m 0600 /tmp/linknode-watchdog.env.example /etc/linknode-watchdog.env
+# First install only: the guard keeps a re-run from replacing the real credentials
+# with the example's placeholders.
+[ -e /etc/linknode-watchdog.env ] || sudo install -m 0600 /tmp/linknode-watchdog.env.example /etc/linknode-watchdog.env
 sudoedit /etc/linknode-watchdog.env    # PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY
 sudo install -m 0644 /tmp/linknode-watchdog.service /tmp/linknode-watchdog.timer /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -129,11 +154,42 @@ python3 /opt/linknode-watchdog/linknode_watchdog.py --dry-run
 sudo sh -c 'set -a; . /etc/linknode-watchdog.env; python3 /opt/linknode-watchdog/linknode_watchdog.py --test-alert'
 
 sudo systemctl enable --now linknode-watchdog.timer
-journalctl -u linknode-watchdog.service -f     # silent while healthy; -v on ExecStart logs every pass
+# While healthy this shows only systemd's start and finish lines for each pass; the script
+# logs only failures. Add -v to ExecStart to make it log every check.
+journalctl -u linknode-watchdog.service -f
 ```
 
 State (failure counts, which checks have alerted) is in
 `/var/lib/linknode-watchdog/state.json`, written only when something changes.
+
+The test message goes at normal priority, as root, with the env file read by the shell.
+It proves the credentials as the shell reads them and the path to the phone. It does not
+exercise the siren request, or the env file as systemd reads it: systemd keeps a trailing
+`# comment` as part of the value, where the shell drops it. After one of the three
+`WATCH_` numbers that makes every pass crash at start. After a `PUSHOVER_` value nothing
+crashes, but the siren request carries the comment inside the credential. Pushover answers
+an invalid credential with a 4xx, so no siren reaches the phone: the watchdog logs
+`pushover send failed` and tries again on each failing pass. So put nothing
+after a value in `/etc/linknode-watchdog.env`, and after any edit run one real pass and
+check that both credential lines are bare values (the second command must print 2):
+
+```sh
+sudo systemctl start linknode-watchdog.service && echo ok
+sudo grep -cE '^PUSHOVER_(API_TOKEN|USER_KEY)=[A-Za-z0-9]{30}$' /etc/linknode-watchdog.env
+```
+
+To update the watchdog later, copy, strip and install only the script. The next timer
+pass runs the new one; nothing needs restarting. If a unit file changed, install it too,
+then `sudo systemctl daemon-reload` and `sudo systemctl restart linknode-watchdog.timer`.
+Leave `/etc/linknode-watchdog.env` alone.
+
+The watchdog changes only when someone installs it, while a push to `main` deploys the
+ingest service and the site within minutes. It judges three replies by their shape:
+`/health/data` (a JSON body and, when the reply is not a 200, its `status` and
+`reading_age_seconds`), `/api/stats` (a 200, the CORS header, `current_power`) and the
+page (the marker `id="power-chart"`). Adding fields is safe. Before a push that renames
+or removes any of these, install a watchdog that accepts both the old and the new reply,
+or the old one sends a siren for a healthy service.
 
 ## Notes
 

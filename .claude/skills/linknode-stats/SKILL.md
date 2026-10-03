@@ -2,7 +2,8 @@
 name: linknode-stats
 description: >-
   Query and interpret linknode.com energy-monitor health from its two stat sources: the Raspberry
-  Pi bypass uploader (pi@10.0.0.139) and the Fly ingest service's /api/stats endpoint. Use when
+  Pi bypass uploader (pi@10.0.0.139) and the Fly ingest service (/health/data for telemetry
+  freshness, /api/stats for what the dashboard shows). Use when
   checking whether data is flowing, reading uptime/outage/meter-link counters, or diagnosing
   staleness, so a session does not re-derive the commands or guess JSON field names.
 ---
@@ -14,7 +15,7 @@ Two independent sources report health. Check both; they answer different questio
 | Source | Answers | Where |
 |---|---|---|
 | **Pi bypass** (`pi@10.0.0.139`) | Is the Pi reading the Eagle and shipping? Read/send failure rates, meter link, outages | `/run/eagle-bypass/stats.json`, or the `--report` / `--print-stats` CLI |
-| **Fly `/api/stats`** | Is fresh data reaching the site? What the dashboard shows | `https://linknode-eagle-monitor.fly.dev/api/stats` |
+| **Fly ingest service** | Is fresh data reaching the store (`/health/data`)? What the dashboard shows, and whether POSTs are arriving (`/api/stats`) | `https://linknode-eagle-monitor.fly.dev/health/data`, `https://linknode-eagle-monitor.fly.dev/api/stats` |
 
 ## Golden rule: never guess field names
 
@@ -26,9 +27,9 @@ wrong name is indistinguishable from a present-but-null field.
   `curl -s .../api/stats | python -c "import sys,json; d=json.load(sys.stdin); print(list(d))"`
 - **Prefer bracket access** (`d['last_update']`) which raises `KeyError` on a typo, over `.get()`
   which hides it.
-- Two names that are easy to get wrong (see the key map below): the "last data received" timestamp is
+- Two names that are easy to get wrong (see the key map below): the arrival time of the last stored POST is
   **`last_update`** at the root (not `last_data_received`, which only exists nested under
-  `monitor_stats`); the heartbeat time is **`bypass_status.updated_at`** (there is no `received_at`).
+  `monitor_stats`), and it shows only that POSTs are arriving (freshness is `/health/data`); the heartbeat time is **`bypass_status.updated_at`** (there is no `received_at`).
 
 ---
 
@@ -92,11 +93,12 @@ mode the outage log stops accruing, so the meaningful failure signals become `re
 
 ---
 
-## Source 2: the Fly ingest service (`/api/stats`)
+## Source 2: the Fly ingest service (`/health/data`, `/api/stats`)
 
 ```bash
 curl -s https://linknode-eagle-monitor.fly.dev/api/stats | python -m json.tool
 curl -s https://linknode-eagle-monitor.fly.dev/health | python -m json.tool
+curl -s https://linknode-eagle-monitor.fly.dev/health/data | python -m json.tool   # telemetry freshness
 # Ops: fly status -a linknode-eagle-monitor ; fly logs -a linknode-eagle-monitor   (region iad)
 ```
 
@@ -104,7 +106,8 @@ curl -s https://linknode-eagle-monitor.fly.dev/health | python -m json.tool
 
 | You want | Read this key | Note |
 |---|---|---|
-| Timestamp of last real meter data | **`last_update`** (root) | also at `monitor_stats.last_data_received`; there is **no** root `last_data_received` |
+| Is the telemetry fresh | **`GET /health/data`**: `status`, `reading_age_seconds`, `last_reading` | 200 `fresh`; 503 `stale`, `no_data` or `unavailable`. Goes by the newest power reading's own timestamp (the Eagle's last contact with the meter). The outage alarm judges the same reading, with two differences (`docs/ALERTING.md`): it also calls a newest reading of exactly 0 W unhealthy, and it sends nothing when the store read fails (`unavailable` here) |
+| Arrival time of the last stored POST | **`last_update`** (root) | also at `monitor_stats.last_data_received`; there is **no** root `last_data_received`. **Not** proof of new data: it stays current while the Eagle keeps answering with a frozen reading |
 | Last bypass heartbeat time | **`bypass_status.updated_at`** | **not** `received_at` (that key does not exist) |
 | Live uptime tile values | `bypass_status.data_uptime_pct` / `.device_uptime_pct` | shipped by the Pi heartbeat every 15 min |
 | Dashboard "Meter Reads (24h)" (received/expected, rolling 24h) | `reads_24h.received` / `.expected` | **fresh** reads passed on, the completeness gauge the dashboard shows; `.period_s` (the measured cycle time used to size `expected`) and `.window_hours` included. `null` if the DB is unreachable |
@@ -125,10 +128,14 @@ packets_today_date, previous_data_received, start_time, successful_writes, total
 observed_seconds, outage_count, readings_rescued, total_outage_seconds, updated_at,
 worst_outage_seconds, interval_s, cycle_period_s`. (The `*_seconds` names are the heartbeat XML's
 renames of the Pi's internal `*_s` fields. `interval_s` is the nominal `--interval` (30). `cycle_period_s`
-is the Pi's **measured** true cycle time, EMA of sleep + per-cycle work, ~35s, and is what actually
+is the Pi's **measured** true cycle time, EMA of sleep + per-cycle work, ~33s, and is what actually
 sizes `reads_24h.expected`.)
 
 `/health`: `{db_ok, status, uptime_seconds}` (503 when the SQLite store is unavailable).
+
+`/health/data`: `{status, reading_age_seconds, last_reading, power_w, stale_after_seconds}`
+(`no_data` and `unavailable` replies carry only `status` and `stale_after_seconds`). How the
+alarm and the Pi watchdog use it: `docs/ALERTING.md`.
 
 The service stores readings in SQLite on the `eagle_data` Fly volume (InfluxDB and Grafana
 were retired 2026-09-27). The last `bypass_status` heartbeat is saved there too and restored
@@ -136,8 +143,11 @@ on restart, so it no longer goes null after a deploy.
 
 ### Healthy Fly baseline
 
-- `last_update` within ~1 minute of now (30s poll cadence; the dashboard flags data stale only after
-  2 minutes, at which point the Pushover outage alert fires).
+- `/health/data` -> `status: fresh`, `reading_age_seconds` under about a minute.
+- `last_update` within ~1 minute of now (30s poll cadence). This shows only that POSTs are
+  arriving. The dashboard flags data stale after 2 minutes without one; the Pushover outage alert
+  fires when the newest reading is more than 5 minutes old at a 5-minute check, so 5 to 10 minutes
+  after the last good reading.
 - `packets_today` climbing.
 - `bypass_status.data_uptime_pct` / `.device_uptime_pct` near `100.0`, and
   `bypass_status.updated_at` within the last ~15 minutes (the heartbeat interval).
@@ -153,12 +163,13 @@ on restart, so it no longer goes null after a deploy.
   not raw messages.
 - **`reads_24h` is the completeness gauge the dashboard shows ("Meter Reads (24h)").** `received`
   counts **fresh** `power_w` (InstantaneousDemand) points over a **rolling 24h** window; `expected` is
-  `window / period_s`. **`period_s` is the Pi's MEASURED cycle time (~35s), not the nominal `--interval`
+  `window / period_s`. **`period_s` is the Pi's MEASURED cycle time (~33s), not the nominal `--interval`
   (30s).** The real cadence is slower than the interval because each cycle also does work (two Eagle API
-  calls + three POSTs) before the `--interval` sleep, so the true max is ~2469/24h, not 2880. Sizing
-  `expected` off the nominal 30s produced a phantom ~15% shortfall (a flat ~85% at every window size was
-  the tell); the measured period fixes it. "Fresh" is enforced at the source: the Pi timestamps each
-  reading with the meter's **LastContact** time, so a cycle where the Eagle did not respond (nothing
+  calls + three POSTs) before the `--interval` sleep, so the true max is about 2,600/24h, not 2880. Sizing
+  `expected` off the nominal 30s produced a phantom shortfall (in July 2026, with a ~35s cycle, a flat
+  ~85% at every window size was the tell); the measured period fixes it. "Fresh" is enforced at the source: the Pi timestamps each
+  power reading with the meter's **LastContact** time (its own clock if the Eagle returns no usable one,
+  which then counts as fresh: `docs/ALERTING.md`), so a cycle where the Eagle did not respond (nothing
   shipped) or returned stale data (same LastContact -> the point overwrites rather than adds) does not
   increment the count. `received` is clamped to `expected`. Sliding window, not a midnight-UTC reset.
   Contrast `packets_today`, which counts every successful write (including stale re-sends) since midnight UTC.
@@ -168,14 +179,20 @@ on restart, so it no longer goes null after a deploy.
   drops for both no-response and stale. When healthy both sit near 100%.
 - **The heartbeat is deliberately out-of-band.** The collector stashes `bypass_status` but does
   **not** touch `last_update` / `last_data_received`, so a heartbeat cannot masquerade as fresh meter
-  data and suppress a real staleness alert. Judge freshness by `last_update`, judge the Pi's
-  self-reported uptime by `bypass_status`.
+  data. Judge freshness by `/health/data` (`last_update` shows only that POSTs are arriving), judge
+  the Pi's self-reported uptime by `bypass_status`.
+- **Frozen reading:** `/health/data` is `stale` while `last_update` is current. POSTs are arriving
+  but the newest power reading's timestamp is over 5 minutes old. Expected cause: the Eagle is
+  answering the Pi with a `LastContact` that has stopped advancing. On the Pi, read
+  `meter_last_contact` twice, a minute apart: unchanged confirms it (`meter_status` can still say
+  `Connected`). If it is advancing, look at `journalctl -u eagle-bypass -n 3`: `demand=NonekW` means
+  the Eagle is serving summation or price without demand, which gives the same picture.
 - **Diagnosing "site looks stale":** if `last_update` is old but the Pi shows `messages_failed: 0`
   and low `read_failures`, suspect the Fly side (endpoint/database). If the Pi shows rising
   `read_failures`, the Eagle stopped answering. If `messages_failed` is rising, the endpoint is
   rejecting. `bypass_status.updated_at` much older than 15 min means the Pi itself stopped shipping.
-- **Meter/HAN health lives only on the Pi** (`meter_status`, `meter_link_pct`); the Fly side has no
-  view of it. A `Connected` meter link with a failing host is the known Eagle failure signature.
+- **Meter/HAN health lives only on the Pi** (`meter_status`, `meter_link_pct`); the Fly side sees it
+  only as the age of the newest reading (`/health/data`). A `Connected` meter link with a failing host is the known Eagle failure signature.
 
 ## Related
 

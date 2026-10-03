@@ -1,7 +1,7 @@
 # Linknode Energy Monitor - Theory of Operation
 
-> **Document Version:** 2.0
-> **Last Updated:** 2026-09-27
+> **Document Version:** 2.1
+> **Last Updated:** 2026-10-03
 > **Author:** Murray Kopit
 
 ## Executive Summary
@@ -61,7 +61,7 @@ The Rainforest Eagle-200 is a ZigBee-to-IP gateway paired with the utility smart
 **Specifications:**
 - Communication: ZigBee (to meter) + WiFi/Ethernet (to network)
 - Interface used: local API (`/cgi-bin/post_manager`), HTTP Basic auth with the Cloud ID and Install Code
-- Native report rate: ~8-10 seconds; the Pi reads it every ~35 seconds
+- Native report rate: ~8-10 seconds; the Pi reads it about every 33 seconds
 - Data Format: XML
 
 **Message Types Supported** (by the ingest service):
@@ -85,13 +85,13 @@ The Pi sends the first three every cycle and `BypassStatus` every 15 minutes. `N
 **Technology:** Python 3, standard library only
 **Deployment:** systemd `eagle-bypass.service` on a Raspberry Pi on the home LAN, the only host that can reach the Eagle (Fly cannot)
 
-Each cycle (a 30 s wait plus the per-cycle work, ~35 s in total) the Pi:
+Each cycle (a 30 s wait plus the per-cycle work, about 33 s in total) the Pi:
 
 1. Queries the Eagle's local API (`device_list`, `device_query`).
 2. Builds three Rainforest-style XML messages (`InstantaneousDemand`, `CurrentSummationDelivered`, `PriceCluster`) tagged with the Control radio MAC (`...ef69`).
 3. POSTs them to `https://linknode-eagle-monitor.fly.dev/eagle` with HTTP Basic auth.
 
-Each reading is timestamped with the meter's `LastContact` time, not the Pi's clock. When the Eagle returns stale data, `LastContact` does not advance, so the re-sent reading lands on an existing (field, timestamp) key and overwrites it instead of adding a row. This is why `reads_24h` counts only fresh reads.
+Each demand and summation reading is timestamped with the meter's `LastContact` time, not the Pi's clock. (The price message always carries the Pi's clock, and so does a reading whose `LastContact` is missing or not a number. A reading whose `LastContact` is more than a year from the ingest service's clock, a zero one included, is stored at its arrival time: see [ALERTING.md](ALERTING.md).) A reading re-sent with an unchanged `LastContact` lands on an existing (field, timestamp) key and overwrites it instead of adding a row, so `reads_24h` counts only reads with a new timestamp. That the Eagle leaves `LastContact` unchanged whenever its data is stale is assumed, not captured on the device.
 
 Always-on is the default mode: the Pi is the sole uploader and ships every cycle. `--failover` restores the older hot-standby behaviour if the Eagle ever uploads on its own again. Live counters are in `/run/eagle-bypass/stats.json` and `--report` prints an uptime and outage report.
 
@@ -132,7 +132,8 @@ flowchart LR
 | `/api/stats` | GET | API Key (optional, unset) | Current power, 24h min/max/avg and cost, `reads_24h`, `bypass_status`, `monitor_stats`, billing period with BC Hydro tiered cost (`?hours=1` to `720`) |
 | `/api/dashboard` | GET | API Key (optional, unset) | Chart series and panel values for `?range=` `1h`, `6h`, `24h`, `7d` or `30d` (15 s cache) |
 | `/api/stream` | GET | None | Server-Sent Events: each new power reading as it is stored |
-| `/health` | GET | None | `{status, db_ok, uptime_seconds}`; 503 if the database is unavailable |
+| `/health` | GET | None | `{status, db_ok, uptime_seconds}`; 503 if the database is unavailable. Fly's service check |
+| `/health/data` | GET | None | Telemetry freshness by the age of the newest power reading: 200 `fresh`; 503 `stale`, `no_data` or `unavailable` |
 | `/api/security/stats` | GET | Admin API Key | Security monitoring stats (`ADMIN_API_KEY` is unset, so this returns 403) |
 | `/` | GET | None | Service information |
 
@@ -173,10 +174,10 @@ sequenceDiagram
 **Security Features:**
 - HTTP Basic Authentication for the ingest endpoint (`EAGLE_USERNAME` / `EAGLE_PASSWORD`)
 - Optional API key for the read endpoints; not configured, so they are public and read-only
-- Rate limiting: 60 requests/minute per client on authenticated requests (in practice `/eagle`)
+- Rate limiting: 60 requests/minute per peer address and username, applied only after authentication passes (in practice the Pi on `/eagle`); a missing or wrong password gets 401 and is not limited
 - CORS restricted to specific origins (see [Security Model](#security-model)); the SSE stream sends `Access-Control-Allow-Origin: *`
 - Security headers (HSTS, X-Frame-Options, etc.)
-- Suspicious IP monitoring
+- Rate-limit violations are logged per peer address (flagged after 10 in an hour; the flag blocks nothing); failed logins are not counted and show only as 401 lines in the access log
 
 ---
 
@@ -323,7 +324,7 @@ sequenceDiagram
     CF-->>USER: HTML + JS + uPlot
     USER->>EM: Open /api/stream (SSE)
 
-    loop Every ~35 seconds
+    loop About every 33 seconds
         PI->>E200: Local API query (LAN)
         E200-->>PI: Meter data
         PI->>EM: XML Data (Basic Auth)
@@ -441,7 +442,7 @@ flowchart LR
     USER --> CF --> CSP --> WEB
     USER -->|"read-only API"| FLY
     PI --> FLY --> AUTH --> RL --> API --> DB
-    ATTACKER -.->|"401 or 429"| AUTH
+    ATTACKER -.->|"401"| AUTH
 ```
 
 **Security Controls:**
@@ -450,7 +451,7 @@ flowchart LR
 |-------|---------|---------------|
 | Network | Cloudflare | TLS termination and DDoS protection for linknode.com |
 | Network | Fly.io proxy | TLS for linknode-eagle-monitor.fly.dev |
-| Application | Rate Limiting | 60 req/min per client on authenticated requests |
+| Application | Rate Limiting | 60 req/min per peer address and username, after authentication only; failed logins are not limited |
 | Application | CORS | Allow-list: linknode.com, www.linknode.com, `linknode-web` workers.dev hosts, local preview on port 8771 (plus the retired `linknode-web.fly.dev`) |
 | Application | CSP | `web/public/_headers`: `connect-src` limited to self and the API, `frame-src 'none'` |
 | Authentication | Basic Auth | Ingest endpoint `/eagle` |
@@ -494,20 +495,22 @@ Data Age > 120s   → stale: gauge greyed, age shown ("Xm ago", "Xh Xm ago", "Xd
 No timestamp      → "No data"
 ```
 
+Data age here is the time since the last stored POST, not the age of the reading. While the Eagle keeps answering with a frozen reading, the gauge goes on saying "Live". Once that reading is over 5 minutes old `/health/data` reports stale and the alarm fires, but only if its timestamp is frozen too, that is, if the Eagle's `LastContact` stays at the last real contact. That is assumed, not captured on the device (see [ALERTING.md](ALERTING.md)).
+
 ### Outage Alerting
 
 The full account, with diagrams, is in [ALERTING.md](ALERTING.md).
 
-The ingest service runs two APScheduler jobs: a data-freshness check every 5 minutes and a retention prune once a day. The freshness check marks the feed unhealthy when the newest power reading in the store is older than `STALE_THRESHOLD_MINUTES` (default 5) or is zero or missing. It goes by the reading's own time, which the Pi takes from the Eagle's last contact with the meter, not by when a POST last arrived: the Pi keeps re-posting a frozen reading while the Eagle answers but has lost the meter. Alerts fire only on state transitions, once per outage:
+The ingest service runs two APScheduler jobs: a data-freshness check every 5 minutes and a retention prune once a day. The freshness check marks the feed unhealthy when the newest power reading in the store is older than `STALE_THRESHOLD_MINUTES` (default 5) or is zero or missing. It goes by the reading's own time, which the Pi takes from the Eagle's last contact with the meter, not by when a POST last arrived: the case it is built for is the Eagle answering after it has lost the meter, with the Pi re-posting the same reading under the same timestamp. The check alerts only on state transitions, so one continuous outage gets one alert from it (the watchdog, below, can add a second). Each alert is a single attempt and is not retried:
 
-- **healthy to unhealthy:** Slack (`SLACK_WEBHOOK_URL`) plus a Pushover emergency siren (priority 2, repeats every 60 s until acknowledged, expires after 1 hour)
+- **healthy to unhealthy:** Slack (`SLACK_WEBHOOK_URL`) plus a Pushover emergency siren (priority 2, repeats every 60 s until acknowledged, at most 50 times)
 - **unhealthy to healthy:** Slack only
 
-The state is saved to `/data/monitor_state.json` on the volume, so a restart does not repeat an alert.
+The state is saved to `/data/monitor_state.json` on the volume (the file is created at the first transition), so a restart does not make the alarm repeat its alert.
 
-`GET /health/data` exposes the same signal: 200 while the newest reading is fresh, 503 once it is stale. `/health` stays a liveness check (process up, store answering), because Fly restarts the machine when it fails and a restart does not fix a dead Pi.
+`GET /health/data` exposes the freshness half of that signal: 200 while the newest reading is fresh, 503 once it is stale. `/health` stays Fly's service check (process up, store answering). While it fails Fly stops routing requests to the machine and does not restart it, so wiring freshness into it would cut off the uploads whenever the feed went stale.
 
-The ingest service cannot report its own death, so the Pi runs the other half: `scripts/linknode_watchdog.py`, a systemd timer every 2 minutes (`deploy/linknode-watchdog.*`). It checks that `/health/data` answers, that linknode.com serves the dashboard, and that `/api/stats` answers with the CORS header the page needs, and sends its own Pushover siren after three consecutive failures. The two watch each other; only both failing at once goes unreported.
+The ingest service cannot report its own death, so the Pi runs the other half: `scripts/linknode_watchdog.py`, a systemd timer every 2 minutes (`deploy/linknode-watchdog.*`). It checks that `/health/data` answers, that linknode.com serves the dashboard, and that `/api/stats` answers with the CORS header the page needs and a `current_power` value, and sends its own Pushover siren after three consecutive failures. It also treats a reading more than 15 minutes old as a failure, so a long telemetry outage with the Pi online alerts twice. A restart of the ingest service while no power readings are arriving also sets it off, because `/api/stats` then has no `current_power`. Each watcher covers the other's main blind spot. Nothing watches the watchdog itself; that case and the others that go unreported are listed in ALERTING.md.
 
 ---
 
@@ -558,7 +561,7 @@ linknode-com/
 
 Pushing to `main` is a production deploy:
 
-- `fly/eagle-monitor/**` triggers `.github/workflows/deploy-fly.yml`: runs the unit tests, captures the current image for rollback, deploys (with retries), checks `/health`, and redeploys the captured image if the deploy fails.
+- `fly/eagle-monitor/**` triggers `.github/workflows/deploy-fly.yml`: runs the unit tests, deploys (with retries) and checks `/health`. It is meant to capture the current image first and redeploy it if the deploy fails, but as of 2026-10-03 that capture fails on every run (the log warns "Could not capture the current image; rollback will not be possible"), so nothing rolls back: a bad release stays on the machine until a good one is deployed.
 - `web/**` triggers `.github/workflows/deploy-web.yml`: writes `build-info.json`, deploys with Wrangler, and verifies the preview URL.
 
 ```bash
@@ -594,8 +597,10 @@ GitHub Actions secrets: `FLY_API_TOKEN` (Fly deploy), `CLOUDFLARE_API_TOKEN` and
 | Symptom | Check | Resolution |
 |---------|-------|------------|
 | Gauge shows stale or "No data" | Pi: `journalctl -u eagle-bypass`, `/run/eagle-bypass/stats.json`; `fly logs -a linknode-eagle-monitor` | The Eagle not answering its local API is expected flapping; a 401 on upload means the Pi and Fly passwords differ |
-| Chart and tiles show "--" | `/api/dashboard?range=24h` | 503 means the store is unavailable: check `/health` |
-| `/health` returns 503 (`db_ok: false`) | Fly logs (`/data is not a mounted volume`, SQLite errors) | Confirm the `eagle_data` volume is attached, then restart the machine |
+| Chart and tiles show "--" | `/api/dashboard?range=24h` | A 503 means the store is unavailable or Fly has stopped routing to the machine: see the next row |
+| `/health` returns 503 (`db_ok: false`), or every API request gets an error from Fly's proxy or no answer | `fly checks list -a linknode-eagle-monitor`, `fly logs -a linknode-eagle-monitor` (SQLite errors) | While `/health` fails Fly routes nothing to the machine and does not restart it: fix the store, then `fly machine restart <machine-id> -a linknode-eagle-monitor` (the id is in `fly status`) |
+| History suddenly empty on a healthy service | Fly logs (`/data is not a mounted volume`) | The machine started without its volume: confirm `eagle_data` is attached (`fly volumes list -a linknode-eagle-monitor`) and redeploy |
+| A siren or a Slack alert arrived | [ALERTING.md](ALERTING.md), "When an alert arrives" | Read the alert's text first, then check `/health/data`, which answers for the feed only |
 | Site loads but no data, CSP errors in console | `connect-src` in `web/public/_headers` | The API host must be listed; keep Rocket Loader off |
 | CORS errors | `CORS(...)` origins in `fly/eagle-monitor/app.py` | Add the calling origin |
 | History differs between requests | `fly status -a linknode-eagle-monitor` | More than one machine is running; scale back to one |
@@ -608,6 +613,7 @@ GitHub Actions secrets: `FLY_API_TOKEN` (Fly deploy), `CLOUDFLARE_API_TOKEN` and
 |---------|------|---------|
 | 1.0 | 2026-01-14 | Initial document creation |
 | 2.0 | 2026-09-27 | SQLite replaces InfluxDB, native chart replaces Grafana, Cloudflare Worker replaces nginx on Fly; Pi uploader and alerting documented |
+| 2.1 | 2026-10-03 | Pi watchdog and `/health/data` documented (2026-10-02); outage alerting, troubleshooting, rate-limit and rollback statements corrected against the code and the live system |
 
 ---
 

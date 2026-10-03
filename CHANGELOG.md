@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Sep 29, 2026 bill (914 kWh over 59 days, $130.38) as a second test of the bill
   calculator; the rates were unchanged
 - `GET /health/data`: telemetry freshness (200 fresh, 503 stale) by the age of the newest
-  meter reading. `/health` is unchanged and stays the liveness check Fly restarts on
+  meter reading. `/health` is unchanged and stays Fly's service check (Fly stops routing to
+  the machine while it fails; it does not restart it)
 - **Pi watchdog** (`scripts/linknode_watchdog.py`, `deploy/linknode-watchdog.*`): a systemd
   timer on the Pi that sends a Pushover siren when the ingest service, linknode.com or the
   stats API stops answering, covering the outages the ingest service cannot report itself
@@ -38,7 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - The outage alarm now goes by the newest reading's own time, not the arrival time of the
   last POST, so it fires when the Eagle loses the meter but keeps answering the Pi with a
-  frozen reading
+  frozen reading, provided the Eagle's `LastContact` stays at the last real contact
+  (assumed, not captured on the device; see `docs/ALERTING.md`)
+- Alerting documentation corrected against the code and the live system (2026-10-03).
+  Fly does not restart a machine that fails `/health`; the watchdog's 15-minute backstop
+  sends a second siren on any long telemetry outage with the Pi online, about 19 to 22
+  minutes after the newest reading; the deploy workflow's rollback does not arm (its
+  image capture fails on every run). The docs now list what goes unreported, what each
+  alert text means and what to do when one arrives (`docs/ALERTING.md`,
+  `docs/THEORY_OF_OPERATION.md`, `docs/HEALTH_CHECKS.md`, `deploy/README.md`, the READMEs,
+  the `linknode-stats` skill, and a dated Corrections section on the 2026-10-02 journal
+  entry). The same corrections are made on the site's Technology Stack panel
+  (`web/public/index.html`) and in two docstrings in `fly/eagle-monitor/app.py`.
+  `deploy/linknode-watchdog.env.example` and `deploy/eagle-bypass.env.example` no longer
+  put comments after values, which systemd would have read as part of them
 
 ## [2.0.0] - 2026-09-27
 

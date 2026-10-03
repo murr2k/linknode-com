@@ -48,8 +48,8 @@ fly/
 ## Deployment
 
 Pushing to `main` with changes under `fly/eagle-monitor/**` runs
-`.github/workflows/deploy-fly.yml`: unit tests, image capture for rollback, deploy,
-health check. To deploy by hand:
+`.github/workflows/deploy-fly.yml`: unit tests, image capture for rollback (the capture
+currently fails, so nothing rolls back: see `docs/HEALTH_CHECKS.md`), deploy, health check. To deploy by hand:
 
 ```bash
 cd fly/eagle-monitor

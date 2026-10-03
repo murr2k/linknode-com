@@ -89,9 +89,18 @@ January 2026; those scripts no longer work.
 - **wrangler** (repo devDependency): site preview and deploys.
 - **Cloudflare API MCP** (`https://mcp.cloudflare.com/mcp`): zone work (DNS,
   redirect rules, zone settings, Worker routes).
-- **`linknode-stats` skill**: how to read health from the Pi and `/api/stats`.
+- **`linknode-stats` skill**: how to read health from the Pi and the ingest service
+  (`/health/data`, `/api/stats`).
 
 ## Open questions / known gaps
+
+- **Outage alerting: the bar, and seven agreed fixes.** linknode.com is not mission
+  critical. The alerting only has to say that the system has stopped reporting, so it can
+  be fixed within a day or two: an outage that is never reported, and noise, matter; the
+  speed of an alert matters little. A review on 2026-10-03 found many defects. Seven fixes
+  were agreed against that bar, none of them built as of that date. `docs/ALERTING.md`
+  ("Planned fixes") lists the seven with their status and names the defects deliberately
+  left alone. Do not gold-plate the alerting beyond that bar.
 
 - **BC Hydro billing values change every April 1** (Step 1 rate and basic charge under
   BCUC order G-42-25; the rate rider and transit levy change too). The defaults live in

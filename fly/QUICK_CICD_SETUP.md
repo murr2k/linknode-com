@@ -4,7 +4,7 @@ Two GitHub Actions workflows deploy production on pushes to `main`:
 
 | Workflow | Trigger paths | Deploys |
 |----------|---------------|---------|
-| `deploy-fly.yml` | `fly/eagle-monitor/**` | Fly app `linknode-eagle-monitor` (unit tests first, rollback image captured) |
+| `deploy-fly.yml` | `fly/eagle-monitor/**` | Fly app `linknode-eagle-monitor` (unit tests first; the rollback image capture currently fails, see `docs/HEALTH_CHECKS.md`) |
 | `deploy-web.yml` | `web/**` | Cloudflare Worker `linknode-web` (the linknode.com site) |
 
 Docs-only changes deploy nothing.
