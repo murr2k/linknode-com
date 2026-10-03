@@ -11,7 +11,7 @@ gauge and dashboard, and raises outage alerts.
 - Stores readings in SQLite (`/data/energy.db`, `store.py`) with the meter's timestamps
 - Statistics endpoint at `/api/stats` and dashboard endpoint at `/api/dashboard`
 - Live power stream (Server-Sent Events) at `/api/stream`
-- Health check endpoint at `/health`
+- Health check endpoint at `/health`, telemetry freshness at `/health/data`
 - Data staleness monitor with Slack and Pushover alerts
 - Minimal resource usage (one shared-cpu-1x machine, 256MB RAM)
 
@@ -51,6 +51,8 @@ second machine would have its own separate database.
   `6h`, `24h`, `7d` or `30d` (15 s cache)
 - `GET /api/stream` - Server-Sent Events, one event per stored power reading
 - `GET /health` - `{status, db_ok, uptime_seconds}`; 503 if the database is unavailable
+- `GET /health/data` - Telemetry freshness by the age of the newest power reading: 200
+  `fresh`; 503 `stale`, `no_data` or `unavailable` (see `docs/ALERTING.md`)
 - `GET /api/security/stats` - Security stats (needs `ADMIN_API_KEY`)
 
 ## Environment Variables
@@ -62,7 +64,10 @@ second machine would have its own separate database.
 - `EAGLE_PASSWORD` - Basic auth password (set as secret)
 - `SLACK_WEBHOOK_URL` - Outage and recovery alerts (set as secret)
 - `PUSHOVER_API_TOKEN`, `PUSHOVER_USER_KEY` - Emergency siren on outage (set as secrets)
-- `STALE_THRESHOLD_MINUTES` - Minutes without data before alerting (default: 5)
+- `STALE_THRESHOLD_MINUTES` - Age in minutes of the newest power reading, by its own
+  timestamp, past which the feed is stale (default: 5). Must be an integer: on `2.5` or
+  `5.0` the service does not start. Used by both `/health/data` and the alarm (see
+  `docs/ALERTING.md`)
 - `EAGLE_API_KEY` - Optional API key for the read endpoints (not set: they are public)
 - `ADMIN_API_KEY` - Optional key for `/api/security/stats` (not set)
 
@@ -78,7 +83,7 @@ The monitor handles several types of Eagle-200 messages:
 6. **NetworkInfo** - Network status (link strength)
 7. **BypassStatus** - The Pi uploader's reliability heartbeat (not Eagle telemetry)
 
-The Pi sends the first three every cycle (~35 s) and `BypassStatus` every 15 minutes.
+The Pi sends the first three every cycle (~33 s) and `BypassStatus` every 15 minutes.
 
 Data is stored in SQLite (`store.py`):
 - `readings(field_id, ts_ms, value)`, primary key `(field_id, ts_ms)`, `WITHOUT ROWID`.
@@ -89,9 +94,11 @@ Data is stored in SQLite (`store.py`):
   restored on restart)
 
 Writes are upserts: the same (field, ts) written again overwrites the value. The Pi
-stamps each reading with the meter's `LastContact` time, so a stale re-read lands on
-the existing row, and `reads_24h` counts only fresh reads. WAL mode, one short-lived
-connection per operation.
+stamps each demand and summation reading with the meter's `LastContact` time, so a stale
+re-read lands on the existing row, and `reads_24h` counts only fresh reads. The price
+reading always carries the Pi's clock, so it adds a row every cycle. A reading with no
+usable `LastContact` falls back to the Pi's or the server's clock and counts as fresh
+(see `docs/ALERTING.md`). WAL mode, one short-lived connection per operation.
 
 The store holds 30 days backfilled from InfluxDB (from 2026-08-27 23:50 UTC) plus
 everything written live since go-live (2026-09-26 23:50:02 UTC). Older InfluxDB history
@@ -104,7 +111,7 @@ The Pi reads the Eagle's local API and posts Rainforest-style XML directly:
 
 ```
 Eagle-200 (local API, home LAN)
-    → Raspberry Pi (eagle-bypass.service, every ~35 s)
+    → Raspberry Pi (eagle-bypass.service, every ~33 s)
         → Linknode /eagle endpoint (Fly.io)
             → SQLite /data/energy.db
 ```

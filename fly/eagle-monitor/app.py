@@ -329,11 +329,13 @@ def prune_old_readings():
 def latest_reading():
     """(datetime, watts) of the newest power reading in the store, or None.
 
-    This is the telemetry-freshness signal. The Pi stamps each reading with the time the
-    Eagle last heard from the meter, so it stops advancing when the meter link, the
-    Eagle, the Pi, the home network or our own writes fail. stats['last_data_received']
-    does not: it is the arrival time of the last POST, and the Pi keeps re-posting a
-    frozen reading while the Eagle answers but has lost the meter.
+    This is the telemetry-freshness signal. The Pi stamps each power reading with the
+    time the Eagle last heard from the meter, so it normally stops advancing when the
+    meter link, the Eagle, the Pi, the home network or our own writes fail.
+    stats['last_data_received'] does not: it is the arrival time of the last POST, and
+    the Pi keeps re-posting a frozen reading while the Eagle answers but has lost the
+    meter. The stamp falls back to a clock when no usable time arrives, which makes a
+    frozen reading look fresh: see "The freshness signal" in docs/ALERTING.md.
     """
     if db is None:
         return None
@@ -869,8 +871,10 @@ def data_health():
     """Telemetry freshness, for a watcher outside this service: 200 while the newest
     meter reading is recent, 503 once it is older than the staleness threshold.
 
-    Separate from /health on purpose. Fly restarts the machine when /health fails, which
-    is right for a dead process or store and wrong for a dead Pi or Eagle.
+    Separate from /health on purpose. /health is Fly's service check: while it fails Fly
+    stops routing requests to this machine (it does not restart it). That is right for a
+    dead process or store and wrong for a dead Pi or Eagle, where it would cut off the
+    uploads that could make the feed fresh again.
     """
     stale_after = monitor.stale_threshold_minutes * 60
     try:
@@ -976,7 +980,7 @@ def get_stats():
     # respond (nothing shipped) or returned stale data (same LastContact -> same
     # point, overwritten) does not add a point, so it does not count. "expected" =
     # window / period, where period is the Pi's MEASURED true cycle time (sleep +
-    # per-cycle work, ~35s at a nominal 30s interval), else the nominal interval,
+    # per-cycle work, ~33s at a nominal 30s interval), else the nominal interval,
     # else SAMPLE_INTERVAL_SEC env, else 30. Using the measured period avoids a
     # phantom shortfall from counting against an unachievable nominal rate.
     received = window['count']

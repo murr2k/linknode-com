@@ -2059,7 +2059,7 @@
                             </div>
                         </div>
                         <div class="api-status-item">
-                            <span class="api-name" title="The Pi's measured read cycle: the ~30s wait plus the per-cycle work (~35s total). Green = normal cadence; yellow/red = cycles running long (e.g. the Eagle slow to answer).">⏱️ Sample Interval</span>
+                            <span class="api-name" title="The Pi's measured read cycle: the ~30s wait plus the per-cycle work (~33s total). Green = normal cadence; yellow/red = cycles running long (e.g. the Eagle slow to answer).">⏱️ Sample Interval</span>
                             <div class="api-status">
                                 <span id="packet-interval" style="font-weight: 600; color: var(--text-primary);">--</span>
                             </div>
@@ -2189,7 +2189,7 @@
                         <div class="tech-line-item">Data Staleness Monitor - Detects when the power meter stops reporting</div>
                         <div class="tech-line-item">APScheduler - Background interval health checks</div>
                         <div class="tech-line-item">Slack Alerts - Outage and recovery notifications on state change</div>
-                        <div class="tech-line-item">Pushover - Emergency-priority siren push that repeats until acknowledged</div>
+                        <div class="tech-line-item">Pushover - Emergency-priority siren push that repeats until acknowledged, for up to about 50 minutes</div>
                     </div>
 
                     <div class="tech-line">
@@ -2205,7 +2205,7 @@
                         <div class="tech-line-item">Fly.io - One machine running the ingest API and its database</div>
                         <div class="tech-line-item">Cloudflare Workers - Static site at the edge on the free tier</div>
                         <div class="tech-line-item">Docker - Containerized Python service (python:3.11-slim)</div>
-                        <div class="tech-line-item">Health Checks - Fly restarts the service if /health fails</div>
+                        <div class="tech-line-item">Health Checks - Fly stops routing to the service while /health fails</div>
                     </div>
 
                     <div class="tech-line">
@@ -2223,7 +2223,7 @@
                         <div class="tech-line-header">CI/CD Pipeline</div>
                         <div class="tech-line-item">GitHub Actions - Automated workflows</div>
                         <div class="tech-line-item">Change Detection - Smart deployments via dorny/paths-filter</div>
-                        <div class="tech-line-item">Auto-Rollback - Version capture and recovery on failure</div>
+                        <div class="tech-line-item">Post-Deploy Checks - /health for the API, build-info.json for the site</div>
                         <div class="tech-line-item">Wrangler - Site deploys to Cloudflare from GitHub Actions</div>
                         <div class="tech-line-item">Slack Integration - Native GitHub notifications</div>
                     </div>
@@ -2757,7 +2757,7 @@
                             }
                         }
 
-                        // Sample interval = the Pi's measured read cycle (~35s: the ~30s
+                        // Sample interval = the Pi's measured read cycle (~33s: the ~30s
                         // wait plus per-cycle work), reported via the heartbeat. Colour
                         // reflects whether the cadence is normal or the Pi is running long
                         // (e.g. the Eagle getting slow to answer), not the old per-message gap.
