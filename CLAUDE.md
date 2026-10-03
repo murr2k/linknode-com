@@ -44,10 +44,11 @@ January 2026; those scripts no longer work.
 
 | Path | What |
 |---|---|
-| `fly/eagle-monitor/` | The only Fly app. `app.py` (Flask: `/eagle` ingest, `/api/stats`, `/api/dashboard`, `/api/stream` SSE, `/health`), `store.py` (SQLite), `dashboard.py` (chart + panel math), `monitor_data_staleness.py` (Slack/Pushover outage alerts). |
+| `fly/eagle-monitor/` | The only Fly app. `app.py` (Flask: `/eagle` ingest, `/api/stats`, `/api/dashboard`, `/api/stream` SSE, `/health` liveness, `/health/data` telemetry freshness), `store.py` (SQLite), `dashboard.py` (chart + panel math), `monitor_data_staleness.py` (Slack/Pushover outage alerts). |
 | `web/public/` | The site: `index.html`, `_headers` (CSP and security headers), `404.html`, vendored uPlot. |
 | `web/wrangler.jsonc` | Cloudflare Worker config: assets only, routes `linknode.com/*` and `www.linknode.com/*`. |
 | `scripts/eagle_bypass.py`, `deploy/` | The Pi uploader (systemd `eagle-bypass.service`). |
+| `scripts/linknode_watchdog.py`, `deploy/linknode-watchdog.*` | The Pi watchdog (systemd timer): Pushover siren when the ingest service or the site stops answering. Installed by hand, not by CI. |
 | `.github/workflows/` | `deploy-fly.yml` (eagle-monitor), `deploy-web.yml` (site). |
 | `docs/THEORY_OF_OPERATION.md` | System design + data flow (current, authoritative). |
 | `docs/archive/` | Historical docs: the retired Kubernetes/Rackspace era and the Grafana/InfluxDB stack. |

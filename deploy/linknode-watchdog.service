@@ -1,0 +1,30 @@
+[Unit]
+# Outside watcher for linknode.com: one pass of scripts/linknode_watchdog.py, started
+# every 2 minutes by linknode-watchdog.timer. Alerts through Pushover when the Fly
+# ingest service or the site stops answering. See the script for the full rationale.
+Description=Linknode watchdog (ingest service and site reachability)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# ADJUST to match your host: the user to run as, and the python3 path.
+User=pi
+WorkingDirectory=/opt/linknode-watchdog
+
+# Pushover credentials live here, NOT in the repo.
+# Install deploy/linknode-watchdog.env.example to this path and chmod 600 it.
+EnvironmentFile=/etc/linknode-watchdog.env
+
+ExecStart=/usr/bin/python3 /opt/linknode-watchdog/linknode_watchdog.py
+SyslogIdentifier=linknode-watchdog
+
+# Failure counts and the alerted flags (/var/lib/linknode-watchdog). Written only when
+# something changes, so a healthy system does not touch the SD card.
+StateDirectory=linknode-watchdog
+
+# Light hardening: the script only talks to the network and writes its state file.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true

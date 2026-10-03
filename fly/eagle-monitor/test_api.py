@@ -10,7 +10,7 @@ import tempfile
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 os.environ.pop('EAGLE_PASSWORD', None)  # Basic auth off for the webhook tests
 import app as monitor_app  # noqa: E402
@@ -171,6 +171,40 @@ class TestRoutes(unittest.TestCase):
         r = self.client.get('/health')
         self.assertEqual(r.status_code, 503)
         self.assertFalse(r.get_json()['db_ok'])
+
+    def test_data_health_follows_the_reading_time_not_the_arrival_time(self):
+        r = self.client.get('/health/data')
+        self.assertEqual((r.status_code, r.get_json()['status']), (503, 'no_data'))
+
+        self.post(demand_xml(900, time.time() - 20))
+        r = self.client.get('/health/data')
+        self.assertEqual((r.status_code, r.get_json()['status']), (200, 'fresh'))
+        self.assertEqual(r.get_json()['power_w'], 900.0)
+        self.assertLess(r.get_json()['reading_age_seconds'], 60)
+
+    def test_data_health_goes_stale_while_a_frozen_reading_keeps_arriving(self):
+        # The Eagle has lost the meter: the Pi re-posts the same 10-minute-old reading.
+        # Arrival time is now, the reading is not.
+        frozen = time.time() - 600
+        self.post(demand_xml(900, frozen))
+        self.post(demand_xml(900, frozen))
+        self.assertIsNotNone(monitor_app.stats['last_data_received'])
+        r = self.client.get('/health/data')
+        self.assertEqual((r.status_code, r.get_json()['status']), (503, 'stale'))
+        self.assertGreater(r.get_json()['reading_age_seconds'], 590)
+
+        # The in-process alarm sees the same thing
+        with patch.object(monitor_app.monitor, 'check_data_freshness',
+                          return_value=('unhealthy', False)) as check:
+            monitor_app.check_data_health()
+        seen = check.call_args[0][0]
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(seen['last_data_received'])
+        self.assertGreater(age.total_seconds(), 590)
+        self.assertEqual(seen['last_power_reading'], 900.0)
+
+    def test_data_health_without_a_store(self):
+        monitor_app.db = None
+        self.assertEqual(self.client.get('/health/data').status_code, 503)
 
     def test_cors_allows_site_origins_only(self):
         for origin in ('https://linknode.com', 'https://www.linknode.com',

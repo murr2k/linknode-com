@@ -29,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boundary
 - The Sep 29, 2026 bill (914 kWh over 59 days, $130.38) as a second test of the bill
   calculator; the rates were unchanged
+- `GET /health/data`: telemetry freshness (200 fresh, 503 stale) by the age of the newest
+  meter reading. `/health` is unchanged and stays the liveness check Fly restarts on
+- **Pi watchdog** (`scripts/linknode_watchdog.py`, `deploy/linknode-watchdog.*`): a systemd
+  timer on the Pi that sends a Pushover siren when the ingest service, linknode.com or the
+  stats API stops answering, covering the outages the ingest service cannot report itself
+
+### Fixed
+- The outage alarm now goes by the newest reading's own time, not the arrival time of the
+  last POST, so it fires when the Eagle loses the meter but keeps answering the Pi with a
+  frozen reading
 
 ## [2.0.0] - 2026-09-27
 

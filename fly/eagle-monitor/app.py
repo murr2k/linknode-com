@@ -326,10 +326,31 @@ def prune_old_readings():
     except Exception as e:
         logger.error(f"Error pruning old readings: {e}")
 
+def latest_reading():
+    """(datetime, watts) of the newest power reading in the store, or None.
+
+    This is the telemetry-freshness signal. The Pi stamps each reading with the time the
+    Eagle last heard from the meter, so it stops advancing when the meter link, the
+    Eagle, the Pi, the home network or our own writes fail. stats['last_data_received']
+    does not: it is the arrival time of the last POST, and the Pi keeps re-posting a
+    frozen reading while the Eagle answers but has lost the meter.
+    """
+    if db is None:
+        return None
+    row = db.latest('power_w', 0, store.now_ms())
+    if row is None:
+        return None
+    return store.EPOCH + timedelta(milliseconds=row[0]), row[1]
+
+
 def check_data_health():
     """Background job to check if data is still arriving"""
     try:
-        current_status, transitioned = monitor.check_data_freshness(stats)
+        reading = latest_reading()
+        current_status, transitioned = monitor.check_data_freshness({
+            'last_data_received': reading[0].isoformat() if reading else None,
+            'last_power_reading': reading[1] if reading else None,
+        })
         if transitioned:
             logger.info(f"Data health status changed to: {current_status}")
     except Exception as e:
@@ -842,6 +863,33 @@ def health_check():
     }
 
     return jsonify(health_status), 200 if health_status['status'] == 'healthy' else 503
+
+@app.route('/health/data', methods=['GET'])
+def data_health():
+    """Telemetry freshness, for a watcher outside this service: 200 while the newest
+    meter reading is recent, 503 once it is older than the staleness threshold.
+
+    Separate from /health on purpose. Fly restarts the machine when /health fails, which
+    is right for a dead process or store and wrong for a dead Pi or Eagle.
+    """
+    stale_after = monitor.stale_threshold_minutes * 60
+    try:
+        reading = latest_reading()
+    except Exception as e:
+        logger.error(f"Error reading the store for /health/data: {e}")
+        return jsonify({'status': 'unavailable', 'stale_after_seconds': stale_after}), 503
+    if reading is None:
+        return jsonify({'status': 'no_data', 'stale_after_seconds': stale_after}), 503
+
+    age = (datetime.now(timezone.utc) - reading[0]).total_seconds()
+    fresh = age <= stale_after
+    return jsonify({
+        'status': 'fresh' if fresh else 'stale',
+        'reading_age_seconds': round(age, 1),
+        'last_reading': reading[0].isoformat(),
+        'power_w': reading[1],
+        'stale_after_seconds': stale_after,
+    }), 200 if fresh else 503
 
 def _window_stats_sqlite(hours, billing_start):
     """Raw window statistics from the SQLite store. None if the store is not open."""

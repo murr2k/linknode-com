@@ -496,12 +496,16 @@ No timestamp      → "No data"
 
 ### Outage Alerting
 
-The ingest service runs two APScheduler jobs: a data-freshness check every 5 minutes and a retention prune once a day. The freshness check marks the feed unhealthy when no reading has been stored for more than `STALE_THRESHOLD_MINUTES` (default 5) or the last power reading is zero or missing. Alerts fire only on state transitions, once per outage:
+The ingest service runs two APScheduler jobs: a data-freshness check every 5 minutes and a retention prune once a day. The freshness check marks the feed unhealthy when the newest power reading in the store is older than `STALE_THRESHOLD_MINUTES` (default 5) or is zero or missing. It goes by the reading's own time, which the Pi takes from the Eagle's last contact with the meter, not by when a POST last arrived: the Pi keeps re-posting a frozen reading while the Eagle answers but has lost the meter. Alerts fire only on state transitions, once per outage:
 
 - **healthy to unhealthy:** Slack (`SLACK_WEBHOOK_URL`) plus a Pushover emergency siren (priority 2, repeats every 60 s until acknowledged, expires after 1 hour)
 - **unhealthy to healthy:** Slack only
 
 The state is saved to `/data/monitor_state.json` on the volume, so a restart does not repeat an alert.
+
+`GET /health/data` exposes the same signal: 200 while the newest reading is fresh, 503 once it is stale. `/health` stays a liveness check (process up, store answering), because Fly restarts the machine when it fails and a restart does not fix a dead Pi.
+
+The ingest service cannot report its own death, so the Pi runs the other half: `scripts/linknode_watchdog.py`, a systemd timer every 2 minutes (`deploy/linknode-watchdog.*`). It checks that `/health/data` answers, that linknode.com serves the dashboard, and that `/api/stats` answers with the CORS header the page needs, and sends its own Pushover siren after three consecutive failures. The two watch each other; only both failing at once goes unreported.
 
 ---
 

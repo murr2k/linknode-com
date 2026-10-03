@@ -105,6 +105,36 @@ is stopped:
 sudo -u pi python3 /opt/eagle-bypass/eagle_bypass.py --print-stats
 ```
 
+## Watchdog (alerts when Fly or the site is down)
+
+`scripts/linknode_watchdog.py` is the outside half of the outage alerting. The ingest
+service on Fly alerts when telemetry stops; it cannot alert when it is itself down, so
+the Pi checks it, the site, and the stats API every 2 minutes and sends a Pushover
+siren after three consecutive failures. Standard library only, like the bypass.
+
+```sh
+# From a machine with this repo:
+scp scripts/linknode_watchdog.py deploy/linknode-watchdog.service \
+    deploy/linknode-watchdog.timer deploy/linknode-watchdog.env.example pi@<pi-ip>:/tmp/
+
+# --- the rest runs on the Pi ---
+sudo install -D -m 0755 /tmp/linknode_watchdog.py /opt/linknode-watchdog/linknode_watchdog.py
+sudo install -m 0600 /tmp/linknode-watchdog.env.example /etc/linknode-watchdog.env
+sudoedit /etc/linknode-watchdog.env    # PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY
+sudo install -m 0644 /tmp/linknode-watchdog.service /tmp/linknode-watchdog.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Prove it before enabling: the three checks, then a real (normal-priority) test message
+python3 /opt/linknode-watchdog/linknode_watchdog.py --dry-run
+sudo sh -c 'set -a; . /etc/linknode-watchdog.env; python3 /opt/linknode-watchdog/linknode_watchdog.py --test-alert'
+
+sudo systemctl enable --now linknode-watchdog.timer
+journalctl -u linknode-watchdog.service -f     # silent while healthy; -v on ExecStart logs every pass
+```
+
+State (failure counts, which checks have alerted) is in
+`/var/lib/linknode-watchdog/state.json`, written only when something changes.
+
 ## Notes
 
 - **Always-on (default) vs. failover:** always-on is now the script's **default**
