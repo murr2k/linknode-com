@@ -10,6 +10,10 @@ kill_timeout = "5s"
   # SQLite store and alert state live on the eagle_data volume
   DB_PATH = "/data/energy.db"
   MONITOR_STATE_FILE = "/data/monitor_state.json"
+  # Minutes before the newest reading counts as stale (the alarm and /health/data).
+  # Must be an integer. The Pi watchdog's WATCH_BACKSTOP_SECS has to stay well above
+  # this many minutes: see docs/ALERTING.md.
+  STALE_THRESHOLD_MINUTES = "30"
 
 # One volume, one machine: never scale this app past 1 (each machine would get
 # its own separate database).
@@ -31,22 +35,24 @@ kill_timeout = "5s"
     port = 443
     handlers = ["tls", "http"]
 
+  # Every open page holds one connection for its live stream, so the limits sit well
+  # clear of the number of pages likely to be open: uploads and the watchdog's checks
+  # must still get in.
   [services.concurrency]
     type = "connections"
-    hard_limit = 25
-    soft_limit = 20
+    hard_limit = 200
+    soft_limit = 150
 
+  # While a check fails Fly stops routing to the machine. It does not restart it.
   [[services.tcp_checks]]
     interval = "15s"
     timeout = "2s"
     grace_period = "5s"
-    restart_limit = 6
 
   [[services.http_checks]]
     interval = "10s"
     timeout = "2s"
     grace_period = "5s"
-    restart_limit = 6
     path = "/health"
     protocol = "http"
     method = "GET"

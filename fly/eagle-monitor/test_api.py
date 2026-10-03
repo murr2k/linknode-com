@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import time
 import unittest
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -55,6 +56,19 @@ def bypass_xml(data_uptime='99.92', cycle_period='34.6'):
     )
 
 
+@contextmanager
+def pinned_clock(fixed):
+    """Hold the clock at `fixed` in app.py and store.py for the length of a test."""
+    class PinnedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed.astimezone(tz) if tz is not None else fixed.replace(tzinfo=None)
+
+    with patch.object(monitor_app, 'datetime', PinnedDatetime), \
+            patch.object(monitor_app.store, 'datetime', PinnedDatetime):
+        yield
+
+
 class TestRoutes(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -97,7 +111,17 @@ class TestRoutes(unittest.TestCase):
         self.assertEqual(monitor_app.stats['failed_writes'], 1)
 
     def test_stats_shape_and_values(self):
-        now = time.time()
+        # The clock is held in a billing period that has already ended. On the real clock
+        # this test failed for the first 40 minutes of each period, before the readings
+        # (stamped up to an hour back) fell inside it, and that blocked a CI deploy. The
+        # clock is read in three places and all three must agree: `now` here, datetime in
+        # app.py and datetime in store.py. Leave any one on the real clock and the
+        # readings fall outside the window, so the test fails at once.
+        fixed = datetime(2026, 8, 15, 12, 0, tzinfo=monitor_app.BILLING_TZ)
+        with pinned_clock(fixed):
+            self._stats_shape_and_values(fixed.timestamp())
+
+    def _stats_shape_and_values(self, now):
         for i, w in enumerate((1000, 2000, 3000)):
             self.post(demand_xml(w, now - 3600 + i * 600))
         self.post(price_xml(1172, now - 60))

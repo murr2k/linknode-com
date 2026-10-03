@@ -22,7 +22,7 @@ import re
 from security_monitor import security_monitor, require_api_key_with_monitoring
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from monitor_data_staleness import DataStalenessMonitor
+from monitor_data_staleness import DataStalenessMonitor, WatchdogLiveness, FROZEN_REGISTER_WINDOW
 import store
 import dashboard
 
@@ -150,6 +150,9 @@ stats = {
     # Reliability heartbeat from the Pi bypass (uptime the dashboard displays).
     # Populated out-of-band by BypassStatus messages; None until the first arrives.
     'bypass_status': None,
+    # When the Pi watchdog (scripts/linknode_watchdog.py) last asked /health/data.
+    # None until it does; restored from the store on restart.
+    'watchdog_last_seen': None,
 }
 
 # Initialize data staleness monitor
@@ -159,6 +162,16 @@ monitor = DataStalenessMonitor(
     pushover_token=os.getenv('PUSHOVER_API_TOKEN'),
     pushover_user=os.getenv('PUSHOVER_USER_KEY')
 )
+
+# Reports a Pi watchdog that has stopped calling; built by init_store(), which gives
+# it the store to keep its state in.
+watchdog_liveness = None
+# The watchdog names itself in its User-Agent (USER_AGENT in linknode_watchdog.py).
+# A run by hand, --dry-run included, sends the same one and counts as the watchdog.
+WATCHDOG_USER_AGENT_PREFIX = 'linknode-watchdog/'
+# Its requests come every 2 minutes; the time is saved to the store this often.
+WATCHDOG_SAVE_SECONDS = 600
+_watchdog_saved_at = None
 
 # Background scheduler for monitoring
 scheduler = None
@@ -267,7 +280,7 @@ def broadcast_power_update(power_w, timestamp, packet_interval_ms=None):
 
 def init_store(path=None):
     """Open (creating if needed) the SQLite store"""
-    global db
+    global db, watchdog_liveness, _watchdog_saved_at
     path = path or DB_PATH
     parent = os.path.dirname(path)
     if parent.startswith('/data') and not os.path.ismount('/data'):
@@ -280,11 +293,44 @@ def init_store(path=None):
         saved = db.get_meta('bypass_status')
         if saved:
             stats['bypass_status'] = json.loads(saved)
+        # Likewise the time of the Pi watchdog's last request, and what has been
+        # said about its silence, so a restart neither forgets nor repeats it.
+        stats['watchdog_last_seen'] = db.get_meta('watchdog_last_seen')
+        _watchdog_saved_at = None
+        watchdog_liveness = WatchdogLiveness(
+            monitor, started=stats['start_time'],
+            load=_load_watchdog_state, save=_save_watchdog_state)
         return True
     except Exception as e:
         db = None
+        watchdog_liveness = None
         logger.error(f"Failed to open SQLite store at {path}: {e}")
         return False
+
+def _load_watchdog_state():
+    saved = db.get_meta('watchdog_alert') if db is not None else None
+    return json.loads(saved) if saved else None
+
+def _save_watchdog_state(state):
+    if db is not None:
+        db.set_meta('watchdog_alert', json.dumps(state))
+
+def note_watchdog_request():
+    """Record that the Pi watchdog has just called. In memory at once; in the store
+    at most every WATCHDOG_SAVE_SECONDS. A save that fails is logged and nothing more:
+    it must not fail the request."""
+    global _watchdog_saved_at
+    if not request.headers.get('User-Agent', '').startswith(WATCHDOG_USER_AGENT_PREFIX):
+        return
+    stats['watchdog_last_seen'] = datetime.now(timezone.utc).isoformat()
+    now = time.monotonic()
+    if db is None or (_watchdog_saved_at is not None and now - _watchdog_saved_at < WATCHDOG_SAVE_SECONDS):
+        return
+    try:
+        db.set_meta('watchdog_last_seen', stats['watchdog_last_seen'])
+        _watchdog_saved_at = now
+    except Exception as e:
+        logger.warning(f"Could not save the watchdog's last request time: {e}")
 
 def start_data_monitor():
     """Start the background jobs: data staleness check and daily retention prune"""
@@ -345,18 +391,52 @@ def latest_reading():
     return store.EPOCH + timedelta(milliseconds=row[0]), row[1]
 
 
+def register_values():
+    """(newest, then) values of the meter's kWh register: the newest stored row,
+    however old, and the newest row from FROZEN_REGISTER_WINDOW or more ago. Either
+    is None when there is no such row. The monitor calls the register frozen when
+    the two are equal: it does not trust timestamps, so it also catches a frozen
+    reading that arrives stamped as new.
+    """
+    if db is None:
+        return None, None
+    now = store.now_ms()
+    window_ms = FROZEN_REGISTER_WINDOW // timedelta(milliseconds=1)
+    newest = db.latest('energy_delivered_kwh', 0, now)
+    then = db.latest('energy_delivered_kwh', 0, now - window_ms)
+    return (newest[1] if newest else None), (then[1] if then else None)
+
+
 def check_data_health():
     """Background job to check if data is still arriving"""
     try:
         reading = latest_reading()
+    except Exception as e:
+        logger.error(f"Error in data health check: {e}")
+        return
+    try:
+        register_now, register_then = register_values()
+    except Exception as e:
+        # No verdict on the register; the rules on the power reading still apply.
+        logger.error(f"Error reading the kWh register for the health check: {e}")
+        register_now = register_then = None
+    try:
         current_status, transitioned = monitor.check_data_freshness({
             'last_data_received': reading[0].isoformat() if reading else None,
             'last_power_reading': reading[1] if reading else None,
+            'register_now': register_now,
+            'register_then': register_then,
         })
         if transitioned:
             logger.info(f"Data health status changed to: {current_status}")
     except Exception as e:
         logger.error(f"Error in data health check: {e}")
+        return
+    try:
+        if watchdog_liveness is not None:
+            watchdog_liveness.check(stats.get('watchdog_last_seen'), current_status)
+    except Exception as e:
+        logger.error(f"Error in watchdog liveness check: {e}")
 
 # Eagle/Zigbee Smart Energy timestamps count seconds from 2000-01-01 UTC,
 # not the Unix epoch (1970-01-01). This is the gap between the two.
@@ -876,6 +956,7 @@ def data_health():
     dead process or store and wrong for a dead Pi or Eagle, where it would cut off the
     uploads that could make the feed fresh again.
     """
+    note_watchdog_request()
     stale_after = monitor.stale_threshold_minutes * 60
     try:
         reading = latest_reading()
@@ -928,8 +1009,21 @@ def get_stats():
     with sse_clients_lock:
         active_viewers = len(sse_clients)
 
+    # The last power value posted since this process started. After a restart there is
+    # none until the next power reading, so fall back to the newest stored one: a
+    # restart during a telemetry outage must not look like the stats API failing.
+    # The in-memory value itself stays unset: the live stream sends it to each page
+    # that connects, and the page would show it as live.
+    current_power = stats.get('last_power_reading')
+    if current_power is None:
+        try:
+            reading = latest_reading()
+            current_power = reading[1] if reading else None
+        except Exception as e:
+            logger.error(f"Error reading the newest power reading for stats: {e}")
+
     result = {
-        'current_power': stats.get('last_power_reading', 0),
+        'current_power': current_power,
         'min_24h': 0,
         'max_24h': 0,
         'avg_24h': 0,
