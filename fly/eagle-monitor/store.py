@@ -168,6 +168,21 @@ class Store:
             return None
         return (total or 0.0) / 3_600_000.0  # W*ms -> Wh
 
+    def integral_wh_buckets(self, start_ms, end_ms, bucket_ms):
+        """integral_wh split into bucket_ms buckets counted from start_ms: {index: Wh}.
+
+        Each straight-line segment goes to the bucket its later point falls in, so the
+        buckets add up to integral_wh(start_ms, end_ms). One pass, like integral_wh."""
+        rows = self._query(
+            'SELECT (ts_ms - ?) / ? AS bucket, SUM((ts_ms - prev_ts) * (value + prev_v) / 2.0) '
+            'FROM (SELECT ts_ms, value, '
+            '             LAG(ts_ms) OVER (ORDER BY ts_ms) AS prev_ts, '
+            '             LAG(value) OVER (ORDER BY ts_ms) AS prev_v '
+            '      FROM readings WHERE field_id = ? AND ts_ms >= ? AND ts_ms < ?) '
+            'WHERE prev_ts IS NOT NULL GROUP BY bucket',
+            (start_ms, bucket_ms, FIELD_IDS['power_w'], start_ms, end_ms))
+        return {bucket: total / 3_600_000.0 for bucket, total in rows}
+
     def series(self, field, start_ms, end_ms, bucket_ms=None):
         """[(t_ms, mean, min, max)] over [start_ms, end_ms). With bucket_ms, epoch-aligned
         buckets stamped at the bucket's end, clipped to end_ms (aggregateWindow semantics).

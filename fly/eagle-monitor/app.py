@@ -127,6 +127,11 @@ BILLING_CYCLE_MONTHS = int(os.getenv('BILLING_CYCLE_MONTHS', '2'))
 BILLING_CYCLE_FIRST_MONTH = int(os.getenv('BILLING_CYCLE_FIRST_MONTH', '1'))  # 1 = Jan, Mar, May...
 BILLING_CYCLE_START_DAY = int(os.getenv('BILLING_CYCLE_START_DAY', '26'))
 BILLING_PERIOD_START = os.getenv('BILLING_PERIOD_START')
+# "Your next meter reading is on or around ..." from the latest bill (Sep 29, 2026): the
+# period ends that day and the next starts the day after, in place of the nominal
+# boundary. Update it with each bill; a date nowhere near a boundary is ignored.
+BILLING_NEXT_READ = os.getenv('BILLING_NEXT_READ', '2026-11-26')
+BILLING_READ_WINDOW_DAYS = 10  # how far a read may sit from the nominal boundary it replaces
 BILLING_TZ = ZoneInfo(os.getenv('BILLING_TZ', 'America/Vancouver'))
 
 # Statistics
@@ -669,13 +674,43 @@ def get_billing_period_start(now=None):
     return start
 
 
+def get_billing_period(now=None):
+    """(start, next_start) of the billing period containing `now`, as local midnights.
+
+    get_billing_period_start gives the nominal boundaries. BILLING_NEXT_READ, the meter
+    read date printed on the latest bill, moves the nominal boundary nearest to it to the
+    day after the read, so the period runs to the day BC Hydro actually reads the meter.
+    """
+    now = (now or datetime.now(timezone.utc)).astimezone(BILLING_TZ)
+    start = get_billing_period_start(now)
+    next_start = _add_months(start, BILLING_CYCLE_MONTHS)
+    if not BILLING_NEXT_READ:
+        return start, next_start
+
+    read = datetime.strptime(BILLING_NEXT_READ, '%Y-%m-%d').replace(tzinfo=BILLING_TZ)
+    boundary = read + timedelta(days=1)
+    window = timedelta(days=BILLING_READ_WINDOW_DAYS)
+    if abs(boundary - start) <= window:
+        if now >= boundary:
+            start = boundary
+        else:  # the nominal boundary has passed but the read has not: still the old period
+            start, next_start = _add_months(start, -BILLING_CYCLE_MONTHS), boundary
+    elif abs(boundary - next_start) <= window:
+        if now >= boundary:
+            start, next_start = boundary, _add_months(next_start, BILLING_CYCLE_MONTHS)
+        else:
+            next_start = boundary
+    return start, next_start
+
+
 def calculate_tiered_cost(energy_kwh, days_in_period, tier1_rate=None, tier2_rate=None):
     """
     Bill for `energy_kwh` over `days_in_period` days, built line by line the way BC Hydro's
     residential tiered bill (rate schedule 1101) is: each line rounded to the cent, the
     deferral account rate rider applied to basic charge + energy, the regional transit
-    levy per day, then GST on the subtotal. Reproduces the Jul 30, 2026 bill exactly
-    (855 kWh over 61 days = $123.75); see test_api.TestBilling.
+    levy per day, then GST on the subtotal. Reproduces the Jul 30, 2026 bill
+    (855 kWh over 61 days = $123.75) and the Sep 29, 2026 bill (914 kWh over 59 days =
+    $130.38) exactly; see test_api.TestBilling.
 
     Args:
         energy_kwh: Total energy consumed in kWh
@@ -719,6 +754,81 @@ def calculate_tiered_cost(energy_kwh, days_in_period, tier1_rate=None, tier2_rat
         'tier1_rate': tier1,
         'tier2_rate': tier2
     }
+
+
+def _linear_fit(points):
+    """Least-squares (slope, intercept) through [(x, y)], or None without two distinct x."""
+    n = len(points)
+    mean_x = sum(x for x, _ in points) / n
+    mean_y = sum(y for _, y in points) / n
+    sxx = sum((x - mean_x) ** 2 for x, _ in points)
+    if not sxx:
+        return None
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in points) / sxx
+    return slope, mean_y - slope * mean_x
+
+
+def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days):
+    """Bill so far against the day of the cycle, with a straight-line forecast.
+
+    The points are $0 at day 0, the bill at the end of each completed day (`day_kwh` is
+    the cumulative kWh at each of those midnights) and the bill now, at `elapsed_days`
+    with the per-day charges prorated so it sits on the same curve as the rest. The
+    trendline is the least-squares line through them: its slope is the spend rate in
+    $/day (the consumption rate only while the unit price holds) and its value at
+    `cycle_days` is the bill if that rate holds. No trendline until one full day is in.
+    """
+    points = [(0.0, 0.0)]
+    points += [(float(day), calculate_tiered_cost(kwh, day)['total_cost'])
+               for day, kwh in enumerate(day_kwh, start=1)]
+    if energy_kwh is not None and elapsed_days > len(day_kwh):
+        points.append((round(elapsed_days, 3),
+                       calculate_tiered_cost(energy_kwh, elapsed_days)['total_cost']))
+
+    trend = {'points': [list(p) for p in points],
+             'slope_per_day': None, 'intercept': None, 'projected_total': None}
+    fit = _linear_fit(points) if day_kwh else None
+    if fit:
+        slope, intercept = fit
+        trend['slope_per_day'] = round(slope, 4)
+        trend['intercept'] = round(intercept, 4)
+        trend['projected_total'] = round(slope * cycle_days + intercept, 2)
+    return trend
+
+
+_billing_days_cache = {}
+_billing_days_cache_lock = Lock()
+BILLING_DAYS_CACHE_SECONDS = 3600
+HOUR_MS = 3_600_000
+
+
+def _billing_day_kwh(billing_start, completed_days):
+    """Cumulative kWh at the end of each completed local day of the billing period.
+
+    One pass over the period in hourly buckets, summed up to each local midnight (hours,
+    so a DST change inside the period cannot shift a day). Completed days do not change,
+    so the result is kept until the day count does; the hourly expiry only picks up
+    late backfilled readings."""
+    start_ms = store.to_ms(billing_start)
+    key = (start_ms, completed_days)
+    now = time.monotonic()
+    with _billing_days_cache_lock:
+        cached = _billing_days_cache.get('days')
+        if cached and cached[0] == key and now - cached[1] < BILLING_DAYS_CACHE_SECONDS:
+            return cached[2]
+
+    edges = [store.to_ms(billing_start + timedelta(days=day)) for day in range(1, completed_days + 1)]
+    buckets = sorted(db.integral_wh_buckets(start_ms, edges[-1], HOUR_MS).items()) if edges else []
+    day_kwh, total_wh, i = [], 0.0, 0
+    for edge in edges:
+        while i < len(buckets) and start_ms + buckets[i][0] * HOUR_MS < edge:
+            total_wh += buckets[i][1]
+            i += 1
+        day_kwh.append(total_wh / 1000.0)
+
+    with _billing_days_cache_lock:
+        _billing_days_cache['days'] = (key, now, day_kwh)
+    return day_kwh
 
 
 @app.route('/health', methods=['GET'])
@@ -792,11 +902,12 @@ def get_stats():
             'days': 0,
             'cycle_days': 0,
             'energy_kwh': 0,
-            'tiered_cost': None
+            'tiered_cost': None,
+            'trend': None
         }
     }
 
-    billing_start = get_billing_period_start()
+    billing_start, next_start = get_billing_period()
     try:
         window = _window_stats_sqlite(hours, billing_start)
     except Exception as e:
@@ -841,14 +952,15 @@ def get_stats():
         result['cost_24h'] = round(kwh * result['price_per_kwh'], 2)
 
     # Billing period so far, in local calendar days like the bill
-    today = datetime.now(timezone.utc).astimezone(BILLING_TZ).date()
+    local_now = datetime.now(timezone.utc).astimezone(BILLING_TZ)
+    today = local_now.date()
     days_in_period = (today - billing_start.date()).days + 1  # Include today
-    next_start = _add_months(billing_start, BILLING_CYCLE_MONTHS)
+    cycle_days = (next_start.date() - billing_start.date()).days
 
     result['billing_period']['start'] = billing_start.isoformat()
     result['billing_period']['next_start'] = next_start.isoformat()
     result['billing_period']['days'] = days_in_period
-    result['billing_period']['cycle_days'] = (next_start.date() - billing_start.date()).days
+    result['billing_period']['cycle_days'] = cycle_days
 
     energy_kwh = window['billing_energy_kwh']
     if energy_kwh is not None:
@@ -857,6 +969,16 @@ def get_stats():
         # Tiered cost from the configured BC Hydro rates
         tiered = calculate_tiered_cost(energy_kwh, days_in_period)
         result['billing_period']['tiered_cost'] = tiered
+
+        # Bill so far by day, and the straight line through it out to the last day
+        try:
+            completed_days = days_in_period - 1
+            midnight = billing_start + timedelta(days=completed_days)
+            elapsed_days = completed_days + (local_now - midnight) / timedelta(days=1)
+            result['billing_period']['trend'] = billing_trend(
+                _billing_day_kwh(billing_start, completed_days), elapsed_days, energy_kwh, cycle_days)
+        except Exception as e:
+            logger.error(f"Error building the billing trend: {e}")
 
     return jsonify(result), 200
 

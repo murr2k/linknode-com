@@ -587,6 +587,10 @@
             position: relative;
         }
 
+        .bill-chart {
+            height: 300px;
+        }
+
         .power-chart .uplot {
             font-family: inherit;
         }
@@ -2088,6 +2092,20 @@
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="dash-cost">--</div><div class="dashboard-stat-label">Estimated Cost</div></div>
                 </div>
             </div>
+
+            <!-- Bill forecast: bill so far by day of the billing cycle and its trendline, from /api/stats -->
+            <div class="energy-dashboard" id="bill-forecast">
+                <div class="dashboard-header">
+                    <h3>📈 Bill Forecast</h3>
+                </div>
+                <div class="power-chart bill-chart" id="bill-chart" role="img" aria-label="Bill so far by day of the billing cycle, with a straight-line forecast to the end of the cycle"></div>
+                <div class="dashboard-stats">
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-now">--</div><div class="dashboard-stat-label">Bill So Far</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-rate">--</div><div class="dashboard-stat-label">Spend Rate</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-projected">--</div><div class="dashboard-stat-label">Projected Bill</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-days-left">--</div><div class="dashboard-stat-label">Days Left</div></div>
+                </div>
+            </div>
         </section>
 
         <!-- Technology Stack Section -->
@@ -2667,6 +2685,7 @@
                             `GST ${c.gst_pct}%: ${money(c.gst)}
 ` +
                             `Total: ${money(c.total_cost)}`;
+                        renderBillChart(bp);
                     }
 
                     // Check data staleness (2 minutes = 120 seconds).
@@ -3013,6 +3032,145 @@
             }, data, el);
         }
 
+        // Bill forecast: the bill so far at each day of the billing cycle, and the
+        // least-squares line through it carried on to the last day. The slope is the
+        // spend rate; where the line ends is the bill if that rate holds.
+        let billChart = null;
+        let billPeriod = null;  // last billing_period drawn, kept so a skin change can redraw it
+
+        const billMoney = v => '$' + v.toFixed(2);
+
+        // "Oct 7" for a day of the cycle (day 1 is the period's start date)
+        function billDayLabel(day) {
+            const [y, m, d] = billPeriod.start.slice(0, 10).split('-').map(Number);
+            return new Date(Date.UTC(y, m - 1, d + day - 1))
+                .toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+        }
+
+        function billTooltipPlugin() {
+            let tip;
+            return {
+                hooks: {
+                    init: u => {
+                        tip = document.createElement('div');
+                        tip.className = 'chart-tooltip';
+                        u.over.appendChild(tip);
+                    },
+                    setCursor: u => {
+                        const i = u.cursor.idx;
+                        if (i === null || i === undefined) {
+                            tip.style.display = 'none';
+                            return;
+                        }
+                        const day = u.data[0][i], actual = u.data[1][i], trend = u.data[2][i];
+                        const parts = [Number.isInteger(day) ? `Day ${day} · ${billDayLabel(day)}` : 'Now'];
+                        if (actual !== null) parts.push(billMoney(actual));
+                        if (trend !== null) parts.push(`trend ${billMoney(trend)}`);
+                        tip.textContent = parts.join('  ');
+                        tip.style.display = 'block';
+                        tip.style.left = Math.max(0, Math.min(u.cursor.left + 12, u.over.clientWidth - tip.offsetWidth)) + 'px';
+                        tip.style.top = Math.max(0, u.valToPos(actual !== null ? actual : trend, 'y') - 36) + 'px';
+                    }
+                }
+            };
+        }
+
+        // The projected bill, written where the trendline ends
+        function billEndLabelPlugin(color, font) {
+            return {
+                hooks: {
+                    draw: u => {
+                        const trend = u.data[2], last = trend.length - 1;
+                        if (trend[last] === null) return;
+                        const ctx = u.ctx;
+                        ctx.save();
+                        ctx.font = font.replace(/(\d+(\.\d+)?)px/, (m, px) => px * devicePixelRatio + 'px');
+                        ctx.fillStyle = color;
+                        ctx.textAlign = 'right';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(billMoney(trend[last]),
+                            u.valToPos(u.data[0][last], 'x', true) - 4 * devicePixelRatio,
+                            u.valToPos(trend[last], 'y', true) - 6 * devicePixelRatio);
+                        ctx.restore();
+                    }
+                }
+            };
+        }
+
+        function renderBillChart(bp) {
+            const el = document.getElementById('bill-chart');
+            const t = bp.trend;
+            const hasTrend = t && t.slope_per_day !== null && t.slope_per_day !== undefined;
+            document.getElementById('bill-now').textContent = billMoney(bp.tiered_cost.total_cost);
+            document.getElementById('bill-rate').textContent = hasTrend ? billMoney(t.slope_per_day) + '/day' : '--';
+            document.getElementById('bill-projected').textContent = hasTrend ? billMoney(t.projected_total) : '--';
+            document.getElementById('bill-days-left').textContent = String(Math.max(0, bp.cycle_days - bp.days));
+            if (!t || t.points.length < 2) {
+                if (billChart) {
+                    billChart.destroy();
+                    billChart = null;
+                }
+                el.innerHTML = '<div class="chart-message">No billing data yet</div>';
+                return;
+            }
+            billPeriod = bp;
+            // Every point so far, then each remaining day out to the end of the cycle
+            const days = t.points.map(p => p[0]);
+            for (let d = Math.floor(days[days.length - 1]) + 1; d <= bp.cycle_days; d++) days.push(d);
+            const data = [
+                days,
+                days.map((d, i) => i < t.points.length ? t.points[i][1] : null),
+                days.map(d => hasTrend ? Math.max(0, t.slope_per_day * d + t.intercept) : null)
+            ];
+            if (billChart) {
+                billChart.setData(data);
+                return;
+            }
+            el.innerHTML = '';
+            const skinStyle = getComputedStyle(document.documentElement);
+            const skinVar = name => skinStyle.getPropertyValue(name).trim();
+            const font = skinVar('--chart-font') || '12px system-ui, sans-serif';
+            const axis = {
+                stroke: skinVar('--chart-axis'),
+                grid: { stroke: skinVar('--chart-grid') },
+                ticks: { stroke: skinVar('--chart-tick') },
+                font: font,
+                labelFont: font
+            };
+            const plugins = [billTooltipPlugin(), billEndLabelPlugin(skinVar('--chart-axis'), font)];
+            if (skinVar('--chart-glow')) plugins.push(chartGlowPlugin(skinVar('--chart-glow')));
+            billChart = new uPlot({
+                width: el.clientWidth,
+                height: el.clientHeight,
+                legend: { show: false },
+                cursor: { y: false, points: { size: 6 } },
+                scales: {
+                    x: { time: false, range: () => [0, billPeriod.cycle_days] },
+                    y: { range: (u, min, max) => [0, max > 0 ? max * 1.15 : 10] }
+                },
+                series: [
+                    {},
+                    {   // bill so far
+                        stroke: skinVar('--chart-line'),
+                        width: 2,
+                        fill: skinVar('--chart-fill'),
+                        points: { show: false }
+                    },
+                    {   // trendline, past and future
+                        stroke: skinVar('--chart-envelope'),
+                        width: 2,
+                        dash: [8, 6],
+                        points: { show: false }
+                    }
+                ],
+                axes: [
+                    Object.assign({}, axis, { label: 'Day of billing cycle', labelSize: 24 }),
+                    Object.assign({}, axis, { size: 70, values: (u, vals) => vals.map(v => '$' + v) })
+                ],
+                plugins: plugins
+            }, data, el);
+        }
+
         async function fetchDashboard() {
             const gen = ++dashboardGen;  // a newer call (range change) supersedes this one
             clearTimeout(dashboardTimer);
@@ -3066,6 +3224,11 @@
             if (powerChart) powerChart.setSize({ width: el.clientWidth, height: el.clientHeight });
         }).observe(document.getElementById('power-chart'));
 
+        new ResizeObserver(() => {
+            const el = document.getElementById('bill-chart');
+            if (billChart) billChart.setSize({ width: el.clientWidth, height: el.clientHeight });
+        }).observe(document.getElementById('bill-chart'));
+
         // Skin picker. "classic" is the page as written (no data-skin attribute); the
         // others are override blocks in the stylesheet. The choice is kept in localStorage
         // and applied before first paint by the script in <head>.
@@ -3100,6 +3263,11 @@
                 powerChart.destroy();
                 powerChart = null;
                 renderPowerChart(chartSeries, chartWindow[0], chartWindow[1]);
+            }
+            if (billChart) {
+                billChart.destroy();
+                billChart = null;
+                renderBillChart(billPeriod);
             }
         }
 

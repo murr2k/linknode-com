@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of Bklit UI (bklit.com): neutral near-black on a dot grid, hairline cards, a cyan chart
   ramp, a notched gauge track, hatched call-out boxes and mono numerals. No Bklit code or
   fonts are used; it is a CSS override block like Scope
+- **Bill Forecast chart** on the site: the bill so far at each day of the billing cycle, with
+  the least-squares trendline through it carried on to the last day and the projected bill
+  written where it ends. The slope is the spend rate in $/day. `GET /api/stats`
+  `billing_period` gains `trend` (`points`, `slope_per_day`, `intercept`, `projected_total`)
+- `BILLING_NEXT_READ`: the next meter read date printed on the latest bill. The current
+  period now ends on that day (Nov 26, 2026, making it 62 days) in place of the nominal
+  boundary
+- The Sep 29, 2026 bill (914 kWh over 59 days, $130.38) as a second test of the bill
+  calculator; the rates were unchanged
 
 ## [2.0.0] - 2026-09-27
 

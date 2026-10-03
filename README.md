@@ -84,7 +84,12 @@ the meter's own register to within 0.01% over 30 days.
 - **Billing period.** BC Hydro bills every two months. For this account the periods start in
   odd months around the 26th (the day after the meter read), and days are counted in Vancouver
   time. The read date drifts by a few days, so `BILLING_PERIOD_START` (the start date on the
-  latest bill) pins the period exactly.
+  latest bill) pins the period exactly, and `BILLING_NEXT_READ` (the next read date on that
+  bill) ends it on the day the meter is actually read.
+- **Forecast.** The Bill Forecast chart plots the bill so far against the day of the cycle and
+  fits a straight line through it, carried on to the last day. The slope is the spend rate in
+  $/day and the line's end is the bill if that rate holds. It is `billing_period.trend` in
+  `GET /api/stats`, and appears once one full day of the period is in.
 - **"So far" means "if the period ended today".** The threshold is prorated to the days
   elapsed, so early in a period one heavy day can show some Tier 2 use that the full period
   would absorb.

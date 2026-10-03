@@ -60,6 +60,7 @@ class TestRoutes(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.assertTrue(monitor_app.init_store(os.path.join(self.tmp, 'energy.db')))
         monitor_app._dashboard_cache.clear()
+        monitor_app._billing_days_cache.clear()
         monitor_app.stats.update({'last_data_received': None, 'last_power_reading': None,
                                   'successful_writes': 0, 'failed_writes': 0,
                                   'bypass_status': None})
@@ -116,6 +117,7 @@ class TestRoutes(unittest.TestCase):
         self.assertIsNotNone(body['billing_period']['tiered_cost'])
         self.assertIn(body['billing_period']['cycle_days'], range(59, 63))
         self.assertIsNotNone(body['billing_period']['next_start'])
+        self.assertEqual(body['billing_period']['trend']['points'][0], [0.0, 0.0])
 
     def test_heartbeat_survives_restart(self):
         r = self.post(bypass_xml())
@@ -182,7 +184,7 @@ class TestRoutes(unittest.TestCase):
 
 
 class TestBilling(unittest.TestCase):
-    """The bill-so-far estimate against a real BC Hydro bill (Jul 30, 2026, rate 1101)."""
+    """The bill-so-far estimate against real BC Hydro bills (Jul 30 and Sep 29, 2026, rate 1101)."""
 
     def test_matches_july_2026_invoice(self):
         # May 29 - Jul 28, 2026: 855 kWh over 61 days, total due $123.75
@@ -196,6 +198,19 @@ class TestBilling(unittest.TestCase):
         self.assertEqual(bill['subtotal'], 117.86)
         self.assertEqual(bill['gst'], 5.89)                # GST 5% on $117.86
         self.assertEqual(bill['total_cost'], 123.75)
+
+    def test_matches_september_2026_invoice(self):
+        # Jul 29 - Sep 25, 2026: 914 kWh over 59 days, total due $130.38
+        bill = monitor_app.calculate_tiered_cost(914, 59)
+        self.assertEqual(bill['threshold_kwh'], 1309.32)   # printed as 1,309 kWh
+        self.assertEqual(bill['basic_charge'], 13.83)      # 59 days x $0.2344
+        self.assertEqual(bill['tier1_cost'], 108.49)       # 914 kWh x $0.1187
+        self.assertEqual(bill['tier2_cost'], 0.00)
+        self.assertEqual(bill['rider'], -1.83)             # deferral account rider -1.5%
+        self.assertEqual(bill['transit_levy'], 3.68)       # 59 days x $0.0624
+        self.assertEqual(bill['subtotal'], 124.17)
+        self.assertEqual(bill['gst'], 6.21)                # GST 5% on $124.17
+        self.assertEqual(bill['total_cost'], 130.38)
 
     def test_usage_over_the_threshold_splits_into_tier2(self):
         bill = monitor_app.calculate_tiered_cost(1500, 61)
@@ -229,6 +244,78 @@ class TestBilling(unittest.TestCase):
             self.assertEqual(self.start('2026-09-30T12:00'), '2026-09-29')
         finally:
             monitor_app.BILLING_PERIOD_START = saved
+
+    def period(self, when, next_read):
+        saved = monitor_app.BILLING_NEXT_READ
+        monitor_app.BILLING_NEXT_READ = next_read
+        try:
+            now = datetime.fromisoformat(when).replace(tzinfo=monitor_app.BILLING_TZ)
+            return tuple(d.strftime('%Y-%m-%d') for d in monitor_app.get_billing_period(now))
+        finally:
+            monitor_app.BILLING_NEXT_READ = saved
+
+    def test_next_read_from_the_bill_moves_the_boundary(self):
+        # Sep 29, 2026 bill: next read on or around Nov 26, so this period is 62 days
+        self.assertEqual(self.period('2026-10-02T12:00', '2026-11-26'), ('2026-09-26', '2026-11-27'))
+        # The read day itself still belongs to the old period, past the nominal boundary
+        self.assertEqual(self.period('2026-11-26T12:00', '2026-11-26'), ('2026-09-26', '2026-11-27'))
+        self.assertEqual(self.period('2026-11-27T00:00', '2026-11-26'), ('2026-11-27', '2027-01-26'))
+        # A read before the nominal boundary ends the period early
+        self.assertEqual(self.period('2026-11-24T12:00', '2026-11-23'), ('2026-11-24', '2027-01-26'))
+
+    def test_next_read_far_from_a_boundary_is_ignored(self):
+        self.assertEqual(self.period('2027-02-10T12:00', '2026-11-26'), ('2027-01-26', '2027-03-26'))
+        self.assertEqual(self.period('2026-10-02T12:00', None), ('2026-09-26', '2026-11-26'))
+
+    def test_trend_of_a_constant_rate_is_the_bill_at_that_rate(self):
+        # 15 kWh/day for 10 full days and half of the 11th, in a 62-day cycle
+        trend = monitor_app.billing_trend([15.0 * day for day in range(1, 11)], 10.5, 157.5, 62)
+        self.assertEqual(trend['points'][0], [0.0, 0.0])
+        self.assertEqual(trend['points'][10], [10.0, monitor_app.calculate_tiered_cost(150, 10)['total_cost']])
+        self.assertEqual(trend['points'][-1][0], 10.5)
+        self.assertEqual(len(trend['points']), 12)
+        # The straight line lands on the real bill for 62 days at that rate, to rounding
+        full = monitor_app.calculate_tiered_cost(15.0 * 62, 62)['total_cost']
+        self.assertAlmostEqual(trend['projected_total'], full, delta=0.05)
+        self.assertAlmostEqual(trend['slope_per_day'], full / 62, delta=0.005)
+
+    def test_trend_slope_follows_the_spend_rate(self):
+        slow = monitor_app.billing_trend([10.0 * day for day in range(1, 8)], 7.0, 70.0, 61)
+        fast = monitor_app.billing_trend([30.0 * day for day in range(1, 8)], 7.0, 210.0, 61)
+        self.assertGreater(fast['slope_per_day'], 2 * slow['slope_per_day'])
+        self.assertGreater(fast['projected_total'], slow['projected_total'])
+
+    def test_no_trendline_before_a_full_day(self):
+        trend = monitor_app.billing_trend([], 0.4, 6.0, 61)
+        self.assertEqual(len(trend['points']), 2)
+        self.assertIsNone(trend['slope_per_day'])
+        self.assertIsNone(trend['projected_total'])
+
+
+class TestBillingDays(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.assertTrue(monitor_app.init_store(os.path.join(self.tmp, 'energy.db')))
+        monitor_app._billing_days_cache.clear()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_cumulative_kwh_at_each_local_midnight(self):
+        start = datetime(2026, 9, 26, tzinfo=monitor_app.BILLING_TZ)
+        start_ms = monitor_app.store.to_ms(start)
+        # A steady 1 kW from the first midnight, read every 30 minutes for 2.5 days
+        for i in range(121):
+            monitor_app.db.write(start_ms + i * 1_800_000, {'power_w': 1000})
+        days = monitor_app._billing_day_kwh(start, 2)
+        self.assertEqual(len(days), 2)
+        # The reading on each midnight belongs to the next day, so day 1 stops at 23:30
+        self.assertAlmostEqual(days[0], 23.5)
+        self.assertAlmostEqual(days[1], 47.5)
+
+    def test_no_completed_days(self):
+        start = datetime(2026, 9, 26, tzinfo=monitor_app.BILLING_TZ)
+        self.assertEqual(monitor_app._billing_day_kwh(start, 0), [])
 
 
 if __name__ == '__main__':

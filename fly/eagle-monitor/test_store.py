@@ -82,6 +82,16 @@ class TestStore(StoreTestCase):
         self.db.write(2 * H, {'power_w': 1000})
         self.assertAlmostEqual(self.db.integral_wh(H, 2 * H + 1), 1000.0)
 
+    def test_integral_buckets_add_up_to_the_integral(self):
+        for ts, w in ((0, 1000), (H // 2, 1000), (H, 3000), (3 * H, 1000)):
+            self.db.write(ts, {'power_w': w})
+        buckets = self.db.integral_wh_buckets(0, 3 * H + 1, H)
+        # A segment goes to the bucket its later point is in: 500 Wh, 1000 Wh, then the
+        # two-hour gap's 4000 Wh lands whole in the last
+        self.assertEqual(buckets, {0: 500.0, 1: 1000.0, 3: 4000.0})
+        self.assertAlmostEqual(sum(buckets.values()), self.db.integral_wh(0, 3 * H + 1))
+        self.assertEqual(self.db.integral_wh_buckets(0, H, H), {0: 500.0})
+
     def test_integral_zero_and_one_point(self):
         self.assertIsNone(self.db.integral_wh(0, H))
         self.db.write(10, {'power_w': 1000})

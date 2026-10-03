@@ -94,9 +94,11 @@ January 2026; those scripts no longer work.
 
 - **BC Hydro billing values change every April 1** (Step 1 rate and basic charge under
   BCUC order G-42-25; the rate rider and transit levy change too). The defaults live in
-  `fly/eagle-monitor/app.py` and are checked by a test that reproduces the Jul 30, 2026 bill
-  (`test_api.TestBilling`); when a new bill shows different values, update the defaults and
-  that test's expected lines together.
+  `fly/eagle-monitor/app.py` and are checked by tests that reproduce the Jul 30 and Sep 29,
+  2026 bills (`test_api.TestBilling`); when a new bill shows different values, update the
+  defaults and those tests' expected lines together. Each new bill also carries the next
+  meter read date: set the `BILLING_NEXT_READ` default in `app.py` to it, or the cycle
+  length and the Bill Forecast's end date fall back to the nominal 26th.
 
 - Fly `shared-cpu-1x` throttles to 6.25% of a core once burst credits run out;
   keep one-off data jobs in the machine light (see project memory).
