@@ -149,8 +149,9 @@ sudoedit /etc/linknode-watchdog.env    # PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY
 sudo install -m 0644 /tmp/linknode-watchdog.service /tmp/linknode-watchdog.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 
-# Prove it before enabling: the three checks, then a real (normal-priority) test message
-python3 /opt/linknode-watchdog/linknode_watchdog.py --dry-run
+# Prove it before enabling: the three checks (a run by hand does not read the env file,
+# so the backstop is given here), then a real (normal-priority) test message
+WATCH_BACKSTOP_SECS=86400 python3 /opt/linknode-watchdog/linknode_watchdog.py --dry-run
 sudo sh -c 'set -a; . /etc/linknode-watchdog.env; python3 /opt/linknode-watchdog/linknode_watchdog.py --test-alert'
 
 sudo systemctl enable --now linknode-watchdog.timer

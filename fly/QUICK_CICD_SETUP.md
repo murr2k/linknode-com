@@ -7,7 +7,10 @@ Two GitHub Actions workflows deploy production on pushes to `main`:
 | `deploy-fly.yml` | `fly/eagle-monitor/**` | Fly app `linknode-eagle-monitor` (unit tests first, rollback image captured; the rollback itself has never run, see `docs/HEALTH_CHECKS.md`) |
 | `deploy-web.yml` | `web/**` | Cloudflare Worker `linknode-web` (the linknode.com site) |
 
-Docs-only changes deploy nothing.
+Each workflow also runs when its own file in `.github/workflows/` changes. A push that
+touches none of these deploys nothing. Documentation is not exempt:
+`fly/eagle-monitor/README.md` is inside the first path, so an edit to it alone redeploys
+the Fly app.
 
 ## Add the Secrets to GitHub
 

@@ -106,7 +106,7 @@ curl -s https://linknode-eagle-monitor.fly.dev/health/data | python -m json.tool
 
 | You want | Read this key | Note |
 |---|---|---|
-| Is the telemetry fresh | **`GET /health/data`**: `status`, `reading_age_seconds`, `last_reading` | 200 `fresh`; 503 `stale`, `no_data` or `unavailable`. Goes by the newest power reading's own timestamp (the Eagle's last contact with the meter). The outage alarm judges the same reading, with two differences (`docs/ALERTING.md`): it also calls a newest reading of exactly 0 W unhealthy, and it sends nothing when the store read fails (`unavailable` here) |
+| Is the telemetry fresh | **`GET /health/data`**: `status`, `reading_age_seconds`, `last_reading` | 200 `fresh`; 503 `stale`, `no_data` or `unavailable`. Goes by the newest power reading's own timestamp (the Eagle's last contact with the meter). The outage alarm judges the same reading, with three differences (`docs/ALERTING.md`): it also calls a newest reading of exactly 0 W unhealthy, it also calls a kWh register unchanged for 2 hours unhealthy (`/health/data` stays `fresh` in both cases), and it sends nothing when the store read fails (`unavailable` here) |
 | Arrival time of the last stored POST | **`last_update`** (root) | also at `monitor_stats.last_data_received`; there is **no** root `last_data_received`. **Not** proof of new data: it stays current while the Eagle keeps answering with a frozen reading |
 | Last bypass heartbeat time | **`bypass_status.updated_at`** | **not** `received_at` (that key does not exist) |
 | Live uptime tile values | `bypass_status.data_uptime_pct` / `.device_uptime_pct` | shipped by the Pi heartbeat every 15 min |
@@ -122,7 +122,8 @@ reads_24h`.
 
 `monitor_stats` (the ingest service's internal counters) keys: `bypass_status, failed_writes,
 filtered_requests, last_data_received, last_power_reading, packet_interval_ms, packets_today,
-packets_today_date, previous_data_received, start_time, successful_writes, total_requests`.
+packets_today_date, previous_data_received, start_time, successful_writes, total_requests,
+watchdog_last_seen`.
 
 `bypass_status` keys (the Pi heartbeat, seconds spelled out): `data_uptime_pct, device_uptime_pct,
 observed_seconds, outage_count, readings_rescued, total_outage_seconds, updated_at,

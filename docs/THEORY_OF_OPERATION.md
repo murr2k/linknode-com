@@ -211,8 +211,10 @@ text_readings(field TEXT, ts_ms INTEGER, value TEXT)
   link_strength, message_text
 
 meta(key TEXT PRIMARY KEY, value TEXT)
-  created_ms      When this store went live
-  bypass_status   Last Pi heartbeat (restored on restart)
+  created_ms          When this store went live
+  bypass_status       Last Pi heartbeat (restored on restart)
+  watchdog_last_seen  Pi watchdog's last /health/data request, saved at most every 10 minutes (restored on restart)
+  watchdog_alert      State of the watchdog-silent message (restored on restart)
 ```
 
 Writes are upserts: writing the same (field, ts) again overwrites the value. The InfluxDB tags (`device_mac`, `meter_mac`, `message_type`) are gone, since each field comes from exactly one message type and the second radio is filtered at ingest.
@@ -509,7 +511,7 @@ The ingest service runs two APScheduler jobs: a data-freshness check every 5 min
 
 The state is saved to `/data/monitor_state.json` on the volume (the file is created at the first transition), so a restart neither repeats a siren that got through nor drops one that did not.
 
-The same job notes when the Pi watchdog last asked `/health/data` (by its User-Agent) and sends a normal-priority message if it has been silent for 6 hours while readings keep arriving.
+The ingest service notes when the Pi watchdog last asked `/health/data` (by its User-Agent), and the same job sends a normal-priority message if it has been silent for 6 hours while readings keep arriving.
 
 `GET /health/data` exposes the freshness half of that signal: 200 while the newest reading is fresh, 503 once it is stale. `/health` stays Fly's service check (process up, store answering). While it fails Fly stops routing requests to the machine and does not restart it, so wiring freshness into it would cut off the uploads whenever the feed went stale.
 

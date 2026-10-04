@@ -92,8 +92,10 @@ Data is stored in SQLite (`store.py`):
   Field ids: 1 `power_w`, 2 `energy_delivered_kwh`, 3 `energy_received_kwh`,
   4 `price_per_kwh`
 - `text_readings(field, ts_ms, value)` for `link_strength` and `message_text`
-- `meta(key, value)`: `created_ms` (go-live) and `bypass_status` (last Pi heartbeat,
-  restored on restart)
+- `meta(key, value)`: `created_ms` (go-live), `bypass_status` (last Pi heartbeat),
+  `watchdog_last_seen` (the Pi watchdog's last `/health/data` request, saved at most
+  every 10 minutes) and `watchdog_alert` (state of the watchdog-silent message); the
+  last three are restored on restart
 
 Writes are upserts: the same (field, ts) written again overwrites the value. The Pi
 stamps each demand and summation reading with the meter's `LastContact` time, so a stale

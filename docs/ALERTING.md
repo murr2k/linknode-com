@@ -298,8 +298,9 @@ the replies, so the tiles and the chart stay empty. (The gauge does not show it 
 the live stream sends its own CORS header and keeps feeding it.) The check says little
 about whether the present usage is displayed: `current_power` is the last value posted
 since the process started or, before any has been, the newest stored one, however old.
-It is null only when the store holds no reading. Freshness is the `ingest` check's job. The
-page's CSP is not checked.
+It is null only when the store yields none either: no power reading is visible in it, or
+the query failed (the cases in which `/health/data` answers `no_data` or `unavailable`).
+Freshness is the `ingest` check's job. The page's CSP is not checked.
 
 **The backstop.** A 503 `stale` from `/health/data` means the ingest service is alive and
 telemetry has stopped. That is the staleness alarm's outage, so the watchdog lets it pass.
@@ -405,7 +406,7 @@ re-send what it could not post.
 | The Pi itself, home network or power | Staleness alarm | 30 to 35 min | A reminder each day. The watchdog is down or cannot send |
 | Readings frozen but stamped as new | Staleness alarm, frozen register | about 2 hours | A reminder each day. `/health/data` stays `fresh`, so the watchdog says nothing |
 | Ingest service down or hung, or `/health` failing | Watchdog, `ingest` and `api` checks | about 4 to 7 min | Fly restarts a crashed process, not a hung one: see [When an alert arrives](#when-an-alert-arrives). If the alarm job is still running and can read the store, it adds its own siren once the newest reading is over 30 minutes old, since no upload gets through |
-| Store on Fly did not open when the process started | Watchdog, `ingest` and `api` checks | about 4 to 7 min | The alarm adds its own siren at its first run, 5 minutes after the start. It reads "No data received yet" |
+| Store on Fly did not open when the process started | Staleness alarm or watchdog (`ingest` and `api` checks), whichever comes first | Alarm 5 min after the process starts, watchdog about 4 to 7 min | Two sirens within a few minutes of each other. The alarm's reads "No data received yet" |
 | Store on Fly opened, but its queries now fail | Watchdog, `ingest` check | about 4 to 7 min | The staleness alarm stays silent. If `/health` fails as well, Fly stops routing and the `api` check fails too |
 | Store on Fly rejects writes | Staleness alarm | 30 to 35 min | The uploader is answered 200 and counts the reading as delivered |
 | linknode.com not serving the dashboard | Watchdog, `site` check | about 4 to 7 min | |
@@ -413,7 +414,9 @@ re-send what it could not post.
 | The watchdog stops calling | Staleness alarm, normal priority | about 6 hours | A reminder each day; "calling again" when it returns |
 | Telemetry stopped and the alarm silent | Watchdog backstop | about a day | |
 
-The alarm's times, and the backstop's, count from the newest reading's timestamp. The
+The alarm's 30 to 35 minutes, and the backstop's day, count from the newest reading's
+timestamp. The 2 hours count from the register's last change. The 6 hours count from the
+watchdog's last request or, if later, the last run that found the feed unhealthy. The
 watchdog's other times count from the start of the failure.
 
 Two cases produce an alert for something that is not down:
@@ -488,7 +491,7 @@ What each message means:
 | Linknode Power Monitor Alert | "Data is not arriving from power meter!" then "Last data received N minutes ago (threshold: 30 minutes)" | Staleness alarm | The newest reading is over 30 minutes old. The cause can be anywhere from the meter to the store on Fly |
 | Linknode Power Monitor Alert | ... then "No data received yet" | Staleness alarm | No power reading is visible: the store is empty, did not open at startup, or holds only readings stamped in the future |
 | Linknode Power Monitor Alert | ... then "Invalid power reading: 0.0W" | Staleness alarm | The newest reading was exactly 0 W when the job ran. Nothing is down |
-| Linknode Power Monitor Alert | "Meter readings look frozen!" then "The meter's kWh register has not changed in over 2 hours ..." | Staleness alarm | Readings keep arriving and look new, but the register has not moved. The Eagle is serving old data |
+| Linknode Power Monitor Alert | "Meter readings look frozen!" then "The meter's kWh register has not changed in over 2 hours ..." | Staleness alarm | Readings keep arriving and look new, but the register has not moved or has stopped arriving. The Eagle is serving old data, or no register |
 | Linknode Power Monitor Alert | "Still down since ..." then one of the texts above | Staleness alarm, normal priority | The same outage is still open, 24 hours after the last message |
 | Linknode watchdog: silent | "No request from the Pi watchdog for over 6 hours ..." | Staleness alarm, normal priority | The watchdog on the Pi has stopped calling while the uploader carries on. Nothing is watching Fly or the site |
 | Linknode watchdog: calling again | "The Pi watchdog is making its requests again." | Staleness alarm, normal priority | Its requests have resumed |
@@ -543,9 +546,10 @@ curl -s -m 15 -w '\nHTTP %{http_code}\n' https://linknode-eagle-monitor.fly.dev/
 - **`fresh`:** readings with new timestamps are arriving. That says nothing about the
   site, the stats API or whether the values are moving.
   - The alert reads "Meter readings look frozen!": the Eagle is serving old data under new
-    timestamps. On the Pi, `meter_status` and `meter_last_contact` in
-    `/run/eagle-bypass/stats.json` and the uploader's journal show what it is returning.
-    Restarting the Eagle is the usual cure.
+    timestamps, or has stopped serving the kWh register while demand carries on (the
+    uploader's journal then shows `summation=NonekWh`). On the Pi, `meter_status` and
+    `meter_last_contact` in `/run/eagle-bypass/stats.json` and the uploader's journal show
+    what it is returning. Restarting the Eagle is the usual cure.
   - The alert has a "linknode.com: ..." or "Stats API (what the page reads): ..." line:
     that check failed and may still be failing. Treat it as down until a "Linknode
     watchdog: recovered" message arrives (none comes if the Pi was rebooted meanwhile).
@@ -553,7 +557,9 @@ curl -s -m 15 -w '\nHTTP %{http_code}\n' https://linknode-eagle-monitor.fly.dev/
     the three checks and prints the reason for each.
     For the site, look at the Cloudflare Worker and the last `deploy-web.yml` run. For
     "no CORS header", look at the `CORS(...)` origins in `fly/eagle-monitor/app.py`. "no
-    current_power in the reply" means the store holds no power reading at all.
+    current_power in the reply" means no power reading has been posted since the service
+    started and the store gave none: none was visible in it, or the query failed (the log
+    from `fly logs` then shows `Error reading the newest power reading for stats`).
   - Otherwise it has already recovered, or the alert was the 0 W rule (the text says so),
     or it was a late DOWN after a home internet outage.
 - **"Linknode watchdog: silent":** on the Pi, `systemctl list-timers linknode-watchdog.timer`
@@ -586,8 +592,9 @@ curl -s https://linknode-eagle-monitor.fly.dev/health/data
 curl -s https://linknode-eagle-monitor.fly.dev/api/stats | python -c "import sys, json; print(json.load(sys.stdin)['monitor_stats']['watchdog_last_seen'])"
 
 # The three checks, without alerting or touching state (works on any machine with the
-# repo; it counts as a call from the watchdog)
-python scripts/linknode_watchdog.py --dry-run
+# repo; it counts as a call from the watchdog). A run by hand does not read the Pi's env
+# file: without the backstop given here, every `stale` reply prints "ingest: FAIL".
+WATCH_BACKSTOP_SECS=86400 python scripts/linknode_watchdog.py --dry-run
 
 # On the Pi: send one normal-priority test message
 sudo sh -c 'set -a; . /etc/linknode-watchdog.env; python3 /opt/linknode-watchdog/linknode_watchdog.py --test-alert'
@@ -686,13 +693,17 @@ What the fixes cost:
 
 ### Deliberately left as they are
 
-At this bar these are not worth a fix. Each is described above.
+At this bar these are not worth a fix. Each is described above, except the crash.
 
 - A hung ingest process is not restarted by anything: the watchdog reports it, and a
   manual restart within a day is acceptable.
 - The watchdog's own code: the late DOWN after a home internet outage, the alerted marks
-  that outlive a recovery, and a crash on an unexpected reply. Each fix would mean changing
-  the script and installing it on the Pi.
+  that outlive a recovery, and a crash on an unexpected reply. A pass dies before it counts
+  or sends anything when a reply with an error status is cut off mid-body, when
+  `/health/data` answers an error status with JSON that is not an object or with an age
+  that is not a number, or when `/api/stats` passes its CORS test with JSON that is not an
+  object. The ingest service sends no such JSON. Each fix would mean changing the script
+  and installing it on the Pi.
 - The backstop's "Ingest service" label, the 0 W rule, the offset between the Eagle's
   clock and Fly's, the scheduler's 1-second grace, a thin feed, a way to stand the alarms
   down for planned work, and a host failure on Fly.
