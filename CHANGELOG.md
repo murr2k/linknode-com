@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now), `projected_min` and `projected_max`. The line through day 1 alone is no longer drawn:
   until two full days are in, the trendline runs from $0 to the bill the previous period
   ended on, when the store holds that whole period
+- **Site traffic at the foot of the page**: 30 days of figures from Cloudflare, each with a
+  few words on what it counts. All requests to the zone (total, 404s, blocked, page views,
+  unique IPs per day, and the top statuses, countries and clients) and the page loads Web
+  Analytics counted in real browsers (loads, visits, referrers, countries). The ingest
+  service fetches them hourly with the `CLOUDFLARE_ANALYTICS` Fly secret (`site_traffic.py`)
+  and publishes them as `site_traffic` in `GET /api/stats`
 - Cloudflare Web Analytics can now run: the site's CSP lists
   `https://static.cloudflareinsights.com` in `script-src`. The zone was already injecting
   the beacon and the CSP was blocking it

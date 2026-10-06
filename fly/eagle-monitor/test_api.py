@@ -22,7 +22,7 @@ STATS_KEYS = {
     'current_power', 'min_24h', 'max_24h', 'avg_24h', 'cost_24h', 'price_per_kwh',
     'meter_price_per_kwh',
     'last_update', 'active_viewers', 'packet_interval_ms', 'packets_today', 'reads_24h',
-    'bypass_status', 'monitor_stats', 'billing_period',
+    'bypass_status', 'monitor_stats', 'billing_period', 'site_traffic',
 }
 
 

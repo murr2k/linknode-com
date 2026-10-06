@@ -66,6 +66,11 @@ second machine would have its own separate database.
 - `EAGLE_PASSWORD` - Basic auth password (set as secret)
 - `SLACK_WEBHOOK_URL` - Outage and recovery alerts (set as secret)
 - `PUSHOVER_API_TOKEN`, `PUSHOVER_USER_KEY` - Emergency siren on outage (set as secrets)
+- `CLOUDFLARE_ANALYTICS` - Read-only Cloudflare analytics token (set as secret). With it the
+  service fetches the site's traffic figures hourly (`site_traffic.py`) and publishes them
+  as `site_traffic` in `/api/stats`; without it that field is null. The token must be able
+  to read the zone, its analytics and the account's analytics. `CLOUDFLARE_ZONE_ID` and
+  `CLOUDFLARE_ACCOUNT_ID` skip the zone lookup when both are set
 - `STALE_THRESHOLD_MINUTES` - Age in minutes of the newest power reading, by its own
   timestamp, past which the feed is stale (default: 5; `fly.toml` sets 30). Must be an
   integer: on `2.5` or `5.0` the service does not start. Used by both `/health/data` and

@@ -25,6 +25,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from monitor_data_staleness import DataStalenessMonitor, WatchdogLiveness, FROZEN_REGISTER_WINDOW
 import store
 import dashboard
+import site_traffic
 
 # Configure logging
 logging.basicConfig(
@@ -68,6 +69,17 @@ API_KEY = os.getenv('EAGLE_API_KEY')  # Set via fly secrets for API endpoints
 EAGLE_USERNAME = os.getenv('EAGLE_USERNAME', 'eagle')  # Basic auth username for Eagle device
 EAGLE_PASSWORD = os.getenv('EAGLE_PASSWORD')  # Basic auth password for Eagle device
 PUBLIC_API_ENDPOINTS = ['/health', '/']  # Endpoints that don't require auth
+
+# Site traffic figures from Cloudflare, shown at the foot of the page (site_traffic.py).
+# CLOUDFLARE_ANALYTICS is a read-only analytics token, set as a Fly secret; without it
+# nothing is fetched. The zone and account ids are looked up with the token unless both
+# are given here.
+CLOUDFLARE_ANALYTICS = os.getenv('CLOUDFLARE_ANALYTICS')
+CLOUDFLARE_ZONE_ID = os.getenv('CLOUDFLARE_ZONE_ID')
+CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+SITE_HOST = os.getenv('SITE_HOST', 'linknode.com')
+SITE_TRAFFIC_REFRESH_HOURS = 1
+site_traffic_state = {'ids': None, 'summary': None}
 
 # Rate limiting configuration
 from collections import defaultdict
@@ -357,8 +369,38 @@ def start_data_monitor():
             replace_existing=True
         )
 
+        if CLOUDFLARE_ANALYTICS:
+            scheduler.add_job(
+                refresh_site_traffic,
+                IntervalTrigger(hours=SITE_TRAFFIC_REFRESH_HOURS),
+                id='site_traffic',
+                name='Fetch site traffic from Cloudflare',
+                max_instances=1,
+                replace_existing=True,
+                next_run_time=datetime.now(timezone.utc) + timedelta(seconds=20)
+            )
+
         scheduler.start()
         logger.info("Data staleness monitor started (checks every 5 minutes)")
+
+def refresh_site_traffic():
+    """Background job: fetch the site's traffic figures from Cloudflare. A failure keeps
+    the figures already held."""
+    if not CLOUDFLARE_ANALYTICS:
+        return
+    try:
+        if site_traffic_state['ids'] is None:
+            if CLOUDFLARE_ZONE_ID and CLOUDFLARE_ACCOUNT_ID:
+                site_traffic_state['ids'] = (CLOUDFLARE_ZONE_ID, CLOUDFLARE_ACCOUNT_ID)
+            else:
+                site_traffic_state['ids'] = site_traffic.lookup_ids(CLOUDFLARE_ANALYTICS, SITE_HOST)
+        summary = site_traffic.fetch(CLOUDFLARE_ANALYTICS, SITE_HOST, site_traffic_state['ids'])
+        if summary['edge'] or summary['browsers']:
+            site_traffic_state['summary'] = summary
+    except site_traffic.CloudflareError as e:
+        logger.warning(f"Site traffic not refreshed: {e}")
+    except Exception as e:
+        logger.error(f"Site traffic not refreshed: {type(e).__name__}")
 
 def prune_old_readings():
     """Background job: drop readings older than RETENTION_DAYS"""
@@ -1087,6 +1129,9 @@ def get_stats():
         # Live uptime from the Pi bypass heartbeat (None until the first arrives).
         'bypass_status': stats.get('bypass_status'),
         'monitor_stats': stats,
+        # Requests and page loads for the site over 30 days, from Cloudflare (None until
+        # the first hourly fetch, or without the token)
+        'site_traffic': site_traffic_state['summary'],
         # Billing period info (tiered rates)
         'billing_period': {
             'start': None,

@@ -184,6 +184,8 @@ npx wrangler deploy --config web/wrangler.jsonc     # needs wrangler login
 - `EAGLE_PASSWORD` - Basic auth for the ingest endpoint
 - `SLACK_WEBHOOK_URL` - Outage notifications
 - `PUSHOVER_API_TOKEN`, `PUSHOVER_USER_KEY` - Emergency outage siren
+- `CLOUDFLARE_ANALYTICS` - Read-only Cloudflare analytics token, for the site traffic
+  figures at the foot of the page
 
 ## CI/CD Workflows
 

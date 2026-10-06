@@ -300,6 +300,7 @@ flowchart TB
 - Rocket Loader is off for the zone (it conflicts with the CSP)
 - Cloudflare's zone-level WebMCP feature injects `/.webmcp/bridge.js` into proxied HTML; it is same-origin, so the CSP allows it
 - Cloudflare Web Analytics is on for the zone in automatic mode: Cloudflare injects its beacon script (`https://static.cloudflareinsights.com/beacon.min.js`) into the page for browsers, and `script-src` lists that host so it can run. It reports to `/cdn-cgi/rum` on this domain, which `connect-src 'self'` covers. It is the only third-party script the page loads
+- The foot of the page lists the site's traffic over 30 days: every request Cloudflare received for the zone (mostly bots) and the page loads its Web Analytics counted. The page cannot hold a token, so the ingest service fetches both hourly with the `CLOUDFLARE_ANALYTICS` secret (`site_traffic.py`) and publishes the summary as `site_traffic` in `/api/stats`
 - `linknode.com` and `www.linknode.com` are proxied DNS records (placeholder `AAAA 100::`) intercepted by the Worker routes
 - `energy.linknode.com` is a Cloudflare redirect rule: 301 to `https://linknode.com/#energy-dashboard`
 

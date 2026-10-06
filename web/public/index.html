@@ -729,6 +729,53 @@
             color: #764ba2 !important;
             text-decoration: underline !important;
         }
+
+        /* Site traffic: figure, value and what it counts, a row each */
+        .site-traffic {
+            max-width: 780px;
+            margin: 0 auto 1.75rem;
+            text-align: left;
+            font-size: 0.8rem;
+        }
+
+        .site-traffic dl {
+            margin: 0;
+        }
+
+        .site-traffic-title {
+            margin: 1rem 0 0.35rem;
+            font-size: 0.72rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #999;
+        }
+
+        .traffic-row {
+            display: grid;
+            grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 1fr);
+            gap: 0 1rem;
+            padding: 0.25rem 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .traffic-row dt {
+            color: #999;
+        }
+
+        .traffic-row dd {
+            margin: 0;
+            color: #888;
+        }
+
+        .traffic-row .traffic-value {
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        @media (max-width: 768px) {
+            .traffic-row { grid-template-columns: 6.5rem minmax(0, 1fr); }
+            .traffic-row .traffic-note { grid-column: 1 / -1; }
+        }
         
         .status-indicator {
             display: inline-block;
@@ -2459,6 +2506,13 @@
         </div>
 
         <footer class="footer">
+            <!-- Site traffic over 30 days, from /api/stats (site_traffic); shown once it arrives -->
+            <div class="site-traffic" id="site-traffic" hidden>
+                <div class="site-traffic-title" id="traffic-edge-title">All requests · last 30 days · Cloudflare edge</div>
+                <dl id="traffic-edge"></dl>
+                <div class="site-traffic-title" id="traffic-browsers-title">Real browsers · last 30 days · Cloudflare Web Analytics</div>
+                <dl id="traffic-browsers"></dl>
+            </div>
             <p>Linknode Energy Monitor • Deployed on Cloudflare + Fly.io</p>
             <p style="margin-top: 0.5rem; font-size: 0.875rem;">
                 Created by <a href="https://github.com/murr2k" style="color: #667eea; text-decoration: none;">Murray Kopit</a> • 
@@ -2687,6 +2741,8 @@
                             `Total: ${money(c.total_cost)}`;
                         renderBillChart(bp);
                     }
+
+                    renderSiteTraffic(data.site_traffic);
 
                     // Check data staleness (2 minutes = 120 seconds).
                     // Guard the timestamp: new Date(null) is epoch 0 (1970), which
@@ -3200,6 +3256,51 @@
                 ],
                 plugins: plugins
             }, data, el);
+        }
+
+        // Site traffic: the figures Cloudflare holds for the site, which the ingest service
+        // fetches hourly. A row each: the figure, its value, what it counts.
+        function renderSiteTraffic(st) {
+            const box = document.getElementById('site-traffic');
+            if (!st || (!st.edge && !st.browsers)) {
+                box.hidden = true;
+                return;
+            }
+            const n = v => v.toLocaleString('en-US');
+            const list = pairs => pairs.map(([key, count]) => `${key} ${n(count)}`).join(' · ') || 'none';
+            const fill = (id, rows) => {
+                document.getElementById(id + '-title').hidden = !rows;
+                document.getElementById(id).replaceChildren(...(rows || []).map(cells => {
+                    const row = document.createElement('div');
+                    row.className = 'traffic-row';
+                    cells.forEach((text, i) => {
+                        const cell = document.createElement(i ? 'dd' : 'dt');
+                        if (i) cell.className = i === 1 ? 'traffic-value' : 'traffic-note';
+                        cell.textContent = text;
+                        row.appendChild(cell);
+                    });
+                    return row;
+                }));
+            };
+            const e = st.edge, b = st.browsers;
+            fill('traffic-edge', e && [
+                ['Requests', n(e.requests), 'every request received, bots included'],
+                ['Not found', `${n(e.not_found)} (${e.requests ? Math.round(100 * e.not_found / e.requests) : 0}%)`,
+                    'answered 404: probes for pages that do not exist'],
+                ['Blocked', n(e.blocked), 'stopped by Cloudflare as threats'],
+                ['Page views', n(e.page_views), 'HTML pages served, bots included'],
+                ['Unique IPs', `${n(e.unique_ips_per_day)} a day`, 'median per day'],
+                ['By status', list(e.status), 'requests per HTTP status, top 5'],
+                ['By country', list(e.countries), 'requests per country, top 5'],
+                ['By client', list(e.clients), 'page views per browser family, top 5']
+            ]);
+            fill('traffic-browsers', b && [
+                ['Page loads', n(b.page_loads), 'counted by a script only browsers run; sampled after 7 days'],
+                ['Visits', n(b.visits), 'page loads arriving from outside this site'],
+                ['Referrers', list(b.referrers), 'where page loads came from, top 5'],
+                ['Countries', list(b.countries), 'page loads per country, top 5']
+            ]);
+            box.hidden = false;
         }
 
         async function fetchDashboard() {

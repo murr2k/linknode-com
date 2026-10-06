@@ -118,7 +118,11 @@ curl -s https://linknode-eagle-monitor.fly.dev/health/data | python -m json.tool
 
 Root keys: `active_viewers, avg_24h, billing_period, bypass_status, cost_24h, current_power,
 last_update, max_24h, meter_price_per_kwh, min_24h, monitor_stats, packet_interval_ms, packets_today, price_per_kwh,
-reads_24h`.
+reads_24h, site_traffic`.
+
+`site_traffic` (the site's visitors, not the meter: 30 days of Cloudflare figures, refreshed hourly; `null`
+without the `CLOUDFLARE_ANALYTICS` secret or before the first fetch) keys: `since, until, updated, edge, browsers`.
+`edge` is every request to the zone, bots included; `browsers` is page loads counted by Web Analytics.
 
 `monitor_stats` (the ingest service's internal counters) keys: `bypass_status, failed_writes,
 filtered_requests, last_data_received, last_power_reading, packet_interval_ms, packets_today,

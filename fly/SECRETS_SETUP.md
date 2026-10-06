@@ -58,7 +58,8 @@ To verify that secrets are set correctly:
 ```bash
 # List all secrets (names and digests only, not values)
 fly secrets list -a linknode-eagle-monitor
-# Expected: EAGLE_PASSWORD, SLACK_WEBHOOK_URL, PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY
+# Expected: EAGLE_PASSWORD, SLACK_WEBHOOK_URL, PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY,
+# CLOUDFLARE_ANALYTICS (optional: the site traffic figures)
 
 gh secret list -R murr2k/linknode-com
 ```
