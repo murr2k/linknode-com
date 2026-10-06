@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now), `projected_min` and `projected_max`. The line through day 1 alone is no longer drawn:
   until two full days are in, the trendline runs from $0 to the bill the previous period
   ended on, when the store holds that whole period
+- Cloudflare Web Analytics can now run: the site's CSP lists
+  `https://static.cloudflareinsights.com` in `script-src`. The zone was already injecting
+  the beacon and the CSP was blocking it
 - `BILLING_NEXT_READ`: the next meter read date printed on the latest bill. The current
   period now ends on that day (Nov 26, 2026, making it 62 days) in place of the nominal
   boundary

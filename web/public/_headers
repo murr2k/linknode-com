@@ -1,9 +1,12 @@
 # Response headers for the static site (Cloudflare Workers static assets).
 # Replaces the nginx security headers. connect-src must list the eagle-monitor API:
 # the page fetches /api/stats, /api/dashboard and /health and opens the /api/stream SSE.
+# script-src lists static.cloudflareinsights.com for Cloudflare Web Analytics: the zone
+# injects that beacon script into the page itself (automatic setup), and it reports to
+# /cdn-cgi/rum on this domain, which connect-src 'self' covers.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://linknode-eagle-monitor.fly.dev; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://linknode-eagle-monitor.fly.dev; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: SAMEORIGIN
