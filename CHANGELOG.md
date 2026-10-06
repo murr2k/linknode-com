@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the least-squares trendline through it carried on to the last day and the projected bill
   written where it ends. The slope is the spend rate in $/day. `GET /api/stats`
   `billing_period` gains `trend` (`points`, `slope_per_day`, `intercept`, `projected_total`)
+- **Range band on the Bill Forecast chart**: a shaded band around the trendline showing where
+  it has pointed over the period, with the lowest and highest projected bill labelled at the
+  last day. `trend` gains `estimates` (the line as it stood after each day from day 2 on, and
+  now), `projected_min` and `projected_max`. The line through day 1 alone is no longer drawn:
+  until two full days are in, the trendline runs from $0 to the bill the previous period
+  ended on, when the store holds that whole period
 - `BILLING_NEXT_READ`: the next meter read date printed on the latest bill. The current
   period now ends on that day (Nov 26, 2026, making it 62 days) in place of the nominal
   boundary

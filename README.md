@@ -92,7 +92,14 @@ the meter's own register to within 0.01% over 30 days.
 - **Forecast.** The Bill Forecast chart plots the bill so far against the day of the cycle and
   fits a straight line through it, carried on to the last day. The slope is the spend rate in
   $/day and the line's end is the bill if that rate holds. It is `billing_period.trend` in
-  `GET /api/stats`, and appears once one full day of the period is in.
+  `GET /api/stats`. The shaded band around the line shows where it has pointed over the
+  period: the line is refitted as it stood at the end of each day from day 2 on, and on every
+  day of the chart the band runs from the lowest to the highest value any of those lines
+  gives, so at the last day it spans the lowest and highest the projected bill has been
+  (`trend.estimates`, `projected_min`, `projected_max`). A line through day 1 alone says
+  little and is left out. Until two full days are in, the line runs from $0 to the bill the
+  previous period ended on, when the store holds that whole period; otherwise there is no
+  line until then.
 - **"So far" means "if the period ended today".** The threshold is prorated to the days
   elapsed, so early in a period one heavy day can show some Tier 2 use that the full period
   would absorb.

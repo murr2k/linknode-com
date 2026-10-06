@@ -871,7 +871,7 @@ def _linear_fit(points):
     return slope, mean_y - slope * mean_x
 
 
-def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days):
+def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days, previous_total=None):
     """Bill so far against the day of the cycle, with a straight-line forecast.
 
     The points are $0 at day 0, the bill at the end of each completed day (`day_kwh` is
@@ -879,7 +879,15 @@ def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days):
     with the per-day charges prorated so it sits on the same curve as the rest. The
     trendline is the least-squares line through them: its slope is the spend rate in
     $/day (the consumption rate only while the unit price holds) and its value at
-    `cycle_days` is the bill if that rate holds. No trendline until one full day is in.
+    `cycle_days` is the bill if that rate holds.
+
+    `estimates` is that line as it stood over the period, [day, slope, intercept,
+    projected bill] each: at the end of every completed day from day 2 on, and now. The
+    last one is the trendline; `projected_min` and `projected_max` are the lowest and
+    highest bill any of them pointed at. A line through day 1 alone says little, so it
+    is left out. In its place the first estimate is the bill the previous period ended
+    on (`previous_total`), as a line from $0 to that amount on the last day: it is the
+    trendline until two full days are in. Without it there is no trendline until then.
     """
     points = [(0.0, 0.0)]
     points += [(float(day), calculate_tiered_cost(kwh, day)['total_cost'])
@@ -888,14 +896,28 @@ def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days):
         points.append((round(elapsed_days, 3),
                        calculate_tiered_cost(energy_kwh, elapsed_days)['total_cost']))
 
+    lines = []  # (day, slope, intercept)
+    if previous_total and cycle_days:
+        lines.append((0.0, previous_total / cycle_days, 0.0))
+    full_days = len(day_kwh)
+    ends = [day + 1 for day in range(2, full_days + 1)]  # points up to the end of each day
+    if full_days >= 2 and len(points) > full_days + 1:
+        ends.append(len(points))                         # and up to now
+    for end in ends:
+        fit = _linear_fit(points[:end])
+        if fit:
+            lines.append((points[end - 1][0],) + fit)
+
     trend = {'points': [list(p) for p in points],
-             'slope_per_day': None, 'intercept': None, 'projected_total': None}
-    fit = _linear_fit(points) if day_kwh else None
-    if fit:
-        slope, intercept = fit
-        trend['slope_per_day'] = round(slope, 4)
-        trend['intercept'] = round(intercept, 4)
-        trend['projected_total'] = round(slope * cycle_days + intercept, 2)
+             'slope_per_day': None, 'intercept': None, 'projected_total': None,
+             'estimates': [], 'projected_min': None, 'projected_max': None}
+    if lines:
+        trend['estimates'] = [[day, round(slope, 4), round(intercept, 4),
+                               round(slope * cycle_days + intercept, 2)]
+                              for day, slope, intercept in lines]
+        _, trend['slope_per_day'], trend['intercept'], trend['projected_total'] = trend['estimates'][-1]
+        totals = [estimate[3] for estimate in trend['estimates']]
+        trend['projected_min'], trend['projected_max'] = min(totals), max(totals)
     return trend
 
 
@@ -932,6 +954,30 @@ def _billing_day_kwh(billing_start, completed_days):
     with _billing_days_cache_lock:
         _billing_days_cache['days'] = (key, now, day_kwh)
     return day_kwh
+
+
+def _previous_period_bill(billing_start):
+    """The bill the period before `billing_start` ended on, or None when the store does
+    not hold that period from its first day. It seeds the trend of a new period."""
+    start_ms = store.to_ms(billing_start)
+    now = time.monotonic()
+    with _billing_days_cache_lock:
+        cached = _billing_days_cache.get('previous')
+        if cached and cached[0] == start_ms and now - cached[1] < BILLING_DAYS_CACHE_SECONDS:
+            return cached[2]
+
+    previous_start = get_billing_period(billing_start - timedelta(days=1))[0]
+    previous_ms = store.to_ms(previous_start)
+    total = None
+    if db.latest('power_w', 0, previous_ms + 24 * HOUR_MS):
+        energy_wh = db.integral_wh(previous_ms, start_ms)
+        if energy_wh:
+            days = (billing_start.date() - previous_start.date()).days
+            total = calculate_tiered_cost(energy_wh / 1000.0, days)['total_cost']
+
+    with _billing_days_cache_lock:
+        _billing_days_cache['previous'] = (start_ms, now, total)
+    return total
 
 
 @app.route('/health', methods=['GET'])
@@ -1122,7 +1168,8 @@ def get_stats():
             midnight = billing_start + timedelta(days=completed_days)
             elapsed_days = completed_days + (local_now - midnight) / timedelta(days=1)
             result['billing_period']['trend'] = billing_trend(
-                _billing_day_kwh(billing_start, completed_days), elapsed_days, energy_kwh, cycle_days)
+                _billing_day_kwh(billing_start, completed_days), elapsed_days, energy_kwh, cycle_days,
+                _previous_period_bill(billing_start))
         except Exception as e:
             logger.error(f"Error building the billing trend: {e}")
 

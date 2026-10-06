@@ -348,6 +348,58 @@ class TestBilling(unittest.TestCase):
         self.assertEqual(len(trend['points']), 2)
         self.assertIsNone(trend['slope_per_day'])
         self.assertIsNone(trend['projected_total'])
+        self.assertEqual(trend['estimates'], [])
+        self.assertIsNone(trend['projected_min'])
+
+    def test_day_one_alone_makes_no_estimate(self):
+        # A heavy first day: the line through it alone would point far too high
+        trend = monitor_app.billing_trend([60.0], 1.5, 70.0, 62)
+        self.assertEqual(len(trend['points']), 3)
+        self.assertIsNone(trend['slope_per_day'])
+        self.assertEqual(trend['estimates'], [])
+
+    def test_estimates_run_from_day_two_to_now(self):
+        # 60 kWh on day 1, then 15 kWh/day: the early lines point high and come down
+        day_kwh = [60.0 + 15.0 * day for day in range(6)]
+        trend = monitor_app.billing_trend(day_kwh, 6.5, 142.5, 62)
+        estimates = trend['estimates']
+        self.assertEqual([e[0] for e in estimates], [2.0, 3.0, 4.0, 5.0, 6.0, 6.5])
+        # Each is the line through the points up to that day
+        points = [tuple(p) for p in trend['points']]
+        slope, intercept = monitor_app._linear_fit(points[:4])
+        self.assertEqual(estimates[1], [3.0, round(slope, 4), round(intercept, 4),
+                                        round(slope * 62 + intercept, 2)])
+        # The last one is the trendline, and the range is over all of them
+        self.assertEqual(estimates[-1][1:], [trend['slope_per_day'], trend['intercept'],
+                                             trend['projected_total']])
+        totals = [e[3] for e in estimates]
+        self.assertEqual(trend['projected_min'], min(totals))
+        self.assertEqual(trend['projected_max'], max(totals))
+        self.assertEqual(trend['projected_max'], totals[0])
+        self.assertGreater(trend['projected_max'], trend['projected_total'])
+
+    def test_constant_rate_has_no_range_to_speak_of(self):
+        # Not exactly none: each line of the bill is rounded to the cent, day by day
+        trend = monitor_app.billing_trend([15.0 * day for day in range(1, 11)], 10.5, 157.5, 62)
+        self.assertAlmostEqual(trend['projected_min'], trend['projected_max'], delta=0.5)
+
+    def test_previous_bill_is_the_trendline_until_two_days_are_in(self):
+        for day_kwh, elapsed, energy in (([], 0.4, 6.0), ([60.0], 1.5, 70.0)):
+            trend = monitor_app.billing_trend(day_kwh, elapsed, energy, 62, 144.66)
+            self.assertEqual(trend['estimates'], [[0.0, round(144.66 / 62, 4), 0.0, 144.66]])
+            self.assertEqual(trend['intercept'], 0.0)
+            self.assertEqual(trend['projected_total'], 144.66)
+            self.assertEqual((trend['projected_min'], trend['projected_max']), (144.66, 144.66))
+
+    def test_previous_bill_stays_the_first_estimate(self):
+        day_kwh = [60.0 + 15.0 * day for day in range(6)]
+        seeded = monitor_app.billing_trend(day_kwh, 6.5, 142.5, 62, 40.0)
+        plain = monitor_app.billing_trend(day_kwh, 6.5, 142.5, 62)
+        self.assertEqual(seeded['estimates'][0], [0.0, round(40.0 / 62, 4), 0.0, 40.0])
+        self.assertEqual(seeded['estimates'][1:], plain['estimates'])
+        self.assertEqual(seeded['projected_total'], plain['projected_total'])
+        self.assertEqual(seeded['projected_min'], 40.0)
+        self.assertEqual(seeded['projected_max'], plain['projected_max'])
 
 
 class TestBillingDays(unittest.TestCase):
@@ -374,6 +426,30 @@ class TestBillingDays(unittest.TestCase):
     def test_no_completed_days(self):
         start = datetime(2026, 9, 26, tzinfo=monitor_app.BILLING_TZ)
         self.assertEqual(monitor_app._billing_day_kwh(start, 0), [])
+
+    def steady_kw(self, first, last):
+        """1 kW read every 6 hours from `first` to `last`."""
+        power = monitor_app.store.FIELD_IDS['power_w']
+        step = 6 * 3_600_000
+        monitor_app.db.insert_ignore(num_rows=[
+            (power, ms, 1000.0)
+            for ms in range(monitor_app.store.to_ms(first), monitor_app.store.to_ms(last) + 1, step)])
+
+    def test_previous_period_bill(self):
+        # The period before Nov 27, 2026 ran from Sep 26: 62 days
+        previous_start = datetime(2026, 9, 26, tzinfo=monitor_app.BILLING_TZ)
+        start = datetime(2026, 11, 27, tzinfo=monitor_app.BILLING_TZ)
+        self.steady_kw(previous_start, start + timedelta(days=3))
+        kwh = monitor_app.db.integral_wh(monitor_app.store.to_ms(previous_start),
+                                         monitor_app.store.to_ms(start)) / 1000.0
+        self.assertAlmostEqual(kwh, 24 * 62, delta=6.0)
+        self.assertEqual(monitor_app._previous_period_bill(start),
+                         monitor_app.calculate_tiered_cost(kwh, 62)['total_cost'])
+
+    def test_no_previous_bill_when_the_store_starts_inside_that_period(self):
+        start = datetime(2026, 11, 27, tzinfo=monitor_app.BILLING_TZ)
+        self.steady_kw(datetime(2026, 10, 20, tzinfo=monitor_app.BILLING_TZ), start)
+        self.assertIsNone(monitor_app._previous_period_bill(start))
 
 
 if __name__ == '__main__':

@@ -2098,7 +2098,7 @@
                 <div class="dashboard-header">
                     <h3>📈 Bill Forecast</h3>
                 </div>
-                <div class="power-chart bill-chart" id="bill-chart" role="img" aria-label="Bill so far by day of the billing cycle, with a straight-line forecast to the end of the cycle"></div>
+                <div class="power-chart bill-chart" id="bill-chart" role="img" aria-label="Bill so far by day of the billing cycle, with a straight-line forecast to the end of the cycle and a band showing the range earlier forecasts covered"></div>
                 <div class="dashboard-stats">
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-now">--</div><div class="dashboard-stat-label">Bill So Far</div></div>
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-rate">--</div><div class="dashboard-stat-label">Spend Rate</div></div>
@@ -3034,7 +3034,9 @@
 
         // Bill forecast: the bill so far at each day of the billing cycle, and the
         // least-squares line through it carried on to the last day. The slope is the
-        // spend rate; where the line ends is the bill if that rate holds.
+        // spend rate; where the line ends is the bill if that rate holds. The shaded band
+        // is where that line has pointed over the period: on each day, the lowest and
+        // highest value any of the period's estimates gives (trend.estimates).
         let billChart = null;
         let billPeriod = null;  // last billing_period drawn, kept so a skin change can redraw it
 
@@ -3063,34 +3065,53 @@
                             return;
                         }
                         const day = u.data[0][i], actual = u.data[1][i], trend = u.data[2][i];
+                        const high = u.data[3][i], low = u.data[4][i];
                         const parts = [Number.isInteger(day) ? `Day ${day} · ${billDayLabel(day)}` : 'Now'];
                         if (actual !== null) parts.push(billMoney(actual));
                         if (trend !== null) parts.push(`trend ${billMoney(trend)}`);
-                        tip.textContent = parts.join('  ');
+                        const lines = [parts.join('  ')];
+                        if (high !== null && high - low >= 0.005) lines.push(`range ${billMoney(low)} to ${billMoney(high)}`);
+                        tip.replaceChildren(...lines.map(text => {
+                            const row = document.createElement('div');
+                            row.textContent = text;
+                            return row;
+                        }));
                         tip.style.display = 'block';
                         tip.style.left = Math.max(0, Math.min(u.cursor.left + 12, u.over.clientWidth - tip.offsetWidth)) + 'px';
-                        tip.style.top = Math.max(0, u.valToPos(actual !== null ? actual : trend, 'y') - 36) + 'px';
+                        tip.style.top = Math.max(0, u.valToPos(actual !== null ? actual : trend, 'y') - tip.offsetHeight - 8) + 'px';
                     }
                 }
             };
         }
 
-        // The projected bill, written where the trendline ends
+        // The projected bill, written where the trendline ends, and the lowest and highest
+        // it has been, written at the two edges of the band
         function billEndLabelPlugin(color, font) {
             return {
                 hooks: {
                     draw: u => {
                         const trend = u.data[2], last = trend.length - 1;
                         if (trend[last] === null) return;
-                        const ctx = u.ctx;
+                        const ctx = u.ctx, dpr = devicePixelRatio;
+                        const fontPx = parseFloat((font.match(/(\d+(\.\d+)?)px/) || [0, 12])[1]) * dpr;
+                        const x = u.valToPos(u.data[0][last], 'x', true) - 4 * dpr;
+                        const yOf = v => u.valToPos(v, 'y', true);
                         ctx.save();
-                        ctx.font = font.replace(/(\d+(\.\d+)?)px/, (m, px) => px * devicePixelRatio + 'px');
+                        ctx.font = font.replace(/(\d+(\.\d+)?)px/, fontPx + 'px');
                         ctx.fillStyle = color;
                         ctx.textAlign = 'right';
                         ctx.textBaseline = 'bottom';
-                        ctx.fillText(billMoney(trend[last]),
-                            u.valToPos(u.data[0][last], 'x', true) - 4 * devicePixelRatio,
-                            u.valToPos(trend[last], 'y', true) - 6 * devicePixelRatio);
+                        const trendY = yOf(trend[last]) - 6 * dpr;
+                        ctx.fillText(billMoney(trend[last]), x, trendY);
+                        const high = u.data[3][last], low = u.data[4][last];
+                        if (high !== null && high - low >= 0.005) {
+                            const t = billPeriod.trend;
+                            // Kept clear of the label above when the trendline is itself the highest
+                            ctx.fillText('high ' + billMoney(t.projected_max),
+                                x, Math.min(yOf(high) - 6 * dpr, trendY - fontPx * 1.25));
+                            ctx.textBaseline = 'top';
+                            ctx.fillText('low ' + billMoney(t.projected_min), x, yOf(low) + 6 * dpr);
+                        }
                         ctx.restore();
                     }
                 }
@@ -3117,10 +3138,17 @@
             // Every point so far, then each remaining day out to the end of the cycle
             const days = t.points.map(p => p[0]);
             for (let d = Math.floor(days[days.length - 1]) + 1; d <= bp.cycle_days; d++) days.push(d);
+            // Each estimate is [day, slope, intercept, projected]; an older API sends none
+            const estimates = hasTrend && t.estimates ? t.estimates : [];
+            const lineAt = (slope, intercept, d) => Math.max(0, slope * d + intercept);
+            const edge = pick => days.map(d => estimates.length
+                ? pick(...estimates.map(e => lineAt(e[1], e[2], d))) : null);
             const data = [
                 days,
                 days.map((d, i) => i < t.points.length ? t.points[i][1] : null),
-                days.map(d => hasTrend ? Math.max(0, t.slope_per_day * d + t.intercept) : null)
+                days.map(d => hasTrend ? lineAt(t.slope_per_day, t.intercept, d) : null),
+                edge(Math.max),  // band: the highest any estimate gives on that day
+                edge(Math.min)   // and the lowest
             ];
             if (billChart) {
                 billChart.setData(data);
@@ -3146,7 +3174,7 @@
                 cursor: { y: false, points: { size: 6 } },
                 scales: {
                     x: { time: false, range: () => [0, billPeriod.cycle_days] },
-                    y: { range: (u, min, max) => [0, max > 0 ? max * 1.15 : 10] }
+                    y: { range: (u, min, max) => [0, max > 0 ? max * 1.2 : 10] }
                 },
                 series: [
                     {},
@@ -3161,8 +3189,11 @@
                         width: 2,
                         dash: [8, 6],
                         points: { show: false }
-                    }
+                    },
+                    { points: { show: false } },  // band edges: no line, only the fill between
+                    { points: { show: false } }
                 ],
+                bands: [{ series: [3, 4], fill: skinVar('--chart-band') }],
                 axes: [
                     Object.assign({}, axis, { label: 'Day of billing cycle', labelSize: 24 }),
                     Object.assign({}, axis, { size: 70, values: (u, vals) => vals.map(v => '$' + v) })
