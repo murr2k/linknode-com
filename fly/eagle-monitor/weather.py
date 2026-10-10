@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 API = 'https://api.open-meteo.com/v1/forecast'
 SOURCE = 'Open-Meteo'
 MAX_PAST_DAYS = 92
-TIMEOUT = 20
+TIMEOUT = (10, 60)  # seconds to connect, then to wait for the reply
 
 
 class WeatherError(Exception):

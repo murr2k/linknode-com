@@ -192,7 +192,7 @@ sequenceDiagram
 | Source | Held as | From |
 |--------|---------|------|
 | Thermostat event log | Table `thermostat_events`, one row per change | The Pi, through `/thermostat` |
-| Outdoor temperature | Field `outdoor_temp_c`, hourly | Open-Meteo's forecast API, fetched every 30 minutes for a point in White Rock (`weather.py`); the first fetch takes the 92 days the API keeps |
+| Outdoor temperature | Field `outdoor_temp_c`, hourly | Open-Meteo's forecast API, fetched every 30 minutes for a point in White Rock (`weather.py`); the first fetch takes 35 days, and a failed one is tried again after 3 minutes |
 | Gas rates and the usage model | Constants in `gas.py` | The FortisBC bills |
 
 **Run time** (`thermostat.py`). A row's state holds until the next row, and the last row's until the logger's last read. Time the logger was not watching (after a `lost` or `stop` row, before a `start` row, past the last read) is unobserved: it is never counted as idle or as running, and a day with none observed has no figures. Days are local (Vancouver) days. A run is one cycle however many rows it spans, counted on the day it began. The state is the thermostat's call for heat, not proof the burner lit.

@@ -91,6 +91,8 @@ site_traffic_state = {'ids': None, 'summary': None}
 WEATHER_LATITUDE = os.getenv('WEATHER_LATITUDE', '49.03')
 WEATHER_LONGITUDE = os.getenv('WEATHER_LONGITUDE', '-122.80')
 WEATHER_REFRESH_MINUTES = 30
+WEATHER_RETRY_MINUTES = 3    # after a fetch that failed
+WEATHER_FIRST_DAYS = 35      # the first fetch: enough to fill the heating chart
 weather_state = {'current': None}  # newest (ts_ms, degrees C), finer than the hourly rows
 
 # Heating (/api/heating): the thermostat's log, the outdoor temperature and the gas bill
@@ -434,23 +436,32 @@ def refresh_site_traffic():
 
 def refresh_weather():
     """Background job: store the hourly outdoor temperature. The first fetch asks for
-    all the history the API keeps; later ones for the days since the newest stored hour,
-    plus two, which also picks up revised values. A failure keeps what is held."""
+    enough days to fill the heating chart; later ones for the days since the newest
+    stored hour, plus two, which also picks up revised values. A failure keeps what is
+    held and is tried again in a few minutes."""
     if db is None or not (WEATHER_LATITUDE and WEATHER_LONGITUDE):
         return
+    started = time.monotonic()
     try:
         now_ms = store.now_ms()
         newest = db.latest('outdoor_temp_c', 0, now_ms + 1)
-        past_days = weather.MAX_PAST_DAYS
+        past_days = WEATHER_FIRST_DAYS
         if newest:
-            past_days = min(past_days, (now_ms - newest[0]) // 86_400_000 + 2)
+            past_days = min(weather.MAX_PAST_DAYS, (now_ms - newest[0]) // 86_400_000 + 2)
         hourly, current = weather.fetch(WEATHER_LATITUDE, WEATHER_LONGITUDE, past_days)
         db.write_many('outdoor_temp_c', hourly)
         weather_state['current'] = current
+        return
     except weather.WeatherError as e:
-        logger.warning(f"Outdoor temperature not refreshed: {e}")
+        logger.warning(f"Outdoor temperature not refreshed after {time.monotonic() - started:.0f} s: {e}")
     except Exception as e:
         logger.error(f"Outdoor temperature not refreshed: {type(e).__name__}")
+    if scheduler is not None:
+        try:
+            scheduler.modify_job('weather', next_run_time=datetime.now(timezone.utc)
+                                 + timedelta(minutes=WEATHER_RETRY_MINUTES))
+        except Exception as e:
+            logger.error(f"Could not schedule the outdoor temperature retry: {type(e).__name__}")
 
 def prune_old_readings():
     """Background job: drop readings older than RETENTION_DAYS"""

@@ -371,16 +371,28 @@ class TestRoutes(unittest.TestCase):
         with patch.object(weather, 'fetch', return_value=(hourly, (base * 1000 + 900_000, 12.4))) as fetch:
             monitor_app.refresh_weather()
             monitor_app.refresh_weather()
-        self.assertEqual([call.args[2] for call in fetch.call_args_list], [weather.MAX_PAST_DAYS, 2])
+        self.assertEqual([call.args[2] for call in fetch.call_args_list], [monitor_app.WEATHER_FIRST_DAYS, 2])
         self.assertEqual(monitor_app.db.latest('outdoor_temp_c', 0, base * 1000 + 1), (base * 1000, 12.0))
         self.assertEqual(monitor_app.weather_state['current'], (base * 1000 + 900_000, 12.4))
 
     def test_a_failed_weather_fetch_keeps_what_is_held(self):
         monitor_app.weather_state['current'] = (1, 9.0)
-        with patch.object(weather, 'fetch', side_effect=weather.WeatherError('HTTP 500, ')):
+        with patch.object(weather, 'fetch', side_effect=weather.WeatherError('HTTP 500, ')), \
+                patch.object(monitor_app, 'scheduler', MagicMock()) as scheduler:
             with self.assertLogs(monitor_app.logger, 'WARNING'):
                 monitor_app.refresh_weather()
         self.assertEqual(monitor_app.weather_state['current'], (1, 9.0))
+        # And it is tried again in a few minutes, not at the next half hour
+        job, kwargs = scheduler.modify_job.call_args.args[0], scheduler.modify_job.call_args.kwargs
+        self.assertEqual(job, 'weather')
+        wait = kwargs['next_run_time'] - datetime.now(timezone.utc)
+        self.assertLess(abs(wait - timedelta(minutes=monitor_app.WEATHER_RETRY_MINUTES)), timedelta(seconds=5))
+
+    def test_a_good_weather_fetch_leaves_the_schedule_alone(self):
+        with patch.object(weather, 'fetch', return_value=([], None)), \
+                patch.object(monitor_app, 'scheduler', MagicMock()) as scheduler:
+            monitor_app.refresh_weather()
+        scheduler.modify_job.assert_not_called()
 
 
 if __name__ == '__main__':
