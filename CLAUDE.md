@@ -14,7 +14,9 @@ home network reads the Eagle-200 smart meter's local API and POSTs XML to a
 Flask ingest service on Fly.io (`linknode-eagle-monitor`), which stores every
 reading in SQLite on a Fly volume and serves the stats, dashboard and live-stream
 APIs. The static site is a Cloudflare Worker (static assets only) that charts the
-data natively with uPlot. Lightweight project, no Ruflo.
+data natively with uPlot. Since 2026-10-10 the Pi also uploads the Honeywell T5
+thermostat's log, and the site charts heating run time against the outdoor
+temperature and forecasts the FortisBC gas bill. Lightweight project, no Ruflo.
 
 Until 2026-09-27 this ran as four Fly apps (nginx site, Grafana, InfluxDB and the
 ingest service); the other three were retired, and the machine moved from `ord` to
@@ -44,10 +46,11 @@ January 2026; those scripts no longer work.
 
 | Path | What |
 |---|---|
-| `fly/eagle-monitor/` | The only Fly app. `app.py` (Flask: `/eagle` ingest, `/api/stats`, `/api/dashboard`, `/api/stream` SSE, `/health` liveness, `/health/data` telemetry freshness), `store.py` (SQLite), `dashboard.py` (chart + panel math), `monitor_data_staleness.py` (Slack/Pushover outage alerts), `site_traffic.py` (the site's traffic figures from Cloudflare, published as `site_traffic` in `/api/stats`). |
+| `fly/eagle-monitor/` | The only Fly app. `app.py` (Flask: `/eagle` ingest, `/api/stats`, `/api/dashboard`, `/api/stream` SSE, `/health` liveness, `/health/data` telemetry freshness), `store.py` (SQLite), `dashboard.py` (chart + panel math), `monitor_data_staleness.py` (Slack/Pushover outage alerts), `site_traffic.py` (the site's traffic figures from Cloudflare, published as `site_traffic` in `/api/stats`). Heating: `/thermostat` ingest and `/api/heating` in `app.py`, `thermostat.py` (run time from the event log), `gas.py` (FortisBC bill and the gas usage model), `weather.py` (outdoor temperature from Open-Meteo). |
 | `web/public/` | The site: `index.html`, `_headers` (CSP and security headers), `404.html`, vendored uPlot. |
 | `web/wrangler.jsonc` | Cloudflare Worker config: assets only, routes `linknode.com/*` and `www.linknode.com/*`. |
 | `scripts/eagle_bypass.py`, `deploy/` | The Pi uploader (systemd `eagle-bypass.service`). |
+| `scripts/t5_upload.py`, `deploy/t5-upload.service` | The Pi's thermostat uploader (systemd `t5-upload.service`): posts the rows the `t5-runtime` logger writes to `/thermostat`. The logger itself belongs to the `1344-network` repo. Installed by hand, not by CI. |
 | `scripts/linknode_watchdog.py`, `deploy/linknode-watchdog.*` | The Pi watchdog (systemd timer): Pushover siren when the ingest service or the site stops answering. Installed by hand, not by CI. |
 | `.github/workflows/` | `deploy-fly.yml` (eagle-monitor), `deploy-web.yml` (site). |
 | `docs/THEORY_OF_OPERATION.md` | System design + data flow (current, authoritative). |
@@ -118,6 +121,24 @@ January 2026; those scripts no longer work.
   defaults and those tests' expected lines together. Each new bill also carries the next
   meter read date: set the `BILLING_NEXT_READ` default in `app.py` to it, or the cycle
   length and the Bill Forecast's end date fall back to the nominal 26th.
+
+- **Gas is modelled, not metered.** FortisBC reads the meter monthly, so `gas.py` estimates
+  usage as `GAS_BASE_GJ_PER_DAY` (0.046, from the summer 2026 bills) plus the furnace's input
+  rating for each hour the thermostat called for heat. `FURNACE_INPUT_BTUH` is unset, so a
+  60,000 BTU/h placeholder is used and the page says so: set it in `fly.toml` when the
+  nameplate value is known, then check the model against each winter bill (the meter resolves
+  about 0.13 GJ). The summer base load is high for a range alone and probably includes pilot
+  lights; not confirmed.
+
+- **FortisBC values change with the bills.** The per-GJ rates in `gas.py` moved on Jul 1, 2026
+  (storage and transport) and are checked by `test_heating.TestGasBill` against real bills:
+  update both together. Each bill also carries its meter read date: add it to the
+  `GAS_READ_DATES` default (comma separated), or the period falls back to starting on the 1st.
+
+- **The Pi is shared with the `1344-network` project**, which owns the `t5-runtime` logger and
+  the Pi's Wi-Fi link to the thermostat's network. `t5_upload.py` only reads that logger's two
+  files. After any change on the Pi check all four units (`eagle-bypass.service`,
+  `linknode-watchdog.timer`, `t5-runtime.service`, `t5-upload.service`).
 
 - Fly `shared-cpu-1x` throttles to 6.25% of a core once burst credits run out;
   keep one-off data jobs in the machine light (see project memory).

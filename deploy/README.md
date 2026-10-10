@@ -206,6 +206,44 @@ page (the marker `id="power-chart"`). Adding fields is safe. Before a push that 
 or removes any of these, install a watchdog that accepts both the old and the new reply,
 or the old one sends a siren for a healthy service.
 
+## Thermostat uploader (heating charts)
+
+`scripts/t5_upload.py` posts the thermostat log to the Fly `/thermostat` endpoint. The log
+is written by the `t5-runtime` logger on the same Pi, which belongs to the `1344-network`
+repo: the uploader reads its `/var/lib/t5-runtime/events.csv` and
+`/run/t5-runtime/last_seen`, never writes to them and never talks to the thermostat.
+Standard library only. It takes its Basic Auth from `/etc/eagle-bypass.env`
+(`EAGLE_UPLOAD_USER`, `EAGLE_UPLOAD_PASSWORD`), so there is no second copy of the password.
+
+```sh
+# From a machine with this repo:
+scp scripts/t5_upload.py deploy/t5-upload.service pi@<pi-ip>:/tmp/
+
+# --- the rest runs on the Pi ---
+sed -i 's/\r$//' /tmp/t5_upload.py /tmp/t5-upload.service      # CRLF from a Windows checkout
+sudo install -D -m 0755 /tmp/t5_upload.py /opt/t5-upload/t5_upload.py
+sudo install -m 0644 /tmp/t5-upload.service /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Prove it before enabling: what is in the file (sends nothing), then one real pass
+python3 /opt/t5-upload/t5_upload.py --dry-run
+sudo sh -c 'set -a; . /etc/eagle-bypass.env; python3 /opt/t5-upload/t5_upload.py --once -v'
+
+sudo systemctl enable --now t5-upload.service
+journalctl -u t5-upload.service -f       # "shipped N rows" when the thermostat changes state
+```
+
+It keeps no state on the Pi and writes nothing to the SD card. Every reply from the service
+names the newest row it holds, and the uploader sends what comes after, so a restart, a
+missed batch or a restored database all sort themselves out. With nothing new it posts the
+logger's last-read time once a minute; that is how the page knows the thermostat's state is
+current, and shows "No Signal" five minutes after the logger or the uploader stops.
+
+To update it later, copy, strip and install the script, then
+`sudo systemctl restart t5-upload.service`. The Pi is shared with the `1344-network` project:
+after any change check `systemctl is-active eagle-bypass.service linknode-watchdog.timer
+t5-runtime.service t5-upload.service`.
+
 ## Notes
 
 - **Always-on (default) vs. failover:** always-on is now the script's **default**

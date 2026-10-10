@@ -30,6 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now), `projected_min` and `projected_max`. The line through day 1 alone is no longer drawn:
   until two full days are in, the trendline runs from $0 to the bill the previous period
   ended on, when the store holds that whole period
+- **Heating and gas** on the site, from the Honeywell T5 thermostat the Pi already logs
+  over HomeKit (the `t5-runtime` logger, kept in the private `1344-network` repo):
+  - `scripts/t5_upload.py` and `deploy/t5-upload.service`: a second small uploader on the Pi
+    that posts the logger's rows to the new `POST /thermostat` (Basic Auth, the same
+    credentials as `/eagle`). It keeps no state: each reply says which rows the service holds
+  - `thermostat.py`: run time per local day, cycles, room temperature and the current state
+    from those rows. Time the logger was not watching is never counted as idle or running
+  - `weather.py`: the hourly outdoor temperature from Open-Meteo (keyless), fetched every
+    30 minutes and stored as `outdoor_temp_c`
+  - `gas.py`: the FortisBC bill, line by line, checked against the June to September 2026
+    bills. The house has no gas telemetry, so gas is modelled as a base load (0.046 GJ/day,
+    from the summer bills) plus the furnace's input rating for each hour of heating. The
+    rating is a placeholder (60,000 BTU/h) until `FURNACE_INPUT_BTUH` is set
+  - `GET /api/heating`: the thermostat's state, 31 days of run time and temperatures, and
+    the gas bill so far with the same trend, estimates and range as the electricity forecast
+  - The page gains a **Heating** card (daily run time over the outdoor and room temperature)
+    and a **Gas Bill Forecast** card. The Bill Forecast card is now titled Electricity Bill
+    Forecast, and a range band under 50 cents wide is no longer labelled
 - **Site traffic at the foot of the page**: 30 days of figures from Cloudflare, each with a
   few words on what it counts. All requests to the zone (total, 404s, blocked, page views,
   unique IPs per day, and the top statuses, countries and clients) and the page loads Web

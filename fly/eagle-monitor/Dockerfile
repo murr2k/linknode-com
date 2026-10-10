@@ -14,6 +14,9 @@ COPY monitor_data_staleness.py .
 COPY store.py .
 COPY dashboard.py .
 COPY site_traffic.py .
+COPY thermostat.py .
+COPY gas.py .
+COPY weather.py .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

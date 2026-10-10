@@ -67,6 +67,8 @@
             --chart-fill: rgba(74, 222, 128, 0.06);
             --chart-envelope: rgba(74, 222, 128, 0.35);
             --chart-band: rgba(74, 222, 128, 0.18);
+            --chart-heat: #fb923c;
+            --chart-cool: #60a5fa;
         }
         
         body {
@@ -589,6 +591,26 @@
 
         .bill-chart {
             height: 300px;
+        }
+
+        .heating-chart {
+            height: 220px;
+        }
+
+        .temperature-chart {
+            height: 240px;
+        }
+
+        /* What a chart's figures rest on, in small print under its tiles */
+        .chart-note {
+            margin-top: 1.25rem;
+            font-size: 0.75rem;
+            line-height: 1.5;
+            color: #888;
+        }
+
+        .chart-note a {
+            color: inherit;
         }
 
         .power-chart .uplot {
@@ -1151,6 +1173,7 @@
             .dashboard-stats { grid-template-columns: 1fr 1fr; }
             .energy-dashboard { padding: 1rem; }
             .power-chart { height: 300px; }
+            .heating-chart, .temperature-chart { height: 200px; }
             .zero-dep-grid { grid-template-columns: 1fr; }
             .tech-stack-section h2 { font-size: 1.75rem; }
         }
@@ -1172,6 +1195,8 @@
             --chart-fill: rgba(255, 194, 51, 0.05);
             --chart-envelope: rgba(255, 194, 51, 0.35);
             --chart-band: rgba(255, 194, 51, 0.14);
+            --chart-heat: #ff7a45;
+            --chart-cool: #5ad8ff;
             --chart-glow: rgba(255, 194, 51, 0.8);
             --chart-font: 12px ui-monospace, 'Cascadia Mono', Consolas, Menlo, 'Courier New', monospace;
         }
@@ -1295,6 +1320,7 @@
         html[data-skin="scope"] .metric-item .label,
         html[data-skin="scope"] .intent-quote,
         html[data-skin="scope"] .chart-message,
+        html[data-skin="scope"] .chart-note,
         html[data-skin="scope"] .range-picker button,
         html[data-skin="scope"] .skin-picker button {
             color: #6f9a80;
@@ -1514,6 +1540,8 @@
             --chart-fill: rgba(83, 234, 253, 0.07);
             --chart-envelope: rgba(0, 184, 219, 0.5);
             --chart-band: rgba(0, 184, 219, 0.14);
+            --chart-heat: #fb923c;
+            --chart-cool: #a78bfa;
             --chart-font: 11px 'Geist Mono', ui-monospace, 'Cascadia Mono', Consolas, Menlo, monospace;
         }
 
@@ -1687,6 +1715,7 @@
         html[data-skin="notch"] .metric-item .label,
         html[data-skin="notch"] .intent-quote,
         html[data-skin="notch"] .chart-message,
+        html[data-skin="notch"] .chart-note,
         html[data-skin="notch"] .range-picker button,
         html[data-skin="notch"] .skin-picker button {
             color: #9f9fa9;
@@ -2143,7 +2172,7 @@
             <!-- Bill forecast: bill so far by day of the billing cycle and its trendline, from /api/stats -->
             <div class="energy-dashboard" id="bill-forecast">
                 <div class="dashboard-header">
-                    <h3>📈 Bill Forecast</h3>
+                    <h3>📈 Electricity Bill Forecast</h3>
                 </div>
                 <div class="power-chart bill-chart" id="bill-chart" role="img" aria-label="Bill so far by day of the billing cycle, with a straight-line forecast to the end of the cycle and a band showing the range earlier forecasts covered"></div>
                 <div class="dashboard-stats">
@@ -2152,6 +2181,45 @@
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-projected">--</div><div class="dashboard-stat-label">Projected Bill</div></div>
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="bill-days-left">--</div><div class="dashboard-stat-label">Days Left</div></div>
                 </div>
+            </div>
+
+            <!-- Heating: thermostat run time over the outdoor temperature, by day, from /api/heating -->
+            <div class="energy-dashboard" id="heating">
+                <div class="dashboard-header">
+                    <h3>🌡️ Heating</h3>
+                </div>
+                <div class="power-chart heating-chart" id="heating-chart" role="img" aria-label="Hours the furnace and the air conditioner ran on each of the last 31 days"></div>
+                <div class="power-chart temperature-chart" id="temperature-chart" role="img" aria-label="Outdoor temperature on each of the last 31 days: the daily mean inside a band from the day's low to its high, with the mean room temperature"></div>
+                <div class="dashboard-stats">
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-state">--</div><div class="dashboard-stat-label">System</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-room">--</div><div class="dashboard-stat-label">Room</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-target">--</div><div class="dashboard-stat-label">Setpoint</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-outdoor">--</div><div class="dashboard-stat-label">Outdoor</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-today">--</div><div class="dashboard-stat-label">Heating Today</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-cycles">--</div><div class="dashboard-stat-label">Cycles Today</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-yesterday">--</div><div class="dashboard-stat-label">Heating Yesterday</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="heat-week">--</div><div class="dashboard-stat-label">Heating, 7 Days</div></div>
+                </div>
+                <div class="chart-note">Run time is the thermostat's call for heat or cooling, logged by the Raspberry Pi. Outdoor temperature from <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>.</div>
+            </div>
+
+            <!-- Gas bill forecast: the modelled gas bill by day of FortisBC's billing period, from /api/heating -->
+            <div class="energy-dashboard" id="gas-forecast">
+                <div class="dashboard-header">
+                    <h3>🔥 Gas Bill Forecast</h3>
+                </div>
+                <div class="power-chart bill-chart" id="gas-chart" role="img" aria-label="Estimated gas bill so far by day of the billing period, with a straight-line forecast to the end of the period and a band showing the range earlier forecasts covered"></div>
+                <div class="dashboard-stats">
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-now">--</div><div class="dashboard-stat-label">Bill So Far</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-rate">--</div><div class="dashboard-stat-label">Spend Rate</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-projected">--</div><div class="dashboard-stat-label">Projected Bill</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-days-left">--</div><div class="dashboard-stat-label">Days Left</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-used">--</div><div class="dashboard-stat-label">Gas So Far (est.)</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-heating">--</div><div class="dashboard-stat-label">Furnace Run Time</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-furnace">--</div><div class="dashboard-stat-label" id="gas-furnace-label">Furnace Input</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-base">--</div><div class="dashboard-stat-label">Base Load</div></div>
+                </div>
+                <div class="chart-note" id="gas-note"></div>
             </div>
         </section>
 
@@ -2739,7 +2807,8 @@
                             `GST ${c.gst_pct}%: ${money(c.gst)}
 ` +
                             `Total: ${money(c.total_cost)}`;
-                        renderBillChart(bp);
+                        billForecast.render({ start: bp.start, days: bp.days, cycle_days: bp.cycle_days,
+                                              total_cost: c.total_cost, trend: bp.trend });
                     }
 
                     renderSiteTraffic(data.site_traffic);
@@ -3093,19 +3162,222 @@
         // spend rate; where the line ends is the bill if that rate holds. The shaded band
         // is where that line has pointed over the period: on each day, the lowest and
         // highest value any of the period's estimates gives (trend.estimates).
-        let billChart = null;
-        let billPeriod = null;  // last billing_period drawn, kept so a skin change can redraw it
-
+        // Drawn twice: electricity (from /api/stats) and gas (from /api/heating).
         const billMoney = v => '$' + v.toFixed(2);
+        const BILL_RANGE_SHOWN = 0.5;  // a band narrower than this many dollars gets no figures
 
-        // "Oct 7" for a day of the cycle (day 1 is the period's start date)
-        function billDayLabel(day) {
-            const [y, m, d] = billPeriod.start.slice(0, 10).split('-').map(Number);
-            return new Date(Date.UTC(y, m - 1, d + day - 1))
+        // `ids` names the chart element and the four tiles under it. render() takes a
+        // period: { start, days, cycle_days, total_cost, trend }.
+        function createBillForecast(ids) {
+            let chart = null;
+            let period = null;  // last period drawn, kept so a skin change can redraw it
+
+            // "Oct 7" for a day of the cycle (day 1 is the period's start date)
+            function dayLabel(day) {
+                const [y, m, d] = period.start.slice(0, 10).split('-').map(Number);
+                return new Date(Date.UTC(y, m - 1, d + day - 1))
+                    .toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+            }
+
+            function tooltipPlugin() {
+                let tip;
+                return {
+                    hooks: {
+                        init: u => {
+                            tip = document.createElement('div');
+                            tip.className = 'chart-tooltip';
+                            u.over.appendChild(tip);
+                        },
+                        setCursor: u => {
+                            const i = u.cursor.idx;
+                            if (i === null || i === undefined) {
+                                tip.style.display = 'none';
+                                return;
+                            }
+                            const day = u.data[0][i], actual = u.data[1][i], trend = u.data[2][i];
+                            const high = u.data[3][i], low = u.data[4][i];
+                            const parts = [Number.isInteger(day) ? `Day ${day} · ${dayLabel(day)}` : 'Now'];
+                            if (actual !== null) parts.push(billMoney(actual));
+                            if (trend !== null) parts.push(`trend ${billMoney(trend)}`);
+                            const lines = [parts.join('  ')];
+                            if (high !== null && high - low >= BILL_RANGE_SHOWN) lines.push(`range ${billMoney(low)} to ${billMoney(high)}`);
+                            tip.replaceChildren(...lines.map(text => {
+                                const row = document.createElement('div');
+                                row.textContent = text;
+                                return row;
+                            }));
+                            tip.style.display = 'block';
+                            tip.style.left = Math.max(0, Math.min(u.cursor.left + 12, u.over.clientWidth - tip.offsetWidth)) + 'px';
+                            tip.style.top = Math.max(0, u.valToPos(actual !== null ? actual : trend, 'y') - tip.offsetHeight - 8) + 'px';
+                        }
+                    }
+                };
+            }
+
+            // The projected bill, written where the trendline ends, and the lowest and highest
+            // it has been, written at the two edges of the band
+            function endLabelPlugin(color, font) {
+                return {
+                    hooks: {
+                        draw: u => {
+                            const trend = u.data[2], last = trend.length - 1;
+                            if (trend[last] === null) return;
+                            const ctx = u.ctx, dpr = devicePixelRatio;
+                            const fontPx = parseFloat((font.match(/(\d+(\.\d+)?)px/) || [0, 12])[1]) * dpr;
+                            const x = u.valToPos(u.data[0][last], 'x', true) - 4 * dpr;
+                            const yOf = v => u.valToPos(v, 'y', true);
+                            ctx.save();
+                            ctx.font = font.replace(/(\d+(\.\d+)?)px/, fontPx + 'px');
+                            ctx.fillStyle = color;
+                            ctx.textAlign = 'right';
+                            ctx.textBaseline = 'bottom';
+                            const trendY = yOf(trend[last]) - 6 * dpr;
+                            ctx.fillText(billMoney(trend[last]), x, trendY);
+                            const high = u.data[3][last], low = u.data[4][last];
+                            if (high !== null && high - low >= BILL_RANGE_SHOWN) {
+                                const t = period.trend;
+                                // Kept clear of the label above when the trendline is itself the highest
+                                ctx.fillText('high ' + billMoney(t.projected_max),
+                                    x, Math.min(yOf(high) - 6 * dpr, trendY - fontPx * 1.25));
+                                ctx.textBaseline = 'top';
+                                ctx.fillText('low ' + billMoney(t.projected_min), x, yOf(low) + 6 * dpr);
+                            }
+                            ctx.restore();
+                        }
+                    }
+                };
+            }
+
+            function render(bp) {
+                const el = document.getElementById(ids.chart);
+                const t = bp.trend;
+                const hasTrend = t && t.slope_per_day !== null && t.slope_per_day !== undefined;
+                document.getElementById(ids.now).textContent = billMoney(bp.total_cost);
+                document.getElementById(ids.rate).textContent = hasTrend ? billMoney(t.slope_per_day) + '/day' : '--';
+                document.getElementById(ids.projected).textContent = hasTrend ? billMoney(t.projected_total) : '--';
+                document.getElementById(ids.daysLeft).textContent = String(Math.max(0, bp.cycle_days - bp.days));
+                if (!t || t.points.length < 2) {
+                    if (chart) {
+                        chart.destroy();
+                        chart = null;
+                    }
+                    el.innerHTML = '<div class="chart-message">No billing data yet</div>';
+                    return;
+                }
+                period = bp;
+                // Every point so far, then each remaining day out to the end of the cycle
+                const days = t.points.map(p => p[0]);
+                for (let d = Math.floor(days[days.length - 1]) + 1; d <= bp.cycle_days; d++) days.push(d);
+                // Each estimate is [day, slope, intercept, projected]; an older API sends none
+                const estimates = hasTrend && t.estimates ? t.estimates : [];
+                const lineAt = (slope, intercept, d) => Math.max(0, slope * d + intercept);
+                const edge = pick => days.map(d => estimates.length
+                    ? pick(...estimates.map(e => lineAt(e[1], e[2], d))) : null);
+                const data = [
+                    days,
+                    days.map((d, i) => i < t.points.length ? t.points[i][1] : null),
+                    days.map(d => hasTrend ? lineAt(t.slope_per_day, t.intercept, d) : null),
+                    edge(Math.max),  // band: the highest any estimate gives on that day
+                    edge(Math.min)   // and the lowest
+                ];
+                if (chart) {
+                    chart.setData(data);
+                    return;
+                }
+                el.innerHTML = '';
+                const skinStyle = getComputedStyle(document.documentElement);
+                const skinVar = name => skinStyle.getPropertyValue(name).trim();
+                const font = skinVar('--chart-font') || '12px system-ui, sans-serif';
+                const axis = {
+                    stroke: skinVar('--chart-axis'),
+                    grid: { stroke: skinVar('--chart-grid') },
+                    ticks: { stroke: skinVar('--chart-tick') },
+                    font: font,
+                    labelFont: font
+                };
+                const plugins = [tooltipPlugin(), endLabelPlugin(skinVar('--chart-axis'), font)];
+                if (skinVar('--chart-glow')) plugins.push(chartGlowPlugin(skinVar('--chart-glow')));
+                chart = new uPlot({
+                    width: el.clientWidth,
+                    height: el.clientHeight,
+                    legend: { show: false },
+                    cursor: { y: false, points: { size: 6 } },
+                    scales: {
+                        x: { time: false, range: () => [0, period.cycle_days] },
+                        y: { range: (u, min, max) => [0, max > 0 ? max * 1.2 : 10] }
+                    },
+                    series: [
+                        {},
+                        {   // bill so far
+                            stroke: skinVar('--chart-line'),
+                            width: 2,
+                            fill: skinVar('--chart-fill'),
+                            points: { show: false }
+                        },
+                        {   // trendline, past and future
+                            stroke: skinVar('--chart-envelope'),
+                            width: 2,
+                            dash: [8, 6],
+                            points: { show: false }
+                        },
+                        { points: { show: false } },  // band edges: no line, only the fill between
+                        { points: { show: false } }
+                    ],
+                    bands: [{ series: [3, 4], fill: skinVar('--chart-band') }],
+                    axes: [
+                        Object.assign({}, axis, { label: 'Day of billing cycle', labelSize: 24 }),
+                        Object.assign({}, axis, { size: 70, values: (u, vals) => vals.map(v => '$' + v) })
+                    ],
+                    plugins: plugins
+                }, data, el);
+            }
+
+            return {
+                render,
+                // The chart's colours are baked into its canvas: rebuild it from the last data
+                redraw() {
+                    if (chart) {
+                        chart.destroy();
+                        chart = null;
+                        render(period);
+                    }
+                },
+                resize() {
+                    const el = document.getElementById(ids.chart);
+                    if (chart) chart.setSize({ width: el.clientWidth, height: el.clientHeight });
+                }
+            };
+        }
+
+        const billForecast = createBillForecast({ chart: 'bill-chart', now: 'bill-now', rate: 'bill-rate',
+                                                  projected: 'bill-projected', daysLeft: 'bill-days-left' });
+        const gasForecast = createBillForecast({ chart: 'gas-chart', now: 'gas-now', rate: 'gas-rate',
+                                                 projected: 'gas-projected', daysLeft: 'gas-days-left' });
+
+        // Heating: the hours the furnace (or the air conditioner) ran each day, over the
+        // outdoor temperature on the same days. Two charts on one day axis, because hours
+        // and degrees share no scale. From /api/heating, which also carries the gas bill.
+        const HEATING_REFRESH_MS = 60000;
+        let heatingData = null;   // last payload drawn, kept so a skin change can redraw it
+        let heatingCharts = [];   // [run time, temperature]
+        let heatingTimer = null;
+
+        function hoursMinutes(h) {
+            const minutes = Math.round(h * 60);
+            return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+        }
+
+        const degrees = v => v.toFixed(1) + ' °C';
+
+        // "Oct 7" for the i-th day drawn
+        function heatingDayLabel(i) {
+            const [y, m, d] = heatingData.days[i].date.split('-').map(Number);
+            return new Date(Date.UTC(y, m - 1, d))
                 .toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
         }
 
-        function billTooltipPlugin() {
+        // Hover tooltip: the day, then what `describe` says about it
+        function heatingTooltipPlugin(describe) {
             let tip;
             return {
                 hooks: {
@@ -3116,17 +3388,12 @@
                     },
                     setCursor: u => {
                         const i = u.cursor.idx;
-                        if (i === null || i === undefined) {
+                        if (i === null || i === undefined || !heatingData.days[i]) {
                             tip.style.display = 'none';
                             return;
                         }
-                        const day = u.data[0][i], actual = u.data[1][i], trend = u.data[2][i];
-                        const high = u.data[3][i], low = u.data[4][i];
-                        const parts = [Number.isInteger(day) ? `Day ${day} · ${billDayLabel(day)}` : 'Now'];
-                        if (actual !== null) parts.push(billMoney(actual));
-                        if (trend !== null) parts.push(`trend ${billMoney(trend)}`);
-                        const lines = [parts.join('  ')];
-                        if (high !== null && high - low >= 0.005) lines.push(`range ${billMoney(low)} to ${billMoney(high)}`);
+                        const lines = describe(heatingData.days[i]);
+                        lines[0] = `${heatingDayLabel(i)}  ${lines[0]}`;
                         tip.replaceChildren(...lines.map(text => {
                             const row = document.createElement('div');
                             row.textContent = text;
@@ -3134,83 +3401,70 @@
                         }));
                         tip.style.display = 'block';
                         tip.style.left = Math.max(0, Math.min(u.cursor.left + 12, u.over.clientWidth - tip.offsetWidth)) + 'px';
-                        tip.style.top = Math.max(0, u.valToPos(actual !== null ? actual : trend, 'y') - tip.offsetHeight - 8) + 'px';
+                        tip.style.top = '4px';
                     }
                 }
             };
         }
 
-        // The projected bill, written where the trendline ends, and the lowest and highest
-        // it has been, written at the two edges of the band
-        function billEndLabelPlugin(color, font) {
+        // A name written at the end of each line: [[series index, text]]. The upper line's
+        // goes above it and the lower line's below, so the two stay apart.
+        function lineEndLabelsPlugin(labels, color, font) {
             return {
                 hooks: {
                     draw: u => {
-                        const trend = u.data[2], last = trend.length - 1;
-                        if (trend[last] === null) return;
                         const ctx = u.ctx, dpr = devicePixelRatio;
                         const fontPx = parseFloat((font.match(/(\d+(\.\d+)?)px/) || [0, 12])[1]) * dpr;
-                        const x = u.valToPos(u.data[0][last], 'x', true) - 4 * dpr;
-                        const yOf = v => u.valToPos(v, 'y', true);
+                        const ends = labels.map(([series, text]) => {
+                            const column = u.data[series];
+                            let i = column.length - 1;
+                            while (i >= 0 && (column[i] === null || column[i] === undefined)) i--;
+                            return i < 0 ? null : {
+                                text: text,
+                                x: u.valToPos(u.data[0][i], 'x', true),
+                                y: u.valToPos(column[i], 'y', true)
+                            };
+                        }).filter(Boolean).sort((a, b) => a.y - b.y);
                         ctx.save();
                         ctx.font = font.replace(/(\d+(\.\d+)?)px/, fontPx + 'px');
                         ctx.fillStyle = color;
                         ctx.textAlign = 'right';
-                        ctx.textBaseline = 'bottom';
-                        const trendY = yOf(trend[last]) - 6 * dpr;
-                        ctx.fillText(billMoney(trend[last]), x, trendY);
-                        const high = u.data[3][last], low = u.data[4][last];
-                        if (high !== null && high - low >= 0.005) {
-                            const t = billPeriod.trend;
-                            // Kept clear of the label above when the trendline is itself the highest
-                            ctx.fillText('high ' + billMoney(t.projected_max),
-                                x, Math.min(yOf(high) - 6 * dpr, trendY - fontPx * 1.25));
-                            ctx.textBaseline = 'top';
-                            ctx.fillText('low ' + billMoney(t.projected_min), x, yOf(low) + 6 * dpr);
-                        }
+                        ends.forEach((end, k) => {
+                            const above = k === 0;
+                            ctx.textBaseline = above ? 'bottom' : 'top';
+                            ctx.fillText(end.text, end.x, end.y + (above ? -6 : 6) * dpr);
+                        });
                         ctx.restore();
                     }
                 }
             };
         }
 
-        function renderBillChart(bp) {
-            const el = document.getElementById('bill-chart');
-            const t = bp.trend;
-            const hasTrend = t && t.slope_per_day !== null && t.slope_per_day !== undefined;
-            document.getElementById('bill-now').textContent = billMoney(bp.tiered_cost.total_cost);
-            document.getElementById('bill-rate').textContent = hasTrend ? billMoney(t.slope_per_day) + '/day' : '--';
-            document.getElementById('bill-projected').textContent = hasTrend ? billMoney(t.projected_total) : '--';
-            document.getElementById('bill-days-left').textContent = String(Math.max(0, bp.cycle_days - bp.days));
-            if (!t || t.points.length < 2) {
-                if (billChart) {
-                    billChart.destroy();
-                    billChart = null;
-                }
-                el.innerHTML = '<div class="chart-message">No billing data yet</div>';
-                return;
-            }
-            billPeriod = bp;
-            // Every point so far, then each remaining day out to the end of the cycle
-            const days = t.points.map(p => p[0]);
-            for (let d = Math.floor(days[days.length - 1]) + 1; d <= bp.cycle_days; d++) days.push(d);
-            // Each estimate is [day, slope, intercept, projected]; an older API sends none
-            const estimates = hasTrend && t.estimates ? t.estimates : [];
-            const lineAt = (slope, intercept, d) => Math.max(0, slope * d + intercept);
-            const edge = pick => days.map(d => estimates.length
-                ? pick(...estimates.map(e => lineAt(e[1], e[2], d))) : null);
-            const data = [
-                days,
-                days.map((d, i) => i < t.points.length ? t.points[i][1] : null),
-                days.map(d => hasTrend ? lineAt(t.slope_per_day, t.intercept, d) : null),
-                edge(Math.max),  // band: the highest any estimate gives on that day
-                edge(Math.min)   // and the lowest
+        function renderHeatingCharts() {
+            const days = heatingData.days;
+            const index = days.map((d, i) => i);
+            const runData = [
+                index,
+                days.map(d => d.heating_h),
+                days.map(d => d.cooling_h || null)   // no mark for a day with no cooling
             ];
-            if (billChart) {
-                billChart.setData(data);
+            const temperatureData = [
+                index,
+                days.map(d => d.outdoor_c),
+                days.map(d => d.outdoor_max_c),
+                days.map(d => d.outdoor_min_c),
+                days.map(d => d.room_c)
+            ];
+            if (heatingCharts.length && heatingCharts[0].data[0].length === index.length) {
+                heatingCharts[0].setData(runData);
+                heatingCharts[1].setData(temperatureData);
                 return;
             }
-            el.innerHTML = '';
+            heatingCharts.forEach(chart => chart.destroy());
+            const runEl = document.getElementById('heating-chart');
+            const temperatureEl = document.getElementById('temperature-chart');
+            runEl.innerHTML = '';
+            temperatureEl.innerHTML = '';
             const skinStyle = getComputedStyle(document.documentElement);
             const skinVar = name => skinStyle.getPropertyValue(name).trim();
             const font = skinVar('--chart-font') || '12px system-ui, sans-serif';
@@ -3221,41 +3475,169 @@
                 font: font,
                 labelFont: font
             };
-            const plugins = [billTooltipPlugin(), billEndLabelPlugin(skinVar('--chart-axis'), font)];
-            if (skinVar('--chart-glow')) plugins.push(chartGlowPlugin(skinVar('--chart-glow')));
-            billChart = new uPlot({
-                width: el.clientWidth,
-                height: el.clientHeight,
+            // One day axis for both: a column per day, labelled with its date
+            const xScale = { time: false, range: () => [-0.6, heatingData.days.length - 0.4] };
+            const xAxis = Object.assign({}, axis, {
+                incrs: [1, 2, 7, 14, 28],
+                space: 56,
+                values: (u, vals) => vals.map(v => Number.isInteger(v) && heatingData.days[v] ? heatingDayLabel(v) : '')
+            });
+            const cursor = { y: false, points: { show: false }, sync: { key: 'heating' } };
+            const glow = skinVar('--chart-glow') ? [chartGlowPlugin(skinVar('--chart-glow'))] : [];
+            const bars = share => uPlot.paths.bars({ size: [share, 48] });
+
+            const runChart = new uPlot({
+                width: runEl.clientWidth,
+                height: runEl.clientHeight,
                 legend: { show: false },
-                cursor: { y: false, points: { size: 6 } },
+                cursor: cursor,
                 scales: {
-                    x: { time: false, range: () => [0, billPeriod.cycle_days] },
-                    y: { range: (u, min, max) => [0, max > 0 ? max * 1.2 : 10] }
+                    x: xScale,
+                    y: { range: (u, min, max) => [0, max > 0 ? Math.max(1, max * 1.15) : 1] }
                 },
                 series: [
                     {},
-                    {   // bill so far
+                    {   // heating
+                        stroke: skinVar('--chart-heat'),
+                        fill: skinVar('--chart-heat'),
+                        width: 1,
+                        paths: bars(0.7),
+                        points: { show: false }
+                    },
+                    {   // cooling: narrower, so a day with both shows both
+                        stroke: skinVar('--chart-cool'),
+                        fill: skinVar('--chart-cool'),
+                        width: 1,
+                        paths: bars(0.35),
+                        points: { show: false }
+                    }
+                ],
+                axes: [
+                    xAxis,
+                    Object.assign({}, axis, { size: 70, label: 'Run time', labelSize: 24,
+                                              values: (u, vals) => vals.map(v => v + ' h') })
+                ],
+                plugins: [heatingTooltipPlugin(d => {
+                    if (d.heating_h === null) return ['not logged'];
+                    const lines = [`heating ${hoursMinutes(d.heating_h)} in ${d.heat_cycles} cycle${d.heat_cycles === 1 ? '' : 's'}`];
+                    if (d.cooling_h > 0) lines.push(`cooling ${hoursMinutes(d.cooling_h)} in ${d.cool_cycles} cycle${d.cool_cycles === 1 ? '' : 's'}`);
+                    if (d.unobserved_h >= 0.1) lines.push(`${hoursMinutes(d.unobserved_h)} not logged`);
+                    return lines;
+                })].concat(glow)
+            }, runData, runEl);
+
+            const temperatureChart = new uPlot({
+                width: temperatureEl.clientWidth,
+                height: temperatureEl.clientHeight,
+                legend: { show: false },
+                cursor: cursor,
+                scales: {
+                    x: xScale,
+                    y: { range: (u, min, max) => min === null ? [0, 25] : [Math.floor(min - 2), Math.ceil(max + 3)] }
+                },
+                series: [
+                    {},
+                    {   // outdoor, daily mean
                         stroke: skinVar('--chart-line'),
                         width: 2,
-                        fill: skinVar('--chart-fill'),
                         points: { show: false }
                     },
-                    {   // trendline, past and future
-                        stroke: skinVar('--chart-envelope'),
+                    { points: { show: false } },  // the day's high and low: only the fill between
+                    { points: { show: false } },
+                    {   // room, daily mean: a lone first day has no line to show, so mark it
+                        stroke: skinVar('--chart-heat'),
                         width: 2,
-                        dash: [8, 6],
-                        points: { show: false }
-                    },
-                    { points: { show: false } },  // band edges: no line, only the fill between
-                    { points: { show: false } }
+                        points: { show: u => u.data[4].filter(v => v !== null).length < 2, size: 7,
+                                  fill: skinVar('--chart-heat') }
+                    }
                 ],
-                bands: [{ series: [3, 4], fill: skinVar('--chart-band') }],
+                bands: [{ series: [2, 3], fill: skinVar('--chart-band') }],
                 axes: [
-                    Object.assign({}, axis, { label: 'Day of billing cycle', labelSize: 24 }),
-                    Object.assign({}, axis, { size: 70, values: (u, vals) => vals.map(v => '$' + v) })
+                    xAxis,
+                    Object.assign({}, axis, { size: 70, label: 'Temperature', labelSize: 24,
+                                              values: (u, vals) => vals.map(v => v + ' °C') })
                 ],
-                plugins: plugins
-            }, data, el);
+                plugins: [heatingTooltipPlugin(d => {
+                    const lines = [d.outdoor_c === null ? 'no outdoor temperature'
+                        : `outdoor ${degrees(d.outdoor_c)}  (${degrees(d.outdoor_min_c)} to ${degrees(d.outdoor_max_c)})`];
+                    if (d.room_c !== null) lines.push(`room ${degrees(d.room_c)}`);
+                    return lines;
+                }), lineEndLabelsPlugin([[1, 'outdoor'], [4, 'room']], skinVar('--chart-axis'), font)].concat(glow)
+            }, temperatureData, temperatureEl);
+
+            heatingCharts = [runChart, temperatureChart];
+        }
+
+        function renderHeating(d) {
+            heatingData = d;
+            const set = (id, text) => { document.getElementById(id).textContent = text; };
+            const or = (v, format) => v === null || v === undefined ? '--' : format(v);
+
+            // What the system is doing now, with when it began in the tooltip
+            const t = d.thermostat;
+            const state = document.getElementById('heat-state');
+            const names = { heating: 'Heating', cooling: 'Cooling', idle: 'Idle', unobserved: 'No Signal' };
+            state.textContent = names[t.state] || '--';
+            state.classList.remove('th-green', 'th-orange', 'th-yellow');
+            state.classList.add({ heating: 'th-orange', cooling: 'th-green', idle: 'th-green' }[t.state] || 'th-yellow');
+            state.title = (t.since ? `Since ${new Date(t.since).toLocaleString()}` : '') +
+                (t.mode ? `${t.since ? ' · ' : ''}mode: ${t.mode}` : '');
+            set('heat-room', or(t.room_c, degrees));
+            set('heat-target', or(t.target_c, degrees));
+            set('heat-outdoor', or(d.outdoor.temp_c, degrees));
+
+            const days = d.days;
+            const today = days[days.length - 1], yesterday = days[days.length - 2];
+            set('heat-today', or(today.heating_h, hoursMinutes));
+            set('heat-cycles', or(today.heat_cycles, String));
+            set('heat-yesterday', or(yesterday && yesterday.heating_h, hoursMinutes));
+            const week = days.slice(-7).filter(day => day.heating_h !== null);
+            set('heat-week', week.length ? hoursMinutes(week.reduce((sum, day) => sum + day.heating_h, 0)) : '--');
+
+            renderHeatingCharts();
+
+            const g = d.gas;
+            gasForecast.render({ start: g.period.start, days: g.period.days, cycle_days: g.period.cycle_days,
+                                 total_cost: g.cost.total_cost, trend: g.trend });
+            set('gas-used', g.usage.gj.toFixed(2) + ' GJ');
+            set('gas-heating', hoursMinutes(g.usage.heating_h));
+            set('gas-furnace', g.model.furnace_btu_per_hour.toLocaleString('en-US') + ' BTU/h');
+            set('gas-furnace-label', g.model.furnace_assumed ? 'Furnace Input (assumed)' : 'Furnace Input');
+            set('gas-base', g.model.base_gj_per_day + ' GJ/day');
+            const c = g.cost;
+            document.getElementById('gas-now').title =
+                `Since ${g.period.start.slice(0, 10)}, FortisBC residential rate\n` +
+                `Basic charge: ${billMoney(c.basic_charge)}\n` +
+                `Delivery: ${billMoney(c.delivery)}\n` +
+                `Storage and transport: ${billMoney(c.storage_transport)}\n` +
+                `Cost of gas: ${billMoney(c.commodity)}\n` +
+                `Municipal operating fee: ${billMoney(c.municipal_fee)}\n` +
+                `Clean energy levy: ${billMoney(c.clean_energy_levy)}\n` +
+                `GST: ${billMoney(c.gst)}\n` +
+                `Total: ${billMoney(c.total_cost)}`;
+            const unloggedDays = Math.floor(g.usage.unobserved_h / 24);
+            set('gas-note',
+                'The gas meter is read once a month, so gas is estimated: a base load taken from the summer bills, ' +
+                'plus the furnace\'s input rating for every hour the thermostat called for heat.' +
+                (g.model.furnace_assumed ? ' The rating shown is a placeholder until the nameplate value is entered.' : '') +
+                (unloggedDays >= 1 ? ` ${unloggedDays} day${unloggedDays === 1 ? '' : 's'} of this period ${unloggedDays === 1 ? 'was' : 'were'} not logged and count${unloggedDays === 1 ? 's' : ''} as no heating.` : ''));
+        }
+
+        async function fetchHeating() {
+            clearTimeout(heatingTimer);
+            if (!document.hidden) {
+                try {
+                    const response = await fetch('https://linknode-eagle-monitor.fly.dev/api/heating',
+                        { signal: AbortSignal.timeout(15000) });
+                    if (!response.ok) {
+                        throw new Error('API returned status ' + response.status);
+                    }
+                    renderHeating(await response.json());
+                } catch (error) {
+                    console.error('Error fetching heating data:', error);
+                }
+            }
+            heatingTimer = setTimeout(fetchHeating, HEATING_REFRESH_MS);
         }
 
         // Site traffic: the figures Cloudflare holds for the site, which the ingest service
@@ -3348,7 +3730,10 @@
 
         // Refresh immediately when the tab comes back into view (polling pauses while hidden)
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) fetchDashboard();
+            if (!document.hidden) {
+                fetchDashboard();
+                fetchHeating();
+            }
         });
 
         new ResizeObserver(() => {
@@ -3356,10 +3741,15 @@
             if (powerChart) powerChart.setSize({ width: el.clientWidth, height: el.clientHeight });
         }).observe(document.getElementById('power-chart'));
 
-        new ResizeObserver(() => {
-            const el = document.getElementById('bill-chart');
-            if (billChart) billChart.setSize({ width: el.clientWidth, height: el.clientHeight });
-        }).observe(document.getElementById('bill-chart'));
+        new ResizeObserver(() => billForecast.resize()).observe(document.getElementById('bill-chart'));
+        new ResizeObserver(() => gasForecast.resize()).observe(document.getElementById('gas-chart'));
+
+        ['heating-chart', 'temperature-chart'].forEach((id, i) => {
+            new ResizeObserver(() => {
+                const el = document.getElementById(id);
+                if (heatingCharts[i]) heatingCharts[i].setSize({ width: el.clientWidth, height: el.clientHeight });
+            }).observe(document.getElementById(id));
+        });
 
         // Skin picker. "classic" is the page as written (no data-skin attribute); the
         // others are override blocks in the stylesheet. The choice is kept in localStorage
@@ -3396,10 +3786,12 @@
                 powerChart = null;
                 renderPowerChart(chartSeries, chartWindow[0], chartWindow[1]);
             }
-            if (billChart) {
-                billChart.destroy();
-                billChart = null;
-                renderBillChart(billPeriod);
+            billForecast.redraw();
+            gasForecast.redraw();
+            if (heatingCharts.length) {
+                heatingCharts.forEach(chart => chart.destroy());
+                heatingCharts = [];
+                renderHeatingCharts();
             }
         }
 
@@ -3507,6 +3899,9 @@
 
         // Chart and stat tiles for the selected range
         fetchDashboard();
+
+        // Heating charts and the gas bill forecast
+        fetchHeating();
 
         // Fetch 24h stats less frequently (every 30 seconds) since SSE handles real-time gauge
         setInterval(fetchPowerData, 30000);

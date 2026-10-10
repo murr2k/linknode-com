@@ -95,6 +95,8 @@ Each demand and summation reading is timestamped with the meter's `LastContact` 
 
 Always-on is the default mode: the Pi is the sole uploader and ships every cycle. `--failover` restores the older hot-standby behaviour if the Eagle ever uploads on its own again. Live counters are in `/run/eagle-bypass/stats.json` and `--report` prints an uptime and outage report.
 
+**Thermostat uploader** (`scripts/t5_upload.py`, systemd `t5-upload.service`). The same Pi logs the Honeywell T5 thermostat over HomeKit with the `t5-runtime` logger, which belongs to the `1344-network` repo: one CSV row per change of state (`start`, `change`, `heartbeat`, `lost`, `resume`, `stop`, with the call for heat or cooling, the mode, the room temperature and the setpoint) and the time of its last good read. The uploader reads those two files every 20 s and POSTs new rows as JSON to `/thermostat` with the same Basic auth; with nothing new it still posts the last-read time once a minute. It keeps no state on the Pi: each reply names the newest row the service holds, and rows after that are the ones to send.
+
 ---
 
 ### 3. Eagle Monitor Service (Backend API)
@@ -129,8 +131,10 @@ flowchart LR
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/eagle` | POST | Basic Auth | Receive XML from the Pi (readings and the `BypassStatus` heartbeat) |
+| `/thermostat` | POST | Basic Auth | Receive thermostat rows from the Pi as JSON; rows already held are ignored |
 | `/api/stats` | GET | API Key (optional, unset) | Current power, 24h min/max/avg and cost, `reads_24h`, `bypass_status`, `monitor_stats`, billing period with BC Hydro tiered cost (`?hours=1` to `720`) |
 | `/api/dashboard` | GET | API Key (optional, unset) | Chart series and panel values for `?range=` `1h`, `6h`, `24h`, `7d` or `30d` (15 s cache) |
+| `/api/heating` | GET | API Key (optional, unset) | Thermostat state, 31 days of run time and temperatures, gas bill so far and its forecast (30 s cache) |
 | `/api/stream` | GET | None | Server-Sent Events: each new power reading as it is stored |
 | `/health` | GET | None | `{status, db_ok, uptime_seconds}`; 503 if the database is unavailable. Fly's service check |
 | `/health/data` | GET | None | Telemetry freshness by the age of the newest power reading: 200 `fresh`; 503 `stale`, `no_data` or `unavailable` |
@@ -180,6 +184,28 @@ sequenceDiagram
 - Rate-limit violations are logged per peer address (flagged after 10 in an hour; the flag blocks nothing); failed logins are not counted and show only as 401 lines in the access log
 
 ---
+
+#### Heating and the gas bill
+
+`/api/heating` is built from three things the service holds:
+
+| Source | Held as | From |
+|--------|---------|------|
+| Thermostat event log | Table `thermostat_events`, one row per change | The Pi, through `/thermostat` |
+| Outdoor temperature | Field `outdoor_temp_c`, hourly | Open-Meteo's forecast API, fetched every 30 minutes for a point in White Rock (`weather.py`); the first fetch takes the 92 days the API keeps |
+| Gas rates and the usage model | Constants in `gas.py` | The FortisBC bills |
+
+**Run time** (`thermostat.py`). A row's state holds until the next row, and the last row's until the logger's last read. Time the logger was not watching (after a `lost` or `stop` row, before a `start` row, past the last read) is unobserved: it is never counted as idle or as running, and a day with none observed has no figures. Days are local (Vancouver) days. A run is one cycle however many rows it spans, counted on the day it began. The state is the thermostat's call for heat, not proof the burner lit.
+
+**Gas** (`gas.py`). FortisBC reads the meter once a month, so there is nothing to ingest. Usage is modelled as
+
+```
+GJ = base load x days  +  furnace input rate x hours of heating
+```
+
+The base load (0.046 GJ/day) is what the four summer bills of 2026 show with the furnace off. The furnace input rate is its nameplate rating, `FURNACE_INPUT_BTUH`; while that is unset 60,000 BTU/h is assumed and the payload says so (`gas.model.furnace_assumed`). Days of a period that were not logged add the base load only. The bill is built line by line (basic charge, delivery, storage and transport, cost of gas, municipal operating fee, clean energy levy, GST) and reproduces the bills of June to September 2026. The period runs from the day after one meter read to the next: read dates from the bills go in `GAS_READ_DATES`, and without one a period starts on the 1st. The forecast is `billing_trend`, the same function as the electricity forecast, given the gas bill as its price.
+
+A straight line under-projects in autumn, when each week needs more heat than the last, and over-projects in spring.
 
 ### 4. SQLite Store (Time-Series Database)
 
@@ -274,6 +300,11 @@ flowchart TB
    - uPlot chart and 8 stat tiles from `/api/dashboard`, range picker 1h/6h/24h/7d/30d
    - Polling pauses while the tab is hidden
    - Tile colours use the thresholds of the retired Grafana stat panels (below)
+
+   **Heating** (`#heating`) and **Gas Bill Forecast** (`#gas-forecast`), both from `/api/heating`, refreshed every minute
+   - Two charts on one day axis: hours the furnace (and the air conditioner) ran each day as bars, and under them the outdoor temperature (daily mean inside a band from low to high) with the mean room temperature. Days the thermostat was not logged have no bar
+   - Tiles: what the system is doing now, room, setpoint and outdoor temperature, heating and cycles today, heating yesterday and over 7 days
+   - The gas forecast is the electricity forecast's chart drawn from the gas figures: bill so far, trendline, range band
 
 4. **Service Status Indicators**
    - Eagle Monitor: `/health` reachable
@@ -530,6 +561,9 @@ linknode-com/
 │   │   ├── app.py                    # Flask routes, auth, SSE, scheduler
 │   │   ├── store.py                  # SQLite time-series store
 │   │   ├── dashboard.py              # /api/dashboard series and panel math
+│   │   ├── thermostat.py             # Run time and state from the thermostat's event log
+│   │   ├── gas.py                    # FortisBC bill and the gas usage model
+│   │   ├── weather.py                # Outdoor temperature from Open-Meteo
 │   │   ├── monitor_data_staleness.py # Slack/Pushover outage alerting
 │   │   ├── security_monitor.py       # Security tracking
 │   │   ├── test_*.py                 # Unit tests (run by deploy-fly.yml)
@@ -547,7 +581,8 @@ linknode-com/
 │       ├── 404.html
 │       └── vendor/uplot-1.6.32/      # Vendored chart library
 │
-├── scripts/eagle_bypass.py           # Pi uploader
+├── scripts/eagle_bypass.py           # Pi uploader (meter readings)
+├── scripts/t5_upload.py              # Pi uploader (thermostat log)
 ├── deploy/                           # Pi systemd unit and env example
 ├── docs/                             # Documentation
 │   ├── THEORY_OF_OPERATION.md        # This document

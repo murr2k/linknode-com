@@ -51,6 +51,11 @@ second machine would have its own separate database.
   `bypass_status`, billing period with BC Hydro tiered cost (`?hours=1` to `720`)
 - `GET /api/dashboard?range=24h` - Chart series and panel values; `range` is `1h`,
   `6h`, `24h`, `7d` or `30d` (15 s cache)
+- `POST /thermostat` - Receives the thermostat's event rows from the Pi as JSON (Basic
+  Auth, the same credentials as `/eagle`)
+- `GET /api/heating` - Thermostat state, 31 days of heating and cooling run time with the
+  outdoor and room temperature, and the modelled FortisBC gas bill with its forecast
+  (30 s cache). `FURNACE_INPUT_BTUH` sets the furnace's input rating for the gas model
 - `GET /api/stream` - Server-Sent Events, one event per stored power reading
 - `GET /health` - `{status, db_ok, uptime_seconds}`; 503 if the database is unavailable
 - `GET /health/data` - Telemetry freshness by the age of the newest power reading: 200

@@ -26,6 +26,9 @@ from monitor_data_staleness import DataStalenessMonitor, WatchdogLiveness, FROZE
 import store
 import dashboard
 import site_traffic
+import thermostat
+import gas
+import weather
 
 # Configure logging
 logging.basicConfig(
@@ -69,6 +72,8 @@ API_KEY = os.getenv('EAGLE_API_KEY')  # Set via fly secrets for API endpoints
 EAGLE_USERNAME = os.getenv('EAGLE_USERNAME', 'eagle')  # Basic auth username for Eagle device
 EAGLE_PASSWORD = os.getenv('EAGLE_PASSWORD')  # Basic auth password for Eagle device
 PUBLIC_API_ENDPOINTS = ['/health', '/']  # Endpoints that don't require auth
+# Uploads from the Pi use the Eagle's Basic Auth: the meter readings and the thermostat log
+BASIC_AUTH_ENDPOINTS = ('eagle_webhook', 'thermostat_webhook')
 
 # Site traffic figures from Cloudflare, shown at the foot of the page (site_traffic.py).
 # CLOUDFLARE_ANALYTICS is a read-only analytics token, set as a Fly secret; without it
@@ -80,6 +85,21 @@ CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')
 SITE_HOST = os.getenv('SITE_HOST', 'linknode.com')
 SITE_TRAFFIC_REFRESH_HOURS = 1
 site_traffic_state = {'ids': None, 'summary': None}
+
+# Outdoor temperature for the heating charts (weather.py). The point is in White Rock, a
+# few km from the house: near enough for the weather, and this repo is public.
+WEATHER_LATITUDE = os.getenv('WEATHER_LATITUDE', '49.03')
+WEATHER_LONGITUDE = os.getenv('WEATHER_LONGITUDE', '-122.80')
+WEATHER_REFRESH_MINUTES = 30
+weather_state = {'current': None}  # newest (ts_ms, degrees C), finer than the hourly rows
+
+# Heating (/api/heating): the thermostat's log, the outdoor temperature and the gas bill
+HEATING_DAYS = 31                 # days of history on the heating chart
+HEATING_CACHE_SECONDS = 30
+HDD_BASE_C = 18.0                 # heating degree days are counted below this daily mean
+# The Pi's uploader reports the logger's last read every minute; past this the
+# thermostat's state is no longer known.
+THERMOSTAT_FRESH_SECONDS = 300
 
 # Rate limiting configuration
 from collections import defaultdict
@@ -226,8 +246,8 @@ def require_auth(f):
         if request.endpoint in PUBLIC_API_ENDPOINTS or request.path in PUBLIC_API_ENDPOINTS:
             return f(*args, **kwargs)
         
-        # For Eagle webhook endpoint, use Basic Auth
-        if request.endpoint == 'eagle_webhook':
+        # For the Pi's upload endpoints, use Basic Auth
+        if request.endpoint in BASIC_AUTH_ENDPOINTS:
             # Check if Basic Auth password is configured
             if not EAGLE_PASSWORD:
                 logger.warning("EAGLE_PASSWORD not configured - authentication disabled for Eagle")
@@ -380,6 +400,16 @@ def start_data_monitor():
                 next_run_time=datetime.now(timezone.utc) + timedelta(seconds=20)
             )
 
+        scheduler.add_job(
+            refresh_weather,
+            IntervalTrigger(minutes=WEATHER_REFRESH_MINUTES),
+            id='weather',
+            name='Fetch the outdoor temperature',
+            max_instances=1,
+            replace_existing=True,
+            next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30)
+        )
+
         scheduler.start()
         logger.info("Data staleness monitor started (checks every 5 minutes)")
 
@@ -401,6 +431,26 @@ def refresh_site_traffic():
         logger.warning(f"Site traffic not refreshed: {e}")
     except Exception as e:
         logger.error(f"Site traffic not refreshed: {type(e).__name__}")
+
+def refresh_weather():
+    """Background job: store the hourly outdoor temperature. The first fetch asks for
+    all the history the API keeps; later ones for the days since the newest stored hour,
+    plus two, which also picks up revised values. A failure keeps what is held."""
+    if db is None or not (WEATHER_LATITUDE and WEATHER_LONGITUDE):
+        return
+    try:
+        now_ms = store.now_ms()
+        newest = db.latest('outdoor_temp_c', 0, now_ms + 1)
+        past_days = weather.MAX_PAST_DAYS
+        if newest:
+            past_days = min(past_days, (now_ms - newest[0]) // 86_400_000 + 2)
+        hourly, current = weather.fetch(WEATHER_LATITUDE, WEATHER_LONGITUDE, past_days)
+        db.write_many('outdoor_temp_c', hourly)
+        weather_state['current'] = current
+    except weather.WeatherError as e:
+        logger.warning(f"Outdoor temperature not refreshed: {e}")
+    except Exception as e:
+        logger.error(f"Outdoor temperature not refreshed: {type(e).__name__}")
 
 def prune_old_readings():
     """Background job: drop readings older than RETENTION_DAYS"""
@@ -788,6 +838,47 @@ def eagle_webhook():
         logger.error(f"Error processing request: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/thermostat', methods=['POST'])
+@require_auth
+def thermostat_webhook():
+    """Thermostat rows from the Pi's uploader (scripts/t5_upload.py), as JSON:
+    {"last_seen": epoch seconds of the logger's last read, "events": [row, ...]}.
+
+    Rows already held are ignored, so the uploader may send a batch again. The reply
+    carries the time of the newest row held, which is where the uploader carries on
+    from, and of the newest held before this batch: if that has gone backwards the
+    store was restored, and the uploader sends its file again. Unlike /eagle this
+    answers a failure honestly: the uploader keeps the rows and tries again."""
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({'error': 'a JSON object is required'}), 400
+    if db is None:
+        return jsonify({'error': 'store unavailable'}), 503
+    now_ms = store.now_ms()
+    try:
+        rows = thermostat.parse_events(body.get('events') or [], now_ms)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    try:
+        previous = db.latest_thermostat_ms()
+        if rows:
+            db.add_thermostat_events(rows)
+            with _heating_cache_lock:
+                _heating_cache.pop('payload', None)
+            logger.info(f"Stored {len(rows)} thermostat rows")
+        seen = body.get('last_seen')
+        if isinstance(seen, (int, float)) and not isinstance(seen, bool):
+            seen_ms = min(round(seen * 1000), now_ms)
+            if seen_ms > int(db.get_meta('thermostat_seen_ms') or 0):
+                db.set_meta('thermostat_seen_ms', str(seen_ms))
+        latest = db.latest_thermostat_ms()
+    except Exception as e:
+        logger.error(f"Failed to store thermostat rows: {e}")
+        return jsonify({'error': 'store failed'}), 503
+    return jsonify({'status': 'ok', 'received': len(rows),
+                    'previous_epoch': previous / 1000 if previous is not None else None,
+                    'latest_epoch': latest / 1000 if latest is not None else None}), 200
+
 def _add_months(dt, months):
     """Same day-of-month `months` later (or earlier), clamped to the month's last day."""
     total = dt.month - 1 + months
@@ -913,7 +1004,7 @@ def _linear_fit(points):
     return slope, mean_y - slope * mean_x
 
 
-def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days, previous_total=None):
+def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days, previous_total=None, cost=None):
     """Bill so far against the day of the cycle, with a straight-line forecast.
 
     The points are $0 at day 0, the bill at the end of each completed day (`day_kwh` is
@@ -930,13 +1021,15 @@ def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days, previous_total=
     is left out. In its place the first estimate is the bill the previous period ended
     on (`previous_total`), as a line from $0 to that amount on the last day: it is the
     trendline until two full days are in. Without it there is no trendline until then.
+
+    `cost(units, days)` prices a point. The default is the electricity bill; the gas
+    forecast passes its own, with GJ in place of kWh.
     """
+    cost = cost or (lambda kwh, days: calculate_tiered_cost(kwh, days)['total_cost'])
     points = [(0.0, 0.0)]
-    points += [(float(day), calculate_tiered_cost(kwh, day)['total_cost'])
-               for day, kwh in enumerate(day_kwh, start=1)]
+    points += [(float(day), cost(kwh, day)) for day, kwh in enumerate(day_kwh, start=1)]
     if energy_kwh is not None and elapsed_days > len(day_kwh):
-        points.append((round(elapsed_days, 3),
-                       calculate_tiered_cost(energy_kwh, elapsed_days)['total_cost']))
+        points.append((round(elapsed_days, 3), cost(energy_kwh, elapsed_days)))
 
     lines = []  # (day, slope, intercept)
     if previous_total and cycle_days:
@@ -1248,6 +1341,181 @@ def get_dashboard():
         _dashboard_cache[range_key] = (now, payload)
     return jsonify(payload), 200
 
+_heating_cache = {}
+_heating_cache_lock = Lock()
+
+
+def _outdoor_by_day(start_ms, end_ms):
+    """{local date: (mean, min, max)} of the hourly outdoor temperature."""
+    by_day = {}
+    for ts_ms, value, _, _ in db.series('outdoor_temp_c', start_ms, end_ms):
+        day = (store.EPOCH + timedelta(milliseconds=ts_ms)).astimezone(BILLING_TZ).date()
+        by_day.setdefault(day, []).append(value)
+    return {day: (sum(values) / len(values), min(values), max(values))
+            for day, values in by_day.items()}
+
+
+def _previous_gas_bill(gas_start):
+    """The modelled bill for the period before `gas_start`, or None when the thermostat
+    was not being logged from that period's first day. It seeds the trend of a new
+    period, as _previous_period_bill does for electricity."""
+    start_ms = store.to_ms(gas_start)
+    now = time.monotonic()
+    with _heating_cache_lock:
+        cached = _heating_cache.get('previous')
+        if cached and cached[0] == start_ms and now - cached[1] < BILLING_DAYS_CACHE_SECONDS:
+            return cached[2]
+
+    previous_start = gas.period(gas_start - timedelta(days=1))[0]
+    previous_ms = store.to_ms(previous_start)
+    total = None
+    if db.thermostat_events(previous_ms, previous_ms + 24 * HOUR_MS):
+        rows = db.thermostat_events(previous_ms, start_ms)
+        per_day = thermostat.daily(rows, start_ms, BILLING_TZ)
+        hours = sum(totals['heating_s'] for day, totals in per_day.items()
+                    if previous_start.date() <= day < gas_start.date()) / 3600.0
+        days = (gas_start.date() - previous_start.date()).days
+        total = gas.bill(gas.usage(days, hours), days)['total_cost']
+
+    with _heating_cache_lock:
+        _heating_cache['previous'] = (start_ms, now, total)
+    return total
+
+
+def build_heating():
+    """The /api/heating payload: what the thermostat is doing, each recent day's run
+    time and temperatures, and the gas bill so far with its forecast."""
+    now = datetime.now(timezone.utc)
+    now_ms = store.to_ms(now)
+    local_now = now.astimezone(BILLING_TZ)
+    midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today = midnight.date()
+    gas_start, gas_next = gas.period(local_now)
+    window_start = min(gas_start, midnight - timedelta(days=HEATING_DAYS - 1))
+    start_ms = store.to_ms(window_start)
+
+    rows = db.thermostat_events(start_ms, now_ms + 1)
+    seen = db.get_meta('thermostat_seen_ms')
+    observed_ms = int(seen) if seen else None
+    # A row's state is taken to hold until the logger's last read, not until now
+    end_ms = min(now_ms, max(observed_ms or 0, rows[-1][0])) if rows else None
+    per_day = thermostat.daily(rows, end_ms, BILLING_TZ)
+    outdoor = _outdoor_by_day(start_ms, now_ms + 1)
+
+    def hours(seconds):
+        return round(seconds / 3600.0, 3)
+
+    days = []
+    day_start = window_start
+    while day_start.date() <= today:
+        date = day_start.date()
+        next_start = day_start + timedelta(days=1)
+        elapsed_s = (min(now_ms, store.to_ms(next_start)) - store.to_ms(day_start)) / 1000.0
+        totals = per_day.get(date)
+        observed_s = totals['heating_s'] + totals['cooling_s'] + totals['idle_s'] if totals else 0.0
+        temps = outdoor.get(date)
+        days.append({
+            'date': date.isoformat(),
+            'heating_h': hours(totals['heating_s']) if totals else None,
+            'cooling_h': hours(totals['cooling_s']) if totals else None,
+            'heat_cycles': totals['heat_cycles'] if totals else None,
+            'cool_cycles': totals['cool_cycles'] if totals else None,
+            'unobserved_h': round(max(0.0, elapsed_s - observed_s) / 3600.0, 2),
+            'room_c': round(totals['room_c'], 1) if totals and totals['room_c'] is not None else None,
+            'outdoor_c': round(temps[0], 1) if temps else None,
+            'outdoor_min_c': temps[1] if temps else None,
+            'outdoor_max_c': temps[2] if temps else None,
+            'hdd': round(max(0.0, HDD_BASE_C - temps[0]), 1) if temps else None,
+        })
+        day_start = next_start
+
+    state = thermostat.current(rows, observed_ms, now_ms, THERMOSTAT_FRESH_SECONDS * 1000)
+
+    def iso(ms):
+        return (store.EPOCH + timedelta(milliseconds=ms)).isoformat() if ms is not None else None
+
+    outdoor_now = weather_state['current']
+    if not outdoor_now or now_ms - outdoor_now[0] > 2 * HOUR_MS:
+        outdoor_now = db.latest('outdoor_temp_c', now_ms - 3 * HOUR_MS, now_ms + 1)
+
+    # Gas so far this period: the base load for the days elapsed plus the furnace's
+    # share for the hours of heating logged. Days the thermostat was not logged add
+    # no heating.
+    cycle_days = (gas_next.date() - gas_start.date()).days
+    days_in_period = (today - gas_start.date()).days + 1  # Include today
+    completed_days = days_in_period - 1
+    heating_h = [(per_day.get(gas_start.date() + timedelta(days=i)) or {}).get('heating_s', 0.0) / 3600.0
+                 for i in range(days_in_period)]
+    day_gj = [gas.usage(day, sum(heating_h[:day])) for day in range(1, completed_days + 1)]
+    elapsed_days = completed_days + (local_now - midnight) / timedelta(days=1)
+    gj_now = gas.usage(elapsed_days, sum(heating_h))
+    furnace_rate, furnace_assumed = gas.furnace_gj_per_hour()
+    period_days = days[-days_in_period:]
+
+    return {
+        'updated': now.isoformat(),
+        'thermostat': {
+            'state': state['state'],
+            'since': iso(state['since_ms']),
+            'mode': state['mode'],
+            'room_c': state['room_c'],
+            'target_c': state['target_c'],
+            'observed_until': iso(end_ms),
+        },
+        'outdoor': {
+            'temp_c': outdoor_now[1] if outdoor_now else None,
+            'at': iso(outdoor_now[0]) if outdoor_now else None,
+            'source': weather.SOURCE,
+        },
+        'days': days,
+        'gas': {
+            'period': {
+                'start': gas_start.isoformat(),
+                'next_start': gas_next.isoformat(),
+                'days': days_in_period,
+                'cycle_days': cycle_days,
+            },
+            'usage': {
+                'gj': round(gj_now, 3),
+                'base_gj': round(gas.BASE_GJ_PER_DAY * elapsed_days, 3),
+                'furnace_gj': round(furnace_rate * sum(heating_h), 3),
+                'heating_h': round(sum(heating_h), 2),
+                'unobserved_h': round(sum(day['unobserved_h'] for day in period_days), 1),
+            },
+            'model': {
+                'base_gj_per_day': gas.BASE_GJ_PER_DAY,
+                'furnace_btu_per_hour': round(furnace_rate * gas.BTU_PER_GJ),
+                'furnace_gj_per_hour': round(furnace_rate, 5),
+                'furnace_assumed': furnace_assumed,
+            },
+            'cost': gas.bill(gj_now, days_in_period),
+            'trend': billing_trend(day_gj, elapsed_days, gj_now, cycle_days,
+                                   _previous_gas_bill(gas_start),
+                                   cost=lambda gj, d: gas.bill(gj, d)['total_cost']),
+        },
+    }
+
+
+@app.route('/api/heating', methods=['GET'])
+@require_api_key
+def get_heating():
+    """Heating: thermostat state, daily run time and temperatures, gas bill forecast"""
+    if db is None:
+        return jsonify({'error': 'store unavailable'}), 503
+    now = time.monotonic()
+    with _heating_cache_lock:
+        cached = _heating_cache.get('payload')
+        if cached and now - cached[0] < HEATING_CACHE_SECONDS:
+            return jsonify(cached[1]), 200
+    try:
+        payload = build_heating()
+    except Exception as e:
+        logger.error(f"Error building the heating payload: {e}")
+        return jsonify({'error': 'query failed'}), 500
+    with _heating_cache_lock:
+        _heating_cache['payload'] = (now, payload)
+    return jsonify(payload), 200
+
 @app.route('/', methods=['GET'])
 def index():
     """Root endpoint"""
@@ -1256,8 +1524,10 @@ def index():
         'version': '1.0.0',
         'endpoints': {
             '/eagle': 'POST - Receive Eagle-200 XML data',
+            '/thermostat': 'POST - Receive thermostat rows from the Pi',
             '/api/stats': 'GET - Monitor statistics',
             '/api/dashboard': 'GET - Dashboard panels (?range=1h|6h|24h|7d|30d)',
+            '/api/heating': 'GET - Thermostat run time, temperatures and the gas bill forecast',
             '/api/stream': 'GET - Real-time power updates (SSE)',
             '/health': 'GET - Health check',
             '/api/security/stats': 'GET - Security monitoring statistics'

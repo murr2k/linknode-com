@@ -144,15 +144,18 @@ git push origin main
 linknode-com/
 ├── fly/
 │   └── eagle-monitor/        # Ingest + API service (Python/Flask, SQLite)
-│       ├── app.py            # Routes: /eagle, /api/stats, /api/dashboard, /api/stream, /health
+│       ├── app.py            # Routes: /eagle, /thermostat, /api/stats, /api/dashboard, /api/heating, /api/stream, /health
 │       ├── store.py          # SQLite time-series store
 │       ├── dashboard.py      # Chart series and stat-panel math
+│       ├── thermostat.py     # Heating run time from the thermostat's event log
+│       ├── gas.py            # FortisBC bill and the gas usage model
+│       ├── weather.py        # Outdoor temperature (Open-Meteo)
 │       └── test_*.py         # Unit tests
 ├── web/                      # The site (Cloudflare Worker, static assets)
 │   ├── wrangler.jsonc        # Worker config and routes
 │   └── public/               # index.html, _headers, 404.html, vendor/uplot-*
 ├── deploy/                   # Raspberry Pi bypass deployment
-├── scripts/                  # Pi uploader (eagle_bypass.py) and utilities
+├── scripts/                  # Pi uploaders (eagle_bypass.py, t5_upload.py) and utilities
 ├── docs/                     # Documentation
 │   ├── THEORY_OF_OPERATION.md  # System architecture
 │   └── archive/              # Historical docs

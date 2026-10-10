@@ -1,0 +1,36 @@
+[Unit]
+# Thermostat log uploader: scripts/t5_upload.py reads the rows the t5-runtime logger
+# writes (that logger belongs to the 1344-network repo and is not changed by this) and
+# posts them to the Fly /thermostat endpoint for linknode.com's heating charts.
+Description=Thermostat log uploader (t5-runtime rows to Fly /thermostat)
+After=network-online.target
+Wants=network-online.target
+# If it keeps dying, stop retrying after a burst rather than restarting forever.
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+# ADJUST to match your host: the user to run as, and the python3 path.
+User=pi
+WorkingDirectory=/opt/t5-upload
+
+# The upload uses the Eagle uploader's Basic Auth, read from its env file
+# (EAGLE_UPLOAD_USER, EAGLE_UPLOAD_PASSWORD), so the password lives in one place.
+EnvironmentFile=/etc/eagle-bypass.env
+
+ExecStart=/usr/bin/python3 /opt/t5-upload/t5_upload.py
+
+Restart=always
+RestartSec=30
+SyslogIdentifier=t5-upload
+
+# Light hardening: the script only reads the logger's two files and talks to the
+# network. It keeps no state, so it writes nothing to the SD card.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=disconnected
+
+[Install]
+WantedBy=multi-user.target

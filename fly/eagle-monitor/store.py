@@ -12,6 +12,10 @@ InstantaneousDemand, energy_* from CurrentSummation, price from PriceCluster), s
 InfluxDB tags (device_mac, meter_mac, message_type) add nothing to the key for the
 single meter this service stores; the second radio (ef68) is filtered upstream.
 
+Two things that are not meter readings share the file: the outdoor temperature (a
+numeric field like the others, hourly, from weather.py) and the thermostat's event log
+(its own table, one row per change of state, from the Pi's t5 uploader).
+
 Connections are short-lived: one per operation. Werkzeug starts a thread per request,
 so a thread-local connection would effectively be per-request anyway and would only
 close when the thread is collected, holding WAL read snapshots open meanwhile.
@@ -31,6 +35,7 @@ FIELD_IDS = {
     'energy_delivered_kwh': 2,
     'energy_received_kwh': 3,
     'price_per_kwh': 4,
+    'outdoor_temp_c': 5,
 }
 # String fields (LinkStrength arrives as text like "0x64").
 TEXT_FIELDS = ('link_strength', 'message_text')
@@ -53,6 +58,15 @@ CREATE TABLE IF NOT EXISTS text_readings (
     PRIMARY KEY (field, ts_ms)
 ) WITHOUT ROWID;
 
+CREATE TABLE IF NOT EXISTS thermostat_events (
+    ts_ms  INTEGER PRIMARY KEY,
+    event  TEXT    NOT NULL,
+    active INTEGER,
+    mode   INTEGER,
+    temp   REAL,
+    target REAL
+);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -69,6 +83,9 @@ ON CONFLICT (field, ts_ms) DO UPDATE SET value = excluded.value
 """
 INSERT_NUM_IGNORE = "INSERT OR IGNORE INTO readings (field_id, ts_ms, value) VALUES (?, ?, ?)"
 INSERT_TEXT_IGNORE = "INSERT OR IGNORE INTO text_readings (field, ts_ms, value) VALUES (?, ?, ?)"
+INSERT_THERMOSTAT_IGNORE = ("INSERT OR IGNORE INTO thermostat_events (ts_ms, event, active, mode, temp, target) "
+                            "VALUES (?, ?, ?, ?, ?, ?)")
+THERMOSTAT_COLUMNS = 'ts_ms, event, active, mode, temp, target'
 
 
 def to_ms(dt):
@@ -130,6 +147,16 @@ class Store:
         """Backfill rows without overwriting anything already stored.
         num_rows: (field_id, ts_ms, value); text_rows: (field, ts_ms, value)."""
         self._write([(INSERT_NUM_IGNORE, list(num_rows)), (INSERT_TEXT_IGNORE, list(text_rows))])
+
+    def write_many(self, field, points):
+        """Upsert [(ts_ms, value)] of one numeric field in a single transaction."""
+        fid = FIELD_IDS[field]
+        self._write([(UPSERT_NUM, [(fid, ts_ms, float(value)) for ts_ms, value in points])])
+
+    def add_thermostat_events(self, rows):
+        """Store thermostat rows (ts_ms, event, active, mode, temp, target). A row
+        already held is left as it is, so a batch sent twice changes nothing."""
+        self._write([(INSERT_THERMOSTAT_IGNORE, list(rows))])
 
     # -- reads (all bounded by end_ms, which callers pass as now: InfluxDB range()
     #    stops at now, so future-stamped points never count) -------------------
@@ -200,6 +227,20 @@ class Store:
             (bucket_ms, bucket_ms, fid, start_ms, end_ms))
         return [(min(bucket + bucket_ms, end_ms), mean, lo, hi) for bucket, mean, lo, hi in rows]
 
+    def thermostat_events(self, start_ms, end_ms):
+        """Thermostat rows in [start_ms, end_ms), oldest first, led by the newest row
+        before start_ms when there is one: it carries the state at start_ms."""
+        before = self._query(
+            f'SELECT {THERMOSTAT_COLUMNS} FROM thermostat_events WHERE ts_ms < ? '
+            'ORDER BY ts_ms DESC LIMIT 1', (start_ms,))
+        return before + self._query(
+            f'SELECT {THERMOSTAT_COLUMNS} FROM thermostat_events WHERE ts_ms >= ? AND ts_ms < ? '
+            'ORDER BY ts_ms', (start_ms, end_ms))
+
+    def latest_thermostat_ms(self):
+        """Time of the newest thermostat row, or None."""
+        return self._query('SELECT MAX(ts_ms) FROM thermostat_events')[0][0]
+
     def created_ms(self):
         value = self.get_meta('created_ms')
         return int(value) if value is not None else None
@@ -230,6 +271,10 @@ class Store:
             deleted += self._prune_table('readings', 'field_id', fid, before_ms, chunk_ms)
         for field in TEXT_FIELDS:
             deleted += self._prune_table('text_readings', 'field', field, before_ms, chunk_ms)
+        with self._write_lock, closing(self._connect()) as conn:
+            with conn:
+                deleted += conn.execute('DELETE FROM thermostat_events WHERE ts_ms < ?',
+                                        (before_ms,)).rowcount
         if deleted:
             with self._write_lock, closing(self._connect()) as conn:
                 conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
