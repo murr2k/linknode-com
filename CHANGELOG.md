@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Selectable skins** on the site: a Classic / Scope picker under the page title. Classic is
-  the existing look, unchanged and still the default. Scope is a bench-instrument look (flat
+  the existing look, unchanged. Scope is a bench-instrument look (flat
   panels on a graticule, phosphor green readouts, amber chart trace, monospace type, CRT
   scanlines, edge vignette and phosphor bloom),
   written as an `html[data-skin="scope"]` override block in `web/public/index.html`. The
@@ -42,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `gas.py`: the FortisBC bill, line by line, checked against the June to September 2026
     bills. The house has no gas telemetry, so gas is modelled as a base load (0.046 GJ/day,
     from the summer bills) plus the furnace's input rating for each hour of heating. The
-    rating is a placeholder (60,000 BTU/h) until `FURNACE_INPUT_BTUH` is set
+    rating is `FURNACE_INPUT_BTUH`, set to 80,000 BTU/h in `fly.toml` (the furnace's four
+    burners; no rating plate was found). Unset, a 60,000 BTU/h placeholder is used
   - `GET /api/heating`: the thermostat's state, 31 days of run time and temperatures, and
     the gas bill so far with the same trend, estimates and range as the electricity forecast
   - The page gains a **Heating** card (daily run time over the outdoor and room temperature)
@@ -79,6 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arriving, and another when it calls again
 
 ### Changed
+- **Notch is the site's default skin**, and the picker reads Notch / Scope / Classic. A
+  visitor who chose a skin keeps it, Classic included; `?skin=classic` selects Classic by URL
 - **Alerting retuned for what it is for** (not mission critical: say that the system has
   stopped reporting, so it can be fixed within a day or two). The alarm's threshold goes
   from 5 to 30 minutes (`STALE_THRESHOLD_MINUTES` in `fly.toml`), so a stop shorter than

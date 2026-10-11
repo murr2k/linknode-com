@@ -13,7 +13,7 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0a0a0a">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
@@ -35,13 +35,15 @@
     <meta name="googlebot" content="index, follow">
     <meta name="google" content="notranslate">
     <meta name="format-detection" content="telephone=no">
-    <!-- Skin: applied before first paint so a saved choice does not flash the default -->
+    <!-- Skin: applied before first paint so the page does not flash another one. Notch is
+         the default; "classic" is the page as written, with no data-skin attribute -->
     <script>
         (function () {
+            var skin = null;
             try {
-                var skin = new URLSearchParams(location.search).get('skin') || localStorage.getItem('linknode-skin');
-                if (skin === 'scope' || skin === 'notch') document.documentElement.dataset.skin = skin;
-            } catch (e) { /* storage blocked: stay on the default skin */ }
+                skin = new URLSearchParams(location.search).get('skin') || localStorage.getItem('linknode-skin');
+            } catch (e) { /* storage blocked: the default skin */ }
+            if (skin !== 'classic') document.documentElement.dataset.skin = skin === 'scope' ? 'scope' : 'notch';
         })();
     </script>
     <style>
@@ -52,7 +54,7 @@
         }
 
         /* Colours the script sets (gauge, sample interval, chart canvas). These are the
-           default "Classic" skin; alternate skins override them under html[data-skin]. */
+           "Classic" skin; the other skins override them under html[data-skin]. */
         :root {
             --text-primary: #fff;
             --status-ok: #22c55e;
@@ -2007,9 +2009,9 @@
             <h1>Linknode Energy Monitor</h1>
             <p class="subtitle">Real-Time Power Monitoring by Murray Kopit • Powered by Cloudflare + Fly.io</p>
             <div class="skin-picker" role="group" aria-label="Skin">
-                <button type="button" data-skin-choice="classic" aria-pressed="true" class="active">Classic</button>
+                <button type="button" data-skin-choice="notch" aria-pressed="true" class="active">Notch</button>
                 <button type="button" data-skin-choice="scope" aria-pressed="false">Scope</button>
-                <button type="button" data-skin-choice="notch" aria-pressed="false">Notch</button>
+                <button type="button" data-skin-choice="classic" aria-pressed="false">Classic</button>
             </div>
         </header>
         
@@ -3617,9 +3619,9 @@
                 `Total: ${billMoney(c.total_cost)}`;
             const unloggedDays = Math.floor(g.usage.unobserved_h / 24);
             set('gas-note',
-                'The gas meter is read once a month, so gas is estimated: a base load taken from the summer bills, ' +
+                'The gas meter is read once a month, so gas is estimated: a base load for the water heater and the range, taken from the summer bills, ' +
                 'plus the furnace\'s input rating for every hour the thermostat called for heat.' +
-                (g.model.furnace_assumed ? ' The rating shown is a placeholder until the nameplate value is entered.' : '') +
+                (g.model.furnace_assumed ? ' The rating shown is a placeholder until the furnace\'s own value is entered.' : '') +
                 (unloggedDays >= 1 ? ` ${unloggedDays} day${unloggedDays === 1 ? '' : 's'} of this period ${unloggedDays === 1 ? 'was' : 'were'} not logged and count${unloggedDays === 1 ? 's' : ''} as no heating.` : ''));
         }
 
@@ -3753,8 +3755,9 @@
 
         // Skin picker. "classic" is the page as written (no data-skin attribute); the
         // others are override blocks in the stylesheet. The choice is kept in localStorage
-        // and applied before first paint by the script in <head>.
-        const SKINS = { classic: '#667eea', scope: '#070b09', notch: '#0a0a0a' };  // name: theme-color
+        // and applied before first paint by the script in <head>, which picks Notch when
+        // there is none.
+        const SKINS = { notch: '#0a0a0a', scope: '#070b09', classic: '#667eea' };  // name: theme-color
 
         function currentSkin() {
             const skin = document.documentElement.dataset.skin;
