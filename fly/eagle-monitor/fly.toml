@@ -14,6 +14,9 @@ kill_timeout = "5s"
   # Must be an integer. The Pi watchdog's WATCH_BACKSTOP_SECS has to stay well above
   # this many minutes: see docs/ALERTING.md.
   STALE_THRESHOLD_MINUTES = "30"
+  # Furnace input rating for the gas model (gas.py), BTU/h. No rating plate was found:
+  # this is its four burners at 20,000 each, in the 17.5 in cabinet that takes 60 or 80.
+  FURNACE_INPUT_BTUH = "80000"
 
 # One volume, one machine: never scale this app past 1 (each machine would get
 # its own separate database).

@@ -5,11 +5,14 @@ modelled instead, as
 
     GJ = base load x days  +  furnace input rate x hours the thermostat called for heat
 
-The base load is everything that is not the furnace (the range, pilot lights), taken
-from the four summer bills of 2026 when the furnace did not run: 5.5 GJ over 119 days
-(Jun 3 to Sep 29). The furnace input rate is its nameplate rating (FURNACE_INPUT_BTUH);
-until that is set a typical 60,000 BTU/h is assumed and the API says so. Each bill is a
-check on both numbers: the meter resolves about 0.13 GJ.
+The base load is everything that is not the furnace: the water heater (a 40 US gallon
+tank rated 38,000 BTU/h) and the range. It is taken from the four summer bills of 2026,
+when the furnace did not run: 5.5 GJ over 119 days (Jun 3 to Sep 29). Expect it to run
+somewhat higher in winter, when the water comes in colder; the model does not allow for
+that, so a furnace rate fitted to winter bills will absorb the difference. The furnace
+input rate is its nameplate rating (FURNACE_INPUT_BTUH); until that is set a typical
+60,000 BTU/h is assumed and the API says so. Each bill is a check on both numbers: the
+meter resolves about 0.13 GJ.
 
 The bill is built line by line the way FortisBC's residential bill (rate schedule 1,
 Lower Mainland) is, and reproduces the Jul 31, Aug 31 and Sep 29, 2026 bills exactly;

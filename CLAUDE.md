@@ -124,11 +124,21 @@ January 2026; those scripts no longer work.
 
 - **Gas is modelled, not metered.** FortisBC reads the meter monthly, so `gas.py` estimates
   usage as `GAS_BASE_GJ_PER_DAY` (0.046, from the summer 2026 bills) plus the furnace's input
-  rating for each hour the thermostat called for heat. `FURNACE_INPUT_BTUH` is unset, so a
-  60,000 BTU/h placeholder is used and the page says so: set it in `fly.toml` when the
-  nameplate value is known, then check the model against each winter bill (the meter resolves
-  about 0.13 GJ). The summer base load is high for a range alone and probably includes pilot
-  lights; not confirmed.
+  rating for each hour the thermostat called for heat. `FURNACE_INPUT_BTUH` is 80,000 in
+  `fly.toml` (unset, `gas.py` falls back to a 60,000 placeholder and the page says so). That
+  figure is inferred, not read from a plate: check it against each winter bill, or against two
+  photos of the meter. The meter is a temperature-compensated Sensus R-275 whose index counts
+  hundreds of cubic feet, about 0.13 GJ a count; it read 5954 on the Sep 29, 2026 bill and
+  5962 on Oct 11 at 08:30, and the thermostat log is complete from Oct 10 at 12:26.
+  The furnace is an American Standard Freedom 80 Comfort-R (80 AFUE, single
+  stage) with no rating plate found, installed downflow (return air enters at the top,
+  burners and draft inducer in the lower compartment); it has four burners.
+  The cooling coil beneath it is a Trane 4TXCB004DS3HCAA
+  (17.5 in "B" cabinet, 2 to 3.5 ton, made 4/2018), which points to a B-cabinet furnace:
+  60,000 (three burners) or 80,000 BTU/h input. The summer base load (1.4 GJ/month) is the gas water heater
+  (Rheem Pro+G40S-38N, 40 US gal, 38,000 BTU/h input, made 12/2014) plus the range; the
+  fireplace pilot was off all summer 2026. The base load is modelled as constant, though a
+  water heater burns more in winter (colder inlet water).
 
 - **FortisBC values change with the bills.** The per-GJ rates in `gas.py` moved on Jul 1, 2026
   (storage and transport) and are checked by `test_heating.TestGasBill` against real bills:
