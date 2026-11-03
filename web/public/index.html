@@ -3269,7 +3269,15 @@
                     el.innerHTML = '<div class="chart-message">No billing data yet</div>';
                     return;
                 }
+                // The axis names the period's first and last days. A new period needs a new
+                // label, and uPlot sets labels only when it builds the chart.
+                const previous = period;
                 period = bp;
+                const xLabel = `Day of billing cycle · ${dayLabel(1)} to ${dayLabel(bp.cycle_days)}`;
+                if (chart && previous && (previous.start !== bp.start || previous.cycle_days !== bp.cycle_days)) {
+                    chart.destroy();
+                    chart = null;
+                }
                 // Every point so far, then each remaining day out to the end of the cycle
                 const days = t.points.map(p => p[0]);
                 for (let d = Math.floor(days[days.length - 1]) + 1; d <= bp.cycle_days; d++) days.push(d);
@@ -3338,7 +3346,7 @@
                     ],
                     bands: [{ series: [3, 4], fill: skinVar('--chart-band') }],
                     axes: [
-                        Object.assign({}, axis, { label: 'Day of billing cycle', labelSize: 24 }),
+                        Object.assign({}, axis, { label: xLabel, labelSize: 24 }),
                         Object.assign({}, axis, { size: 70, values: (u, vals) => vals.map(v => '$' + v) })
                     ],
                     plugins: plugins
