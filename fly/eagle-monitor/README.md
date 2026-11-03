@@ -55,7 +55,8 @@ second machine would have its own separate database.
   Auth, the same credentials as `/eagle`)
 - `GET /api/heating` - Thermostat state, 31 days of heating and cooling run time with the
   outdoor and room temperature, and the modelled FortisBC gas bill with its forecast
-  (30 s cache). `FURNACE_INPUT_BTUH` sets the furnace's input rating for the gas model
+  (30 s cache). `FURNACE_INPUT_BTUH` is the gas the furnace burns per hour of call for
+  heat; the forecast is `gas.forecast`, a degree-day model on 2011 to 2025 normals
 - `GET /api/stream` - Server-Sent Events, one event per stored power reading
 - `GET /health` - `{status, db_ok, uptime_seconds}`; 503 if the database is unavailable
 - `GET /health/data` - Telemetry freshness by the age of the newest power reading: 200

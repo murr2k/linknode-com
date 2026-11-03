@@ -1015,7 +1015,17 @@ def _linear_fit(points):
     return slope, mean_y - slope * mean_x
 
 
-def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days, previous_total=None, cost=None):
+def _bill_points(day_units, elapsed_days, units_now, cost):
+    """(day, bill) points: $0 at day 0, the bill at the end of each completed day
+    (`day_units` is the cumulative use at each of those midnights) and the bill now."""
+    points = [(0.0, 0.0)]
+    points += [(float(day), cost(units, day)) for day, units in enumerate(day_units, start=1)]
+    if units_now is not None and elapsed_days > len(day_units):
+        points.append((round(elapsed_days, 3), cost(units_now, elapsed_days)))
+    return points
+
+
+def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days, previous_total=None):
     """Bill so far against the day of the cycle, with a straight-line forecast.
 
     The points are $0 at day 0, the bill at the end of each completed day (`day_kwh` is
@@ -1032,15 +1042,9 @@ def billing_trend(day_kwh, elapsed_days, energy_kwh, cycle_days, previous_total=
     is left out. In its place the first estimate is the bill the previous period ended
     on (`previous_total`), as a line from $0 to that amount on the last day: it is the
     trendline until two full days are in. Without it there is no trendline until then.
-
-    `cost(units, days)` prices a point. The default is the electricity bill; the gas
-    forecast passes its own, with GJ in place of kWh.
     """
-    cost = cost or (lambda kwh, days: calculate_tiered_cost(kwh, days)['total_cost'])
-    points = [(0.0, 0.0)]
-    points += [(float(day), cost(kwh, day)) for day, kwh in enumerate(day_kwh, start=1)]
-    if energy_kwh is not None and elapsed_days > len(day_kwh):
-        points.append((round(elapsed_days, 3), cost(energy_kwh, elapsed_days)))
+    points = _bill_points(day_kwh, elapsed_days, energy_kwh,
+                          lambda kwh, days: calculate_tiered_cost(kwh, days)['total_cost'])
 
     lines = []  # (day, slope, intercept)
     if previous_total and cycle_days:
@@ -1366,31 +1370,30 @@ def _outdoor_by_day(start_ms, end_ms):
             for day, values in by_day.items()}
 
 
-def _previous_gas_bill(gas_start):
-    """The modelled bill for the period before `gas_start`, or None when the thermostat
-    was not being logged from that period's first day. It seeds the trend of a new
-    period, as _previous_period_bill does for electricity."""
-    start_ms = store.to_ms(gas_start)
-    now = time.monotonic()
-    with _heating_cache_lock:
-        cached = _heating_cache.get('previous')
-        if cached and cached[0] == start_ms and now - cached[1] < BILLING_DAYS_CACHE_SECONDS:
-            return cached[2]
+def gas_trend(day_gj, elapsed_days, gj_now, cycle_days, gj, sd, floor_gj):
+    """The gas bill so far against the day of the period, with the forecast.
 
-    previous_start = gas.period(gas_start - timedelta(days=1))[0]
-    previous_ms = store.to_ms(previous_start)
-    total = None
-    if db.thermostat_events(previous_ms, previous_ms + 24 * HOUR_MS):
-        rows = db.thermostat_events(previous_ms, start_ms)
-        per_day = thermostat.daily(rows, start_ms, BILLING_TZ)
-        hours = sum(totals['heating_s'] for day, totals in per_day.items()
-                    if previous_start.date() <= day < gas_start.date()) / 3600.0
-        days = (gas_start.date() - previous_start.date()).days
-        total = gas.bill(gas.usage(days, hours), days)['total_cost']
+    The points are those of billing_trend. The forecast is not fitted to them: `gj` is
+    the period's expected total from gas.forecast(), so it stands from the first hour.
+    The trendline runs through the newest point to that total on the last day (its slope
+    is the spend rate expected from here on) and is drawn across the whole period. The
+    band fans out from the newest point to the 80% range of the total, `gj` give or take
+    gas.INTERVAL_Z x `sd` but never below `floor_gj` (the use so far plus the base load
+    still to come); `projected_min` and `projected_max` are its ends."""
+    def cost(units, days):
+        return gas.bill(units, days)['total_cost']
 
-    with _heating_cache_lock:
-        _heating_cache['previous'] = (start_ms, now, total)
-    return total
+    points = _bill_points(day_gj, elapsed_days, gj_now, cost)
+    day, so_far = points[-1]
+    total = cost(gj, cycle_days)
+    low = cost(max(floor_gj, gj - gas.INTERVAL_Z * sd), cycle_days)
+    high = cost(gj + gas.INTERVAL_Z * sd, cycle_days)
+    slope = (total - so_far) / (cycle_days - day) if cycle_days > day else 0.0
+    return {'points': [list(p) for p in points],
+            'slope_per_day': round(slope, 4), 'intercept': round(so_far - slope * day, 4),
+            'projected_total': total, 'projected_gj': round(gj, 2),
+            'projected_min': low, 'projected_max': high,
+            'band': {'from_day': day, 'low': low, 'high': high}}
 
 
 def build_heating():
@@ -1462,6 +1465,12 @@ def build_heating():
     gj_now = gas.usage(elapsed_days, sum(heating_h))
     furnace_rate, furnace_assumed = gas.furnace_gj_per_hour()
     period_days = days[-days_in_period:]
+    # The forecast's hours per degree-day, from the whole days logged in the window
+    heating_fit = gas.fit_heating([
+        (gas.degree_days(day['outdoor_c']), day['heating_h']) for day in days[:-1]
+        if day['heating_h'] is not None and day['unobserved_h'] <= 0.1 and day['outdoor_c'] is not None])
+    gj_forecast, gj_sd = gas.forecast(gj_now, local_now, gas_next, heating_fit)
+    floor_gj = gj_now + gas.BASE_GJ_PER_DAY * (gas_next - local_now) / timedelta(days=1)
 
     return {
         'updated': now.isoformat(),
@@ -1498,11 +1507,12 @@ def build_heating():
                 'furnace_btu_per_hour': round(furnace_rate * gas.BTU_PER_GJ),
                 'furnace_gj_per_hour': round(furnace_rate, 5),
                 'furnace_assumed': furnace_assumed,
+                'balance_point_c': gas.BALANCE_POINT_C,
+                'heating_hours_per_degree_day': round(heating_fit[0], 3),
+                'fit_days': heating_fit[3],
             },
             'cost': gas.bill(gj_now, days_in_period),
-            'trend': billing_trend(day_gj, elapsed_days, gj_now, cycle_days,
-                                   _previous_gas_bill(gas_start),
-                                   cost=lambda gj, d: gas.bill(gj, d)['total_cost']),
+            'trend': gas_trend(day_gj, elapsed_days, gj_now, cycle_days, gj_forecast, gj_sd, floor_gj),
         },
     }
 

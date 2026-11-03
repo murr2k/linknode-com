@@ -2218,7 +2218,7 @@
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-days-left">--</div><div class="dashboard-stat-label">Days Left</div></div>
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-used">--</div><div class="dashboard-stat-label">Gas So Far (est.)</div></div>
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-heating">--</div><div class="dashboard-stat-label">Furnace Run Time</div></div>
-                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-furnace">--</div><div class="dashboard-stat-label" id="gas-furnace-label">Furnace Input</div></div>
+                    <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-furnace">--</div><div class="dashboard-stat-label" id="gas-furnace-label">Furnace Rate</div></div>
                     <div class="dashboard-stat"><div class="dashboard-stat-value" id="gas-base">--</div><div class="dashboard-stat-label">Base Load</div></div>
                 </div>
                 <div class="chart-note" id="gas-note"></div>
@@ -3159,12 +3159,15 @@
             }, data, el);
         }
 
-        // Bill forecast: the bill so far at each day of the billing cycle, and the
-        // least-squares line through it carried on to the last day. The slope is the
-        // spend rate; where the line ends is the bill if that rate holds. The shaded band
-        // is where that line has pointed over the period: on each day, the lowest and
-        // highest value any of the period's estimates gives (trend.estimates).
-        // Drawn twice: electricity (from /api/stats) and gas (from /api/heating).
+        // Bill forecast: the bill so far at each day of the billing cycle, and a trendline
+        // carried on to the last day. The slope is the spend rate; where the line ends is
+        // the projected bill. Drawn twice: electricity (from /api/stats) and gas (from
+        // /api/heating). Electricity's line is the least-squares fit to the bill so far,
+        // and its shaded band is where that line has pointed over the period: on each day,
+        // the lowest and highest value any of the period's estimates gives
+        // (trend.estimates). Gas's line runs from the bill now to a forecast that stands
+        // from day 0 (so on day 0 it spans the period), and its band (trend.band) fans out
+        // from the bill now to the range the bill should land in.
         const billMoney = v => '$' + v.toFixed(2);
         const BILL_RANGE_SHOWN = 0.5;  // a band narrower than this many dollars gets no figures
 
@@ -3275,12 +3278,20 @@
                 const lineAt = (slope, intercept, d) => Math.max(0, slope * d + intercept);
                 const edge = pick => days.map(d => estimates.length
                     ? pick(...estimates.map(e => lineAt(e[1], e[2], d))) : null);
+                // A forecast band: straight from the newest point to each end of the range
+                const band = hasTrend && t.band ? t.band : null;
+                const fan = end => {
+                    const from = band.from_day, start = t.points[t.points.length - 1][1];
+                    const span = bp.cycle_days - from;
+                    return days.map(d => d < from ? null : span > 0 ? start + (end - start) * (d - from) / span : end);
+                };
                 const data = [
                     days,
                     days.map((d, i) => i < t.points.length ? t.points[i][1] : null),
-                    days.map(d => hasTrend ? lineAt(t.slope_per_day, t.intercept, d) : null),
-                    edge(Math.max),  // band: the highest any estimate gives on that day
-                    edge(Math.min)   // and the lowest
+                    // A forecast's line starts at the newest point; a fitted one spans the period
+                    days.map(d => hasTrend && !(band && d < band.from_day) ? lineAt(t.slope_per_day, t.intercept, d) : null),
+                    band ? fan(band.high) : edge(Math.max),  // band: the highest any estimate gives on that day
+                    band ? fan(band.low) : edge(Math.min)    // and the lowest
                 ];
                 if (chart) {
                     chart.setData(data);
@@ -3604,7 +3615,7 @@
             set('gas-used', g.usage.gj.toFixed(2) + ' GJ');
             set('gas-heating', hoursMinutes(g.usage.heating_h));
             set('gas-furnace', g.model.furnace_btu_per_hour.toLocaleString('en-US') + ' BTU/h');
-            set('gas-furnace-label', g.model.furnace_assumed ? 'Furnace Input (assumed)' : 'Furnace Input');
+            set('gas-furnace-label', g.model.furnace_assumed ? 'Furnace Rate (assumed)' : 'Furnace Rate');
             set('gas-base', g.model.base_gj_per_day + ' GJ/day');
             const c = g.cost;
             document.getElementById('gas-now').title =
@@ -3620,9 +3631,13 @@
             const unloggedDays = Math.floor(g.usage.unobserved_h / 24);
             set('gas-note',
                 'The gas meter is read once a month, so gas is estimated: a base load for the water heater and the range, taken from the summer bills, ' +
-                'plus the furnace\'s input rating for every hour the thermostat called for heat.' +
-                (g.model.furnace_assumed ? ' The rating shown is a placeholder until the furnace\'s own value is entered.' : '') +
-                (unloggedDays >= 1 ? ` ${unloggedDays} day${unloggedDays === 1 ? '' : 's'} of this period ${unloggedDays === 1 ? 'was' : 'were'} not logged and count${unloggedDays === 1 ? 's' : ''} as no heating.` : ''));
+                'plus the gas the furnace burns for every hour the thermostat called for heat, as the meter measured it.' +
+                (g.model.furnace_assumed ? ' The furnace rate shown is a placeholder until a measured one is entered.' : '') +
+                (unloggedDays >= 1 ? ` ${unloggedDays} day${unloggedDays === 1 ? '' : 's'} of this period ${unloggedDays === 1 ? 'was' : 'were'} not logged and count${unloggedDays === 1 ? 's' : ''} as no heating.` : '') +
+                ` The forecast adds the rest of the period in a normal year's weather (2011 to 2025): the furnace runs ` +
+                `${g.model.heating_hours_per_degree_day.toFixed(2)} hours a day for each degree the day's mean falls below ${g.model.balance_point_c} °C` +
+                (g.model.fit_days ? `, as the last ${g.model.fit_days} days logged show` : '') +
+                '. The shaded fan is where the bill should land 8 times in 10.');
         }
 
         async function fetchHeating() {

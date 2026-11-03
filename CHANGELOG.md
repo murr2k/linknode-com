@@ -42,8 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `gas.py`: the FortisBC bill, line by line, checked against the June to September 2026
     bills. The house has no gas telemetry, so gas is modelled as a base load (0.046 GJ/day,
     from the summer bills) plus the furnace's input rating for each hour of heating. The
-    rating is `FURNACE_INPUT_BTUH`, set to 80,000 BTU/h in `fly.toml` (the furnace's four
-    burners; no rating plate was found). Unset, a 60,000 BTU/h placeholder is used
+    rating is `FURNACE_INPUT_BTUH` in `fly.toml`. Unset, a 60,000 BTU/h placeholder is used
   - `GET /api/heating`: the thermostat's state, 31 days of run time and temperatures, and
     the gas bill so far with the same trend, estimates and range as the electricity forecast
   - The page gains a **Heating** card (daily run time over the outdoor and room temperature)
@@ -80,6 +79,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arriving, and another when it calls again
 
 ### Changed
+- **The gas forecast stands from day 0.** It is no longer a straight line fitted to the bill
+  so far: the period's total is the use so far plus the rest of the period in a normal
+  year's weather (`gas.forecast`), so the trendline spans the chart from the first hour. The
+  furnace's run time follows degree-days below 12.5 C, at 0.79 hours each until the log's
+  last 31 days hold 7 cold days to refit it from; the normals are the 2011 to 2025
+  temperatures (`scripts/gas_normals.py`). The shaded band is now the 80% range of the bill,
+  fanning out from today, and the line starts at today. `/api/heating` gains
+  `trend.projected_gj` and `trend.band`, and `model.balance_point_c`,
+  `model.heating_hours_per_degree_day` and `model.fit_days`; `trend.estimates` is gone from
+  the gas payload, and so is the seed from the previous period's bill
+- **The furnace burns 42,000 BTU/h per hour of call for heat, measured** (was 80,000, inferred
+  from its four burners): the meter's gain between a photo on Oct 11 and the Oct 30 read,
+  less the base load, over the hours of call logged in between. The tile is now Furnace Rate
+- **The Oct 30, 2026 gas bill** is in: its read date joins `GAS_READ_DATES` (the period now
+  runs Oct 31 to Nov 30) and the bill model reproduces it, which needed the cost of gas line
+  to leave out the renewable share (`GAS_RNG_SHARE`, 3%)
 - **Notch is the site's default skin**, and the picker reads Notch / Scope / Classic. A
   visitor who chose a skin keeps it, Classic included; `?skin=classic` selects Classic by URL
 - **Alerting retuned for what it is for** (not mission critical: say that the system has

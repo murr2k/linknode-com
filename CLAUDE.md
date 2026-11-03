@@ -123,26 +123,39 @@ January 2026; those scripts no longer work.
   length and the Bill Forecast's end date fall back to the nominal 26th.
 
 - **Gas is modelled, not metered.** FortisBC reads the meter monthly, so `gas.py` estimates
-  usage as `GAS_BASE_GJ_PER_DAY` (0.046, from the summer 2026 bills) plus the furnace's input
-  rating for each hour the thermostat called for heat. `FURNACE_INPUT_BTUH` is 80,000 in
-  `fly.toml` (unset, `gas.py` falls back to a 60,000 placeholder and the page says so). That
-  figure is inferred, not read from a plate: check it against each winter bill, or against two
-  photos of the meter. The meter is a temperature-compensated Sensus R-275 whose index counts
-  hundreds of cubic feet, about 0.13 GJ a count; it read 5954 on the Sep 29, 2026 bill and
-  5962 on Oct 11 at 08:30, and the thermostat log is complete from Oct 10 at 12:26.
-  The furnace is an American Standard Freedom 80 Comfort-R (80 AFUE, single
-  stage) with no rating plate found, installed downflow (return air enters at the top,
-  burners and draft inducer in the lower compartment); it has four burners.
-  The cooling coil beneath it is a Trane 4TXCB004DS3HCAA
-  (17.5 in "B" cabinet, 2 to 3.5 ton, made 4/2018), which points to a B-cabinet furnace:
-  60,000 (three burners) or 80,000 BTU/h input. The summer base load (1.4 GJ/month) is the gas water heater
+  usage as `GAS_BASE_GJ_PER_DAY` (0.046, from the summer 2026 bills) plus the gas the furnace
+  burns per hour the thermostat called for heat. `FURNACE_INPUT_BTUH` is 42,000 in `fly.toml`
+  (unset, `gas.py` falls back to a 60,000 placeholder and the page says so), measured: the
+  meter gained 24 counts (3.18 GJ) from 5962 on Oct 11, 2026 at 08:30 to 5986 on the Oct 30
+  read, against 51.6 hours of call logged between them (39,000 to 45,000 for a count either
+  way). The four burners suggest 80,000 at full fire; why it burns about half that per hour of
+  call is not settled (low fire if it is in fact two-stage, ignition time in each of its many
+  short cycles, or the T5 reporting a call while the burner is off). Recheck it against each
+  bill, or against two photos of the meter. The meter is a temperature-compensated Sensus R-275
+  whose index counts hundreds of cubic feet, about 0.13 GJ a count.
+  The furnace is an American Standard Freedom 80 Comfort-R (80 AFUE) with no rating plate
+  found, installed downflow (return air enters at the top, burners and draft inducer in the
+  lower compartment); it has four burners. The cooling coil beneath it is a Trane
+  4TXCB004DS3HCAA (17.5 in "B" cabinet, 2 to 3.5 ton, made 4/2018), which points to a
+  B-cabinet furnace: 60,000 (three burners) or 80,000 BTU/h input. The summer base load (1.4 GJ/month) is the gas water heater
   (Rheem Pro+G40S-38N, 40 US gal, 38,000 BTU/h input, made 12/2014) plus the range; the
   fireplace pilot was off all summer 2026. The base load is modelled as constant, though a
   water heater burns more in winter (colder inlet water).
 
+- **The gas forecast is a degree-day model** (`gas.forecast`): the use so far plus, for the
+  rest of the period, the base load and 0.79 hours of heating per degree-day below 12.5 C in
+  a normal year's weather (`gas.NORMALS`, 2011 to 2025, from `scripts/gas_normals.py`). The
+  slope is refitted from the last 31 days of the log once they hold 7 cold days; 0.794 and
+  the 12.5 C balance point were fitted on 2026-11-02 to Oct 11 to Nov 1, the balance point
+  chosen so the 2026 bills fit too (April to October, each within 0.25 GJ). The page's band
+  is an 80% range (weather year to year, daily scatter, uncertainty of both rates). If the
+  balance point changes, regenerate the normals. Backtested: the Oct 2026 bill (4.24 GJ,
+  $69.74) sat inside the range forecast on Oct 20 ($58 to $71).
+
 - **FortisBC values change with the bills.** The per-GJ rates in `gas.py` moved on Jul 1, 2026
-  (storage and transport) and are checked by `test_heating.TestGasBill` against real bills:
-  update both together. Each bill also carries its meter read date: add it to the
+  (storage and transport) and are checked by `test_heating.TestGasBill` against real bills
+  (July to October 2026): update both together. The cost of gas line leaves out the
+  renewable share (`GAS_RNG_SHARE`, 3%, rounded to 0.1 GJ as the bill does). Each bill also carries its meter read date: add it to the
   `GAS_READ_DATES` default (comma separated), or the period falls back to starting on the 1st.
 
 - **The Pi is shared with the `1344-network` project**, which owns the `t5-runtime` logger and

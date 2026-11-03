@@ -52,6 +52,11 @@ class TestGasBill(unittest.TestCase):
         # Sep 1 - Sep 29, 2026: 1.4 GJ over 29 days, total $31.66
         self.assertEqual(self.lines(gas.bill(1.4, 29)), [12.23, 11.86, 3.46, 2.32, 0.17, 0.12, 1.50, 31.66])
 
+    def test_matches_october_2026_invoice(self):
+        # Sep 30 - Oct 30, 2026: 4.2 GJ over 31 days, total $69.74. The cost of gas is on
+        # 4.1 GJ: 0.1 GJ of it was renewable gas.
+        self.assertEqual(self.lines(gas.bill(4.2, 31)), [13.07, 35.57, 10.38, 6.81, 0.34, 0.26, 3.31, 69.74])
+
     def test_matches_june_2026_invoice_at_the_rate_of_the_time(self):
         # Jun 3 - Jun 30, 2026: 1.4 GJ over 28 days, total $30.90. Storage and transport
         # was $2.255 until Jul 1, and the GST lands on a half cent ($1.4655).
@@ -97,6 +102,54 @@ class TestGasPeriod(unittest.TestCase):
 
     def test_a_read_date_far_from_the_first_is_ignored(self):
         self.assertEqual(self.period('2026-10-10T12:00', '2026-10-15'), ('2026-10-01', '2026-11-01'))
+
+
+class TestGasForecast(unittest.TestCase):
+    def at(self, text):
+        return datetime.fromisoformat(text).replace(tzinfo=TZ)
+
+    def test_normals_are_the_monthly_means_at_the_15th_with_lines_between(self):
+        self.assertEqual(gas.normal_degree_days(date(2026, 11, 15)), gas.NORMALS[11][0])
+        self.assertEqual(gas.normal_degree_days(date(2027, 1, 15)), gas.NORMALS[1][0])
+        nov, dec = gas.NORMALS[11][0], gas.NORMALS[12][0]
+        self.assertAlmostEqual(gas.normal_degree_days(date(2026, 11, 30)), nov + (dec - nov) * 15 / 30)
+        # Across the turn of the year
+        self.assertAlmostEqual(gas.normal_degree_days(date(2027, 1, 1)),
+                               dec + (gas.NORMALS[1][0] - dec) * 17 / 31)
+
+    def test_a_window_counts_part_days_in_part(self):
+        noon_to_midnight = gas.normal_window(self.at('2026-11-20T12:00'), self.at('2026-11-21T00:00'))
+        self.assertAlmostEqual(noon_to_midnight[0], gas.normal_degree_days(date(2026, 11, 20)) / 2)
+        # Nov 1, 2026 has 25 hours: it still counts as one day
+        self.assertAlmostEqual(gas.normal_window(self.at('2026-11-01T00:00'), self.at('2026-11-02T00:00'))[0],
+                               gas.normal_degree_days(date(2026, 11, 1)))
+        # A whole month carries that month's spread; nothing left, nothing to add
+        self.assertAlmostEqual(gas.normal_window(self.at('2026-11-01T00:00'), self.at('2026-12-01T00:00'))[1],
+                               gas.NORMALS[11][1])
+        self.assertEqual(gas.normal_window(self.at('2026-11-20T12:00'), self.at('2026-11-20T12:00')), (0.0, 0.0))
+
+    def test_the_heating_fit_needs_enough_cold_days(self):
+        fallback = (gas.HEATING_HOURS_PER_DEGREE_DAY, gas.HEATING_HOURS_SE, gas.HEATING_HOURS_SD, 0)
+        self.assertEqual(gas.fit_heating([]), fallback)
+        self.assertEqual(gas.fit_heating([(5.0, 4.0)] * 6 + [(0.0, 0.0)] * 20), fallback)   # 6 cold days
+        self.assertEqual(gas.fit_heating([(2.0, 1.0)] * 9), fallback)                       # 18 degree-days
+        slope, se, scatter, n = gas.fit_heating([(x, 0.5 * x) for x in range(1, 11)] + [(0.0, 0.0)])
+        self.assertEqual((round(slope, 9), round(se, 9), round(scatter, 9), n), (0.5, 0.0, 0.0, 11))
+
+    def test_the_forecast_adds_a_normal_rest_of_the_period(self):
+        heating = (0.8, 0.0, 0.0, 10)
+        now, end = self.at('2026-11-20T12:00'), self.at('2026-12-01T00:00')
+        with patch.object(gas, 'FURNACE_INPUT_BTUH', 42_000.0), patch.object(gas, 'FURNACE_RATE_SD', 0.0):
+            rate = 42_000 / gas.BTU_PER_GJ
+            expected, spread = gas.normal_window(now, end)
+            gj, sd = gas.forecast(3.0, now, end, heating)
+            self.assertAlmostEqual(gj, 3.0 + gas.BASE_GJ_PER_DAY * 10.5 + rate * 0.8 * expected)
+            self.assertAlmostEqual(sd, rate * 0.8 * spread)          # only the weather is uncertain here
+            # At the end of the period there is nothing left to forecast
+            self.assertEqual(gas.forecast(3.0, end, end, heating), (3.0, 0.0))
+        # Every source of doubt widens it
+        base = gas.forecast(3.0, now, end, heating)[1]
+        self.assertGreater(gas.forecast(3.0, now, end, (0.8, 0.1, 1.0, 10))[1], base)
 
 
 class TestThermostat(unittest.TestCase):
@@ -326,8 +379,12 @@ class TestRoutes(unittest.TestCase):
         self.assertEqual((g['period']['start'][:10], g['period']['next_start'][:10]), ('2026-09-30', '2026-11-01'))
         self.assertEqual((g['period']['days'], g['period']['cycle_days']), (13, 32))
         rate = 60_000 / 947_817
+        # One whole day logged is too few to fit, so the hours per degree-day are the fallback
         self.assertEqual(g['model'], {'base_gj_per_day': gas.BASE_GJ_PER_DAY, 'furnace_btu_per_hour': 60000,
-                                      'furnace_gj_per_hour': round(rate, 5), 'furnace_assumed': True})
+                                      'furnace_gj_per_hour': round(rate, 5), 'furnace_assumed': True,
+                                      'balance_point_c': gas.BALANCE_POINT_C,
+                                      'heating_hours_per_degree_day': gas.HEATING_HOURS_PER_DEGREE_DAY,
+                                      'fit_days': 0})
         self.assertEqual(g['usage']['heating_h'], 1.5)
         self.assertEqual(g['usage']['furnace_gj'], round(1.5 * rate, 3))
         self.assertEqual(g['usage']['gj'], round(12.5 * gas.BASE_GJ_PER_DAY + 1.5 * rate, 3))
@@ -338,9 +395,24 @@ class TestRoutes(unittest.TestCase):
         self.assertEqual((len(points), points[0], points[-1][0]), (14, [0.0, 0.0], 12.5))
         self.assertEqual(points[11], [11.0, gas.bill(gas.usage(11, 0), 11)['total_cost']])
         self.assertEqual(points[12], [12.0, gas.bill(gas.usage(12, 1.5), 12)['total_cost']])
-        self.assertGreater(g['trend']['projected_total'], points[-1][1])
-        # Logging began inside the previous period, so nothing seeds the trend
-        self.assertEqual(g['trend']['estimates'][0][0], 2.0)
+        # The forecast: the use so far plus a normal rest of the period, priced for 32 days
+        t = g['trend']
+        gj_now = 12.5 * gas.BASE_GJ_PER_DAY + 1.5 * rate
+        gj, sd = gas.forecast(gj_now, self.NOW, datetime(2026, 11, 1, tzinfo=TZ),
+                              gas.fit_heating([]))
+        self.assertEqual((t['projected_gj'], t['projected_total']), (round(gj, 2), gas.bill(gj, 32)['total_cost']))
+        self.assertEqual((t['projected_min'], t['projected_max']),
+                         (gas.bill(gj - gas.INTERVAL_Z * sd, 32)['total_cost'],
+                          gas.bill(gj + gas.INTERVAL_Z * sd, 32)['total_cost']))
+        self.assertEqual(t['band'], {'from_day': 12.5, 'low': t['projected_min'], 'high': t['projected_max']})
+        # The line runs through the bill now to the forecast on the last day
+        self.assertAlmostEqual(t['intercept'] + t['slope_per_day'] * 12.5, points[-1][1], places=2)
+        self.assertAlmostEqual(t['intercept'] + t['slope_per_day'] * 32, t['projected_total'], places=2)
+
+    def test_the_gas_range_never_falls_below_the_base_load_still_to_come(self):
+        trend = monitor_app.gas_trend([], 1.0, 0.05, 31, gj=1.5, sd=2.0, floor_gj=1.43)
+        self.assertEqual(trend['projected_min'], gas.bill(1.43, 31)['total_cost'])
+        self.assertEqual(trend['points'], [[0.0, 0.0], [1.0, gas.bill(0.05, 1.0)['total_cost']]])
 
     def test_heating_payload_with_nothing_stored(self):
         with pinned_clock(self.NOW):
@@ -352,17 +424,21 @@ class TestRoutes(unittest.TestCase):
         monitor_app.db = None
         self.assertEqual(self.client.get('/api/heating').status_code, 503)
 
-    def test_previous_gas_bill_seeds_a_period_the_log_covers(self):
-        with patch.object(gas, 'READ_DATES', '2026-09-29'), patch.object(gas, 'FURNACE_INPUT_BTUH', None):
-            start = datetime(2026, 12, 1, tzinfo=TZ)
-            self.assertIsNone(monitor_app._previous_gas_bill(start))
-            monitor_app._heating_cache.clear()
-            # Logged from Nov 1, the first day of the period before: 2 hours of heat in it
-            monitor_app.db.add_thermostat_events([
-                row('2026-11-01 08:00', 'start'), row('2026-11-10 06:00', active=1),
-                row('2026-11-10 08:00'), row('2026-12-02 06:00', active=1)])
-            self.assertEqual(monitor_app._previous_gas_bill(start),
-                             gas.bill(gas.usage(30, 2.0), 30)['total_cost'])
+    def test_the_forecast_learns_hours_per_degree_day_from_the_log(self):
+        # Ten whole days at 4.5 C (8 degree-days), heating 6 of every 24 hours
+        now = datetime(2026, 11, 12, 12, 0, tzinfo=TZ)
+        events = [row('2026-10-31 23:00', 'start')]
+        for day in range(1, 12):
+            for hour in (0, 12):
+                events += [row(f'2026-11-{day:02d} {hour:02d}:00', active=1),
+                           row(f'2026-11-{day:02d} {hour + 3:02d}:00')]
+        monitor_app.db.add_thermostat_events(events)
+        monitor_app.db.set_meta('thermostat_seen_ms', str(ms('2026-11-12 11:59')))
+        monitor_app.db.write_many('outdoor_temp_c', [
+            (ms('2026-11-01 00:00') + h * HOUR, gas.BALANCE_POINT_C - 8.0) for h in range(12 * 24)])
+        with pinned_clock(now), patch.object(gas, 'READ_DATES', '2026-10-30'):
+            g = self.client.get('/api/heating').get_json()['gas']
+        self.assertEqual((g['model']['fit_days'], g['model']['heating_hours_per_degree_day']), (11, 0.75))
 
     def test_refresh_weather_stores_the_hours_and_asks_for_less_next_time(self):
         now = datetime.now(timezone.utc)
